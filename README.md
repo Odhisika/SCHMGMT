@@ -2,9 +2,9 @@
 
 ### The world’s most high-end designed, lightweight, and feature-rich learning management system.
 
-# SkyLearn: Open source learning management system
+# LuckyTech Innovation Groups School Management System
 
-Learning management system using Django web framework. You might want to develop a learning management system (also known as a school/college management system) for a school/college organization, or simply for the purpose of learning the tech stack and enhancing your portfolio. In either case, this project would be a great way to get started. The aim is to create the world's most lightweight yet feature-rich learning management system. However, this is not possible without your support, so please give it a star ⭐️.
+Learning management system using Django web framework. This project is a high-end designed, lightweight, and feature-rich school management system for schools and colleges.
 
 _Documentation is under development_
 
@@ -61,7 +61,7 @@ If you would like to contribute, simply begin by implementing one from the list 
 - Clone the repo with
 
 ```bash
-git clone https://github.com/SkyCascade/SkyLearn.git
+git clone https://github.com/Odhisika/SCHMGMT.git
 ```
 
 - Create and activate a python virtual environment
