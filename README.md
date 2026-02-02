@@ -1,4 +1,4 @@
-![Group 23](https://github.com/user-attachments/assets/4e84251a-27b0-462b-bd5e-fb0bcadc4694)
+
 
 ### The world’s most high-end designed, lightweight, and feature-rich learning management system.
 
@@ -10,7 +10,6 @@ _Documentation is under development_
 
 Let's enhance the project by contributing! 👩‍💻👩‍💻
 
-<img width="1440" alt="screenshot" src="https://github.com/user-attachments/assets/08644f49-6ae0-4695-86cc-afe331c6f61a">
 
 ## Current features
 
@@ -84,14 +83,4 @@ python manage.py createsuperuser
 
 ```bash
 python manage.py runserver
-```
 
-Last but not least, go to this address http://127.0.0.1:8000
-
-#### _Check [this page](https://adilmohak.github.io/dj-lms-starter/) for more insight and support._
-
-# References
-
-- Quiz part: https://github.com/tomwalker/django_quiz
-
-#### Show your support by ⭐️ this project!
