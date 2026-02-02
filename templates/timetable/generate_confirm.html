@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% block title %}{{ title }} | {% trans 'Learning management system' %}{% endblock title %}
+
+{% block content %}
+
+<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'timetable:timetable_dashboard' %}">{% trans 'Timetable' %}</a></li>
+        <li class="breadcrumb-item active" aria-current="page">{{ title }}</li>
+    </ol>
+</nav>
+
+{% include 'snippets/messages.html' %}
+
+<div class="row">
+    <div class="col-md-6 mx-auto">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <i class="fas fa-magic"></i> {{ title }}
+            </div>
+            <div class="p-3">
+                <div class="alert alert-info">
+                    <h5>{% trans 'How it works:' %}</h5>
+                    <ul class="mb-0">
+                        <li>{% trans 'Automatically fills empty slots in the timetable.' %}</li>
+                        <li>{% trans 'Distributes subjects based on allocations.' %}</li>
+                        <li>{% trans 'Avoids teacher conflicts.' %}</li>
+                        <li>{% trans 'Existing entries are preserved.' %}</li>
+                    </ul>
+                </div>
+                
+                <p>{% trans 'Are you sure you want to proceed?' %}</p>
+                
+                <form method="POST">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-magic"></i> {% trans 'Generate Timetable' %}
+                    </button>
+                    <a href="{% url 'timetable:timetable_dashboard' %}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> {% trans 'Cancel' %}
+                    </a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

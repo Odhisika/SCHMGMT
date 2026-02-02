@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% block title %}{% trans 'Report Card' %} | {{ student.student.get_full_name }}{% endblock title %}
+
+{% block content %}
+
+<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+  <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
+      <li class="breadcrumb-item active" aria-current="page">{% trans 'Report Card' %}</li>
+  </ol>
+</nav>
+
+{% include 'snippets/messages.html' %}
+
+<div class="card p-4 shadow-sm">
+    <div class="text-center mb-4">
+        <h2 class="fw-bold">{% trans 'TERMINAL REPORT CARD' %}</h2>
+        <h4 class="text-muted">{{ student.level }} - {{ student.house }} {% trans 'House' %}</h4>
+    </div>
+
+    <div class="row mb-4 bg-light p-3 rounded">
+        <div class="col-md-6">
+            <p><b>{% trans 'Student Name:' %}</b> {{ student.student.get_full_name }}</p>
+            <p><b>{% trans 'Student ID:' %}</b> {{ student.student.username }}</p>
+        </div>
+        <div class="col-md-6">
+            <p><b>{% trans 'Academic Session:' %}</b> {{ results.0.session }}</p>
+            <p><b>{% trans 'Grade Level:' %}</b> {{ student.level }}</p>
+        </div>
+    </div>
+
+    {% for term_name, term_res in terms_results.items %}
+    <div class="mb-5">
+        <h4 class="border-bottom pb-2 text-primary"><i class="fas fa-calendar-alt me-2"></i>{{ term_name|upper }}</h4>
+        
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped align-middle">
+                <thead class="bg-primary text-white text-center">
+                    <tr>
+                        <th style="width: 5%;">#</th>
+                        <th style="width: 30%;">{% trans 'Subject' %}</th>
+                        <th style="width: 10%;">{% trans 'Class (40%)' %}</th>
+                        <th style="width: 10%;">{% trans 'Exam (60%)' %}</th>
+                        <th style="width: 10%;">{% trans 'Total' %}</th>
+                        <th style="width: 10%;">{% trans 'Grade' %}</th>
+                        <th style="width: 10%;">{% trans 'Pos' %}</th>
+                        <th style="width: 15%;">{% trans 'Remarks' %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for course in courses %}
+                    {% if course.course.term == term_name %}
+                    <tr>
+                        <td class="text-center">{{ forloop.counter }}</td>
+                        <td><b>{{ course.course.title }}</b></td>
+                        <td class="text-center">{{ course.class_score }}</td>
+                        <td class="text-center">{{ course.exam_score }}</td>
+                        <td class="text-center fw-bold">{{ course.total }}</td>
+                        <td class="text-center bg-light">{{ course.grade }}</td>
+                        <td class="text-center">{{ course.class_position|default:"-" }}</td>
+                        <td class="small">{{ course.teacher_remark|default:"-" }}</td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+                <tfoot class="bg-light fw-bold">
+                    <tr>
+                        <td colspan="4" class="text-end">{% trans 'Term Average:' %}</td>
+                        <td class="text-center text-primary fs-5">{{ term_res.term_average }}</td>
+                        <td colspan="2" class="text-end">{% trans 'Overall position:' %}</td>
+                        <td class="text-center text-danger">{{ term_res.overall_position|default:"-" }}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <div class="row mt-3">
+            <div class="col-md-6">
+                <div class="p-2 border rounded mb-2">
+                    <h6><b>{% trans 'Teacher Comments' %}</b></h6>
+                    <p class="small text-muted">{{ term_res.class_teacher_comment|default:"No comment yet." }}</p>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="p-2 border rounded">
+                    <h6><b>{% trans 'Head Teacher Remarks' %}</b></h6>
+                    <p class="small text-muted">{{ term_res.head_teacher_comment|default:"Pending review." }}</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="mt-2 p-2 bg-info bg-opacity-10 rounded border border-info">
+            <i class="fas fa-info-circle me-2"></i>
+            {% trans 'Attendance:' %} <b>{{ term_res.days_present }}</b> / {{ term_res.total_attendance_days }} days 
+            ({{ term_res.attendance_percentage }}%)
+        </div>
+    </div>
+    {% empty %}
+    <div class="alert alert-warning">
+        {% trans 'No results found for the current academic year.' %}
+    </div>
+    {% endfor %}
+
+    <div class="mt-5 row text-center">
+        <div class="col-4">
+            <div class="border-top pt-2">{% trans "Class Teacher's Signature" %}</div>
+        </div>
+        <div class="col-4">
+        </div>
+        <div class="col-4">
+            <div class="border-top pt-2">{% trans "Head Teacher's Signature" %}</div>
+        </div>
+    </div>
+</div>
+
+<div class="mt-4 text-center d-print-none">
+    <a href="{% url 'report_card_pdf' pk=student.pk %}" class="btn btn-primary" target="_blank"><i class="fas fa-file-pdf me-2"></i>{% trans 'Download Report Card PDF' %}</a>
+    <button class="btn btn-secondary" onclick="window.print()"><i class="fas fa-print me-2"></i>{% trans 'Print Report Card' %}</button>
+</div>
+
+{% endblock %}

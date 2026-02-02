@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+{% load i18n timetable_tags %}
+{% block title %}{{ title }} | {% trans 'Learning management system' %}{% endblock title %}
+
+{% block content %}
+
+<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'timetable:timetable_dashboard' %}">{% trans 'Timetable' %}</a></li>
+        <li class="breadcrumb-item active" aria-current="page">{{ level_display }}</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="title-1">
+        <i class="fas fa-table"></i> {{ level_display }} {% trans 'Timetable' %}
+    </div>
+    {% if request.user.is_superuser or request.user.is_school_admin %}
+    <div>
+        <a href="{% url 'timetable:timetable_entry_add' %}?level={{ level }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> {% trans 'Add Entry' %}
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+{% if current_term %}
+<div class="alert alert-info">
+    <i class="fas fa-calendar"></i> {% trans 'Term' %}: <strong>{{ current_term }}</strong>
+</div>
+{% endif %}
+
+{% include 'snippets/messages.html' %}
+
+<div class="table-responsive">
+    <table class="table table-bordered table-hover">
+        <thead class="table-primary">
+            <tr>
+                <th style="width: 120px;">{% trans 'Time' %}</th>
+                {% for day in days %}
+                <th class="text-center">{{ DAYS_DISPLAY|get_item:day }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for period in all_periods %}
+            <tr {% if period.period_type == 'BREAK' or period.period_type == 'ASSEMBLY' %}class="table-warning"{% endif %}>
+                <td>
+                    <strong>{{ period.name }}</strong><br>
+                    <small class="text-muted">{{ period.start_time|time:"H:i" }} - {{ period.end_time|time:"H:i" }}</small>
+                </td>
+                {% if period.period_type == 'LESSON' %}
+                    {% for day in days %}
+                    <td class="text-center">
+                        {% with entry=timetable_grid|get_item:day|get_item:period.id %}
+                        {% if entry %}
+                            <div class="timetable-entry">
+                                <strong>{{ entry.subject.title|default:"Free Period" }}</strong><br>
+                                {% if entry.teacher %}
+                                <small class="text-muted">{{ entry.teacher.get_full_name }}</small><br>
+                                {% endif %}
+                                {% if entry.classroom %}
+                                <small class="badge bg-secondary">{{ entry.classroom }}</small>
+                                {% endif %}
+                                {% if request.user.is_superuser or request.user.is_school_admin %}
+                                <div class="mt-1">
+                                    <a href="{% url 'timetable:timetable_entry_edit' pk=entry.pk %}" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <a href="{% url 'timetable:timetable_entry_delete' pk=entry.pk %}" class="btn btn-sm btn-outline-danger">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                </div>
+                                {% endif %}
+                            </div>
+                        {% else %}
+                            <span class="text-muted">-</span>
+                            {% if request.user.is_superuser or request.user.is_school_admin %}
+                            <br><a href="{% url 'timetable:timetable_entry_add' %}?level={{ level }}&day={{ day }}&period={{ period.id }}" class="btn btn-sm btn-outline-success mt-1">
+                                <i class="fas fa-plus"></i>
+                            </a>
+                            {% endif %}
+                        {% endif %}
+                        {% endwith %}
+                    </td>
+                    {% endfor %}
+                {% else %}
+                    <td colspan="5" class="text-center">
+                        <strong>{{ period.get_period_type_display }}</strong>
+                    </td>
+                {% endif %}
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6" class="text-center text-danger">
+                    {% trans 'No periods defined. Please' %} <a href="{% url 'timetable:period_list' %}">{% trans 'add periods' %}</a> {% trans 'first.' %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<style>
+.timetable-entry {
+    padding: 8px;
+    min-height: 80px;
+}
+</style>
+
+{% endblock %}

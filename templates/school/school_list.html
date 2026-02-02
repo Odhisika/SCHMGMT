@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+{% block title %} Schools | SkyLearn {% endblock title %}
+{% load static %}
+
+{% block content %}
+<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">Home</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Schools</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="title-1"><i class="fas fa-university"></i> Schools Management</h1>
+    <div>
+        <a href="{% url 'school_onboarding' %}" class="btn btn-success me-2">
+            <i class="fas fa-rocket"></i> Onboard New School
+        </a>
+        <a href="{% url 'add_school' %}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Add School (Manual)
+        </a>
+    </div>
+</div>
+
+{% include 'snippets/messages.html' %}
+
+<div class="row">
+    {% for school in schools %}
+    <div class="col-md-4 mb-4">
+        <div class="card h-100 shadow-sm {% if request.school.id == school.id %}border-primary{% endif %}">
+            <div class="card-body text-center">
+                {% if school.logo %}
+                    <img src="{{ school.logo.url }}" class="img-fluid mb-3 school-logo" alt="{{ school.name }}">
+                {% else %}
+                    <div class="display-4 text-muted mb-3"><i class="fas fa-school"></i></div>
+                {% endif %}
+                
+                <h5 class="card-title fw-bold">{{ school.name }}</h5>
+                <p class="text-muted small">{{ school.email }}</p>
+                
+                <div class="d-grid gap-2 mt-3">
+                    <a href="{% url 'edit_school' pk=school.pk %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-edit"></i> Edit Details
+                    </a>
+                    
+                    {% if request.school.id != school.id %}
+                    <a href="{% url 'school_switch' school_slug=school.slug %}" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-exchange-alt"></i> Switch to this School
+                    </a>
+                    {% else %}
+                    <button class="btn btn-success btn-sm" disabled>
+                        <i class="fas fa-check"></i> Current Context
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-footer bg-light text-muted small">
+                Created: {{ school.created_at|date:"M d, Y" }}
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12">
+        <div class="alert alert-info text-center">
+            <h4>No schools found</h4>
+            <p>Get started by onboarding your first school!</p>
+            <a href="{% url 'school_onboarding' %}" class="btn btn-success btn-lg">
+                <i class="fas fa-rocket"></i> Onboard First School
+            </a>
+            <div class="mt-3">
+                <small class="text-muted">or <a href="{% url 'add_school' %}">add manually</a></small>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% endblock content %}

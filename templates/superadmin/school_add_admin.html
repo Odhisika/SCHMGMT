@@ -1,0 +1,121 @@
+{% extends 'superadmin/base_superadmin.html' %}
+{% load i18n %}
+{% block title %}{{ title }} | Super Admin{% endblock title %}
+
+{% block content %}
+<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'superadmin:dashboard' %}">{% trans 'Super Admin' %}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'superadmin:school_detail' school.pk %}">{{ school.name }}</a></li>
+        <li class="breadcrumb-item active" aria-current="page">{% trans 'Add Admin' %}</li>
+    </ol>
+</nav>
+
+<div class="title-1"><i class="fas fa-user-shield"></i> {% trans 'Add Administrator to' %} {{ school.name }}</div>
+<br>
+
+{% include 'snippets/messages.html' %}
+
+<div class="card">
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="{{ admin_form.username.id_for_label }}" class="form-label">
+                            {{ admin_form.username.label }} <span class="text-danger">*</span>
+                        </label>
+                        {{ admin_form.username }}
+                        {% if admin_form.username.errors %}
+                        <div class="text-danger">{{ admin_form.username.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="{{ admin_form.email.id_for_label }}" class="form-label">
+                            {{ admin_form.email.label }} <span class="text-danger">*</span>
+                        </label>
+                        {{ admin_form.email }}
+                        {% if admin_form.email.errors %}
+                        <div class="text-danger">{{ admin_form.email.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="{{ admin_form.first_name.id_for_label }}" class="form-label">
+                            {{ admin_form.first_name.label }} <span class="text-danger">*</span>
+                        </label>
+                        {{ admin_form.first_name }}
+                        {% if admin_form.first_name.errors %}
+                        <div class="text-danger">{{ admin_form.first_name.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="{{ admin_form.last_name.id_for_label }}" class="form-label">
+                            {{ admin_form.last_name.label }} <span class="text-danger">*</span>
+                        </label>
+                        {{ admin_form.last_name }}
+                        {% if admin_form.last_name.errors %}
+                        <div class="text-danger">{{ admin_form.last_name.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label for="{{ admin_form.phone.id_for_label }}" class="form-label">
+                    {{ admin_form.phone.label }}
+                </label>
+                {{ admin_form.phone }}
+                {% if admin_form.phone.errors %}
+                <div class="text-danger">{{ admin_form.phone.errors }}</div>
+                {% endif %}
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="{{ admin_form.password1.id_for_label }}" class="form-label">
+                            {{ admin_form.password1.label }} <span class="text-danger">*</span>
+                        </label>
+                        {{ admin_form.password1 }}
+                        {% if admin_form.password1.errors %}
+                        <div class="text-danger">{{ admin_form.password1.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="{{ admin_form.password2.id_for_label }}" class="form-label">
+                            {{ admin_form.password2.label }} <span class="text-danger">*</span>
+                        </label>
+                        {{ admin_form.password2 }}
+                        {% if admin_form.password2.errors %}
+                        <div class="text-danger">{{ admin_form.password2.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between">
+                <a href="{% url 'superadmin:school_detail' school.pk %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> {% trans 'Cancel' %}
+                </a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> {% trans 'Add Administrator' %}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}

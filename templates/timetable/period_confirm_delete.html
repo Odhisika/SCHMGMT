@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% block title %}{{ title }} | {% trans 'Learning management system' %}{% endblock title %}
+
+{% block content %}
+
+<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'timetable:timetable_dashboard' %}">{% trans 'Timetable' %}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'timetable:period_list' %}">{% trans 'Periods' %}</a></li>
+        <li class="breadcrumb-item active" aria-current="page">{% trans 'Delete' %}</li>
+    </ol>
+</nav>
+
+{% include 'snippets/messages.html' %}
+
+<div class="row">
+    <div class="col-md-6 mx-auto">
+        <div class="card">
+            <p class="form-title text-danger">{% trans 'Delete Period' %}</p>
+            <div class="p-3">
+                <p>{% trans 'Are you sure you want to delete this period?' %}</p>
+                <div class="alert alert-warning">
+                    <strong>{{ period.name }}</strong><br>
+                    {{ period.start_time|time:"H:i" }} - {{ period.end_time|time:"H:i" }}
+                </div>
+                <form method="POST">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash"></i> {% trans 'Yes, Delete' %}
+                    </button>
+                    <a href="{% url 'timetable:period_list' %}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> {% trans 'Cancel' %}
+                    </a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+{% load i18n crispy_forms_tags %}
+
+{% block title %}{{ title }} | {% trans 'Learning management system' %}{% endblock title %}
+
+{% block content %}
+
+<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'school_list' %}">{% trans 'Manage Schools' %}</a></li>
+        <li class="breadcrumb-item active" aria-current="page">{% trans 'Onboard School' %}</li>
+    </ol>
+</nav>
+
+<div class="title-1">
+    <i class="fas fa-school"></i> {% trans 'Onboard New School' %}
+</div>
+
+{% include 'snippets/messages.html' %}
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5>{% trans 'School Information' %}</h5>
+                <p class="text-muted">{% trans 'Enter the basic information for the new school' %}</p>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            {{ form.name|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.plan|as_crispy_field }}
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            {{ form.email|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.phone|as_crispy_field }}
+                        </div>
+                    </div>
+                    
+                    {{ form.address|as_crispy_field }}
+                    {{ form.website|as_crispy_field }}
+                    
+                    <hr>
+                    <h5>{% trans 'School Administrator' %}</h5>
+                    <p class="text-muted">{% trans 'Create the first administrator account for this school' %}</p>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            {{ form.admin_first_name|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.admin_last_name|as_crispy_field }}
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            {{ form.admin_email|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.admin_phone|as_crispy_field }}
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> {% trans 'Create School & Admin' %}
+                        </button>
+                        <a href="{% url 'school_list' %}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> {% trans 'Cancel' %}
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5>{% trans 'Onboarding Process' %}</h5>
+            </div>
+            <div class="card-body">
+                <ol>
+                    <li>{% trans 'Enter school details' %}</li>
+                    <li>{% trans 'Provide administrator information' %}</li>
+                    <li>{% trans 'System creates school record' %}</li>
+                    <li>{% trans 'Administrator account is automatically created' %}</li>
+                    <li>{% trans 'Welcome email with credentials is sent' %}</li>
+                    <li>{% trans 'School can start using the system' %}</li>
+                </ol>
+                
+                <div class="alert alert-info mt-3">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>{% trans 'Note:' %}</strong> {% trans 'The administrator will receive temporary credentials via email and should change their password on first login.' %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5>{% trans 'Subscription Plans' %}</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled">
+                    <li><strong>Free:</strong> 100 students, 10 teachers</li>
+                    <li><strong>Basic:</strong> 500 students, 50 teachers</li>
+                    <li><strong>Premium:</strong> 2000 students, 200 teachers</li>
+                    <li><strong>Enterprise:</strong> Unlimited</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock content %}

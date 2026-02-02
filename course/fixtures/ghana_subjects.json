@@ -1,0 +1,262 @@
+[
+    {
+        "model": "course.program",
+        "pk": 2,
+        "fields": {
+            "title": "Basic Education",
+            "summary": "Ghana Education Service Basic Education Curriculum (Primary & JHS)"
+        }
+    },
+    {
+        "model": "course.course",
+        "pk": 1,
+        "fields": {
+            "title": "English Language",
+            "code": "ENG-PRIMARY",
+            "summary": "English Language for Primary School",
+            "program": 2,
+            "level": "Primary 1",
+            "term": "First",
+            "is_core_subject": true,
+            "is_elective": false
+        }
+    },
+    {
+        "model": "course.course",
+        "pk": 2,
+        "fields": {
+            "title": "Mathematics",
+            "code": "MATH-PRIMARY",
+            "summary": "Mathematics for Primary School",
+            "program": 2,
+            "level": "Primary 1",
+            "term": "First",
+            "is_core_subject": true,
+            "is_elective": false
+        }
+    },
+    {
+        "model": "course.course",
+        "pk": 3,
+        "fields": {
+            "title": "Science",
+            "code": "SCI-PRIMARY",
+            "summary": "Integrated Science for Primary School",
+            "program": 2,
+            "level": "Primary 1",
+            "term": "First",
+            "is_core_subject": true,
+            "is_elective": false
+        }
+    },
+    {
+        "model": "course.course",
+        "pk": 4,
+        "fields": {
+            "title": "Social Studies",
+            "code": "SS-PRIMARY",
+            "summary": "Social Studies for Primary School",
+            "program": 2,
+            "level": "Primary 1",
+            "term": "First",
+            "is_core_subject": true,
+            "is_elective": false
+        }
+    },
+    {
+        "model": "course.course",
+        "pk": 5,
+        "fields": {
+            "title": "Ghanaian Languages",
+            "code": "LANG-PRIMARY",
+            "summary": "Ghanaian Languages (Twi, Ga, Ewe, etc.)",
+            "program": 2,
+            "level": "Primary 1",
+            "term": "First",
+            "is_core_subject": true,
+            "is_elective": false
+        }
+    },
+    {
+        "model": "course.course",
+        "pk": 6,
+        "fields": {
+            "title": "Creative Arts",
+            "code": "CA-PRIMARY",
+            "summary": "Creative Arts and Design",
+            "program": 2,
+            "level": "Primary 1",
+            "term": "First",
+            "is_core_subject": true,
+            "is_elective": false
+        }
+    },
+    {
+        "model": "course.course",
+        "pk": 7,
+        "fields": {
+            "title": "Religious & Moral Education",
+            "code": "RME-PRIMARY",
+            "summary": "Religious and Moral Education",
+            "program": 2,
+            "level": "Primary 1",
+            "term": "First",
+            "is_core_subject": true,
+            "is_elective": false
+        }
+    },
+    {
+        "model": "course.course",
+        "pk": 8,
+        "fields": {
+            "title": "Physical Education",
+            "code": "PE-PRIMARY",
+            "summary": "Physical Education and Sports",
+            "program": 2,
+            "level": "Primary 1",
+            "term": "First",
+            "is_core_subject": true,
+            "is_elective": false
+        }
+    },
+    {
+        "model": "course.course",
+        "pk": 9,
+        "fields": {
+            "title": "Computing (ICT)",
+            "code": "ICT-PRIMARY",
+            "summary": "Information and Communication Technology",
+            "program": 2,
+            "level": "Primary 1",
+            "term": "First",
+            "is_core_subject": true,
+            "is_elective": false
+        }
+    },
+    {
+        "model": "course.course",
+        "pk": 10,
+        "fields": {
+            "title": "English Language",
+            "code": "ENG-JHS",
+            "summary": "English Language for Junior High School",
+            "program": 2,
+            "level": "JHS 1",
+            "term": "First",
+            "is_core_subject": true,
+            "is_elective": false
+        }
+    },
+    {
+        "model": "course.course",
+        "pk": 11,
+        "fields": {
+            "title": "Mathematics",
+            "code": "MATH-JHS",
+            "summary": "Mathematics for Junior High School",
+            "program": 2,
+            "level": "JHS 1",
+            "term": "First",
+            "is_core_subject": true,
+            "is_elective": false
+        }
+    },
+    {
+        "model": "course.course",
+        "pk": 12,
+        "fields": {
+            "title": "Integrated Science",
+            "code": "ISCI-JHS",
+            "summary": "Integrated Science for JHS",
+            "program": 2,
+            "level": "JHS 1",
+            "term": "First",
+            "is_core_subject": true,
+            "is_elective": false
+        }
+    },
+    {
+        "model": "course.course",
+        "pk": 13,
+        "fields": {
+            "title": "Social Studies",
+            "code": "SS-JHS",
+            "summary": "Social Studies for Junior High School",
+            "program": 2,
+            "level": "JHS 1",
+            "term": "First",
+            "is_core_subject": true,
+            "is_elective": false
+        }
+    },
+    {
+        "model": "course.course",
+        "pk": 14,
+        "fields": {
+            "title": "Ghanaian Languages",
+            "code": "LANG-JHS",
+            "summary": "Ghanaian Languages for JHS",
+            "program": 2,
+            "level": "JHS 1",
+            "term": "First",
+            "is_core_subject": true,
+            "is_elective": false
+        }
+    },
+    {
+        "model": "course.course",
+        "pk": 15,
+        "fields": {
+            "title": "French",
+            "code": "FR-JHS",
+            "summary": "French Language for JHS",
+            "program": 2,
+            "level": "JHS 1",
+            "term": "First",
+            "is_core_subject": true,
+            "is_elective": false
+        }
+    },
+    {
+        "model": "course.course",
+        "pk": 16,
+        "fields": {
+            "title": "Religious & Moral Education",
+            "code": "RME-JHS",
+            "summary": "Religious and Moral Education for JHS",
+            "program": 2,
+            "level": "JHS 1",
+            "term": "First",
+            "is_core_subject": true,
+            "is_elective": false
+        }
+    },
+    {
+        "model": "course.course",
+        "pk": 17,
+        "fields": {
+            "title": "Career Technology",
+            "code": "CT-JHS",
+            "summary": "Career Technology (formerly Pre-Technical Skills)",
+            "program": 2,
+            "level": "JHS 1",
+            "term": "First",
+            "is_core_subject": true,
+            "is_elective": false
+        }
+    },
+    {
+        "model": "course.course",
+        "pk": 18,
+        "fields": {
+            "title": "Computing (ICT)",
+            "code": "ICT-JHS",
+            "summary": "Information and Communication Technology for JHS",
+            "program": 2,
+            "level": "JHS 1",
+            "term": "First",
+            "is_core_subject": true,
+            "is_elective": false
+        }
+    }
+]
