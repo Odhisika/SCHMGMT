@@ -1,0 +1,99 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% block title %} {% trans 'Result Amendment Requests' %} | {{ block.super }}{% endblock title %}
+
+{% block content %}
+<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
+        <li class="breadcrumb-item active" aria-current="page">{% trans 'Result Requests' %}</li>
+    </ol>
+</nav>
+
+<div class="row mb-4">
+    <div class="col-md-8">
+        <h3 class="text-primary"><i class="fas fa-clipboard-check"></i> {% trans 'Result Amendment Requests' %}</h3>
+        <p class="text-muted">{% trans 'Review and approve/reject teacher requests to modify published results.' %}</p>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="bg-light">
+                    <tr>
+                        <th>{% trans 'Date' %}</th>
+                        <th>{% trans 'Type' %}</th>
+                        <th>{% trans 'Requester' %}</th>
+                        <th>{% trans 'Course' %}</th>
+                        <th>{% trans 'Reason' %}</th>
+                        <th>{% trans 'Status' %}</th>
+                        <th>{% trans 'Action' %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for req in requests %}
+                    <tr>
+                        <td>{{ req.created_at|date:"M d, Y H:i" }}</td>
+                        <td>
+                            <span class="small badge {% if req.request_type == 'TEACHER_TO_ADMIN' %}bg-info{% else %}bg-primary{% endif %}">
+                                {{ req.get_request_type_display }}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="fw-bold">{{ req.requested_by.get_full_name }}</div>
+                            <span class="small text-muted">({{ req.requested_by.get_user_role }})</span>
+                        </td>
+                        <td>
+                            <div class="fw-bold">{{ req.course.title }}</div>
+                            <span class="small text-muted">{{ req.course.code }} - {{ req.teacher.get_full_name }}</span>
+                        </td>
+                        <td>
+                            <p class="mb-0 small text-wrap" style="max-width: 250px;">{{ req.reason }}</p>
+                        </td>
+                        <td>
+                            {% if req.status == 'Pending' %}
+                            <span class="badge bg-warning text-dark">{{ req.status }}</span>
+                            {% elif req.status == 'Approved' %}
+                            <span class="badge bg-success">{{ req.status }}</span>
+                            {% else %}
+                            <span class="badge bg-danger">{{ req.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if req.status == 'Pending' %}
+                                {% if req.requested_by != request.user %}
+                                <form method="post" class="d-flex gap-2">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="request_id" value="{{ req.id }}">
+                                    <button type="submit" name="action" value="approve" class="btn btn-sm btn-success" title="Approve">
+                                        <i class="fas fa-check"></i> {% trans 'Approve' %}
+                                    </button>
+                                    <button type="submit" name="action" value="reject" class="btn btn-sm btn-danger" title="Reject">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </form>
+                                {% else %}
+                                <span class="text-muted small">{% trans 'Waiting' %}...</span>
+                                {% endif %}
+                            {% else %}
+                            <span class="text-muted small">{% trans 'Processed' %}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center py-5">
+                            <i class="fas fa-check-circle fa-3x text-light mb-3"></i>
+                            <h5 class="text-muted">{% trans 'No pending requests.' %}</h5>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% endblock content %}

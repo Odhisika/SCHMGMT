@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+{% load i18n static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/clean-ui.css' %}">
+{% endblock %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'fees:dashboard' %}">{% trans 'Payments' %}</a></li>
+        <li class="breadcrumb-item active">{% trans 'Bank Accounts' %}</li>
+    </ol>
+</nav>
+
+<div class="title-1"><i class="fas fa-university"></i> {% trans 'Bank Account Management' %}</div>
+<br>
+
+{% include 'snippets/messages.html' %}
+
+<div class="card-clean">
+    <div class="card-header-clean">
+        <div class="d-flex justify-content-between align-items-center">
+            <h3>{% trans 'Payment Collection Accounts' %}</h3>
+            <a href="{% url 'fees:bank_account_create' %}" class="btn-success-clean">
+                <i class="fas fa-plus"></i> {% trans 'Add Account' %}
+            </a>
+        </div>
+    </div>
+    <div class="card-body-clean">
+        {% if accounts %}
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>{% trans 'Type' %}</th>
+                            <th>{% trans 'Account Name' %}</th>
+                            <th>{% trans 'Details' %}</th>
+                            <th>{% trans 'Status' %}</th>
+                            <th>{% trans 'Actions' %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for account in accounts %}
+                        <tr>
+                            <td>
+                                {% if account.account_type == 'BANK' %}
+                                    <span class="badge bg-primary">{% trans 'Bank' %}</span>
+                                {% else %}
+                                    <span class="badge bg-success">{% trans 'Mobile Money' %}</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ account.account_name }}</td>
+                            <td>
+                                {% if account.account_type == 'BANK' %}
+                                    {{ account.bank_name }} - {{ account.account_number }}
+                                {% else %}
+                                    {{ account.get_mobile_money_network_display }} - {{ account.mobile_money_number }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if account.is_default %}
+                                    <span class="badge bg-warning">{% trans 'Default' %}</span>
+                                {% endif %}
+                                {% if account.is_active %}
+                                    <span class="badge bg-success">{% trans 'Active' %}</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{% trans 'Inactive' %}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{% url 'fees:bank_account_edit' account.pk %}" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-edit"></i> {% trans 'Edit' %}
+                                </a>
+                                <form method="post" action="{% url 'fees:bank_account_toggle' account.pk %}" style="display: inline;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-{% if account.is_active %}danger{% else %}success{% endif %}">
+                                        <i class="fas fa-toggle-{% if account.is_active %}off{% else %}on{% endif %}"></i>
+                                        {% if account.is_active %}{% trans 'Deactivate' %}{% else %}{% trans 'Activate' %}{% endif %}
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="text-muted">{% trans 'No bank accounts configured yet. Add one to start collecting payments.' %}</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

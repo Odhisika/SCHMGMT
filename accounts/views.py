@@ -9,8 +9,9 @@ from django.utils.decorators import method_decorator
 from django.views.generic import CreateView
 from django_filters.views import FilterView
 from xhtml2pdf import pisa
+from django.conf import settings
 
-from accounts.decorators import admin_required
+from accounts.decorators import admin_required, lecturer_required
 from accounts.filters import LecturerFilter, StudentFilter
 from accounts.forms import (
     ParentAddForm,
@@ -22,7 +23,7 @@ from accounts.forms import (
 from accounts.models import Parent, Student, User
 from core.models import Semester
 from course.models import Course
-from result.models import TakenCourse
+from result.models import TakenCourse, Result
 
 # ########################################################
 # Utility Functions
@@ -180,14 +181,16 @@ def admin_panel(request):
 @login_required
 def profile_update(request):
     if request.method == "POST":
-        form = ProfileUpdateForm(request.POST, request.FILES, instance=request.user)
+        form = ProfileUpdateForm(
+            request.POST, request.FILES, instance=request.user, school=request.school
+        )
         if form.is_valid():
             form.save()
             messages.success(request, "Your profile has been updated successfully.")
             return redirect("profile")
         messages.error(request, "Please correct the error(s) below.")
     else:
-        form = ProfileUpdateForm(instance=request.user)
+        form = ProfileUpdateForm(instance=request.user, school=request.school)
     return render(request, "setting/profile_info_change.html", {"form": form})
 
 
@@ -215,11 +218,11 @@ def change_password(request):
 @admin_required
 def staff_add_view(request):
     if request.method == "POST":
-        form = StaffAddForm(request.POST)
+        form = StaffAddForm(request.POST, school=request.school)
         if form.is_valid():
             form.instance.school = request.school
             lecturer = form.save()
-            
+
             full_name = lecturer.get_full_name
             email = lecturer.email
             messages.success(
@@ -229,7 +232,7 @@ def staff_add_view(request):
             )
             return redirect("lecturer_list")
     else:
-        form = StaffAddForm()
+        form = StaffAddForm(school=request.school)
     return render(
         request, "accounts/add_staff.html", {"title": "Add Lecturer", "form": form}
     )
@@ -238,9 +241,11 @@ def staff_add_view(request):
 @login_required
 @admin_required
 def edit_staff(request, pk):
-    lecturer = get_object_or_404(User, is_lecturer=True, pk=pk)
+    lecturer = get_object_or_404(User, is_lecturer=True, pk=pk, school=request.school)
     if request.method == "POST":
-        form = ProfileUpdateForm(request.POST, request.FILES, instance=lecturer)
+        form = ProfileUpdateForm(
+            request.POST, request.FILES, instance=lecturer, school=request.school
+        )
         if form.is_valid():
             form.save()
             full_name = lecturer.get_full_name
@@ -248,7 +253,7 @@ def edit_staff(request, pk):
             return redirect("lecturer_list")
         messages.error(request, "Please correct the error below.")
     else:
-        form = ProfileUpdateForm(instance=lecturer)
+        form = ProfileUpdateForm(instance=lecturer, school=request.school)
     return render(
         request, "accounts/edit_lecturer.html", {"title": "Edit Lecturer", "form": form}
     )
@@ -316,10 +321,21 @@ def student_add_view(request):
                 f"Account for {full_name} has been created. "
                 f"An email with account credentials will be sent to {email} within a minute.",
             )
-            return redirect("student_list")
+            # Redirect back to the specific class workspace if level was provided
+            level_code = request.POST.get("level") # Try to get from hidden or form data? 
+            # Or better, check the student's level
+            if student.student.level:
+                 return redirect("class_detail", level_code=student.student.level)
+            return redirect("class_list")
         messages.error(request, "Correct the error(s) below.")
     else:
-        form = StudentAddForm(school=request.school)
+        # Pre-fill level if provided in URL (e.g. ?level=Primary 1)
+        initial_data = {}
+        level_param = request.GET.get("level")
+        if level_param:
+            initial_data["level"] = level_param
+        
+        form = StudentAddForm(initial=initial_data, school=request.school)
     return render(
         request, "accounts/add_student.html", {"title": "Add Student", "form": form}
     )
@@ -330,7 +346,9 @@ def student_add_view(request):
 def edit_student(request, pk):
     student_user = get_object_or_404(User, is_student=True, pk=pk, school=request.school)
     if request.method == "POST":
-        form = ProfileUpdateForm(request.POST, request.FILES, instance=student_user)
+        form = ProfileUpdateForm(
+            request.POST, request.FILES, instance=student_user, school=request.school
+        )
         if form.is_valid():
             form.save()
             full_name = student_user.get_full_name
@@ -338,7 +356,7 @@ def edit_student(request, pk):
             return redirect("student_list")
         messages.error(request, "Please correct the error below.")
     else:
-        form = ProfileUpdateForm(instance=student_user)
+        form = ProfileUpdateForm(instance=student_user, school=request.school)
     return render(
         request, "accounts/edit_student.html", {"title": "Edit Student", "form": form}
     )
@@ -427,3 +445,133 @@ class ParentAdd(CreateView):
         # Let's trust the form for now but ensures proper redirection/scoping if possible.
         messages.success(self.request, "Parent added successfully.")
         return super().form_valid(form)
+
+
+@login_required
+@lecturer_required
+def class_list_view(request):
+    """Dashboard showing all classes (levels)"""
+    
+    if request.user.is_superuser or request.user.is_school_admin:
+        # Admins see all classes
+        levels = settings.LEVEL_CHOICES
+    else:
+        # Teachers see only classes where they have allocated courses
+        from course.models import CourseAllocation
+        
+        allocations = CourseAllocation.objects.filter(
+            teacher=request.user
+        ).prefetch_related('courses')
+        
+        # Extract unique levels from allocated courses
+        teacher_levels = set()
+        for allocation in allocations:
+            for course in allocation.courses.filter(school=request.school):
+                teacher_levels.add(course.level)
+        
+        # Filter LEVEL_CHOICES to only include teacher's levels
+        levels = [(code, name) for code, name in settings.LEVEL_CHOICES if code in teacher_levels]
+    
+    # Calculate student counts per class efficiently
+    students_counts = {}
+    for level_code, _ in levels:
+        count = Student.objects.filter(level=level_code, student__school=request.school).count()
+        students_counts[level_code] = count
+
+    context = {
+        "title": "Manage Classes",
+        "levels": levels,
+        "students_counts": students_counts,
+        "is_teacher": not (request.user.is_superuser or request.user.is_school_admin),
+    }
+    return render(request, "accounts/class_list.html", context)
+
+
+@login_required
+@lecturer_required
+def class_detail_view(request, level_code):
+    """Workspace for a specific class level"""
+    from course.models import CourseAllocation
+    
+    # Find level name from choices
+    level_name = dict(settings.LEVEL_CHOICES).get(level_code, level_code)
+
+    # Access Control: Verify teacher has courses in this level
+    if not (request.user.is_superuser or request.user.is_school_admin):
+        has_access = CourseAllocation.objects.filter(
+            teacher=request.user,
+            courses__level=level_code,
+            courses__school=request.school
+        ).exists()
+        
+        if not has_access:
+            messages.error(request, f"You don't have access to {level_name}.")
+            return redirect('class_list')
+
+    students = Student.objects.filter(
+        level=level_code, student__school=request.school
+    ).select_related('student', 'program')
+
+    current_term = Semester.objects.filter(is_current_term=True, school=request.school).first()
+    is_third_term = current_term and current_term.term == settings.THIRD_TERM
+    
+    # Get subjects for this class level (filtered by role)
+    if request.user.is_superuser or request.user.is_school_admin:
+        # Admins see all subjects
+        subjects = Course.objects.filter(level=level_code, school=request.school)
+    else:
+        # Teachers see only their allocated subjects
+        allocations = CourseAllocation.objects.filter(teacher=request.user).prefetch_related('courses')
+        teacher_course_ids = []
+        for allocation in allocations:
+            teacher_course_ids.extend(
+                allocation.courses.filter(
+                    level=level_code, 
+                    school=request.school
+                ).values_list('id', flat=True)
+            )
+        subjects = Course.objects.filter(id__in=teacher_course_ids)
+
+    # Broadsheet logic
+    broadsheet_data = []
+    if current_term:
+        # Fetch all relevant scores in one go
+        taken_courses = TakenCourse.objects.filter(
+            student__in=students,
+            course__in=subjects,
+            course__term=current_term.term,
+            school=request.school
+        )
+        scores_map = {(tc.student_id, tc.course_id): tc.total for tc in taken_courses}
+        
+        # Fetch all results in one go
+        results_map = {
+            r.student_id: r 
+            for r in Result.objects.filter(
+                student__in=students, 
+                term=current_term.term, 
+                session=current_term.year,
+                school=request.school
+            )
+        }
+
+        for student in students:
+            student_row = {
+                'student': student,
+                'scores': [scores_map.get((student.id, s.id), "-") for s in subjects],
+                'average': results_map.get(student.id).term_average if results_map.get(student.id) else "-",
+                'position': results_map.get(student.id).overall_position if results_map.get(student.id) else "-"
+            }
+            broadsheet_data.append(student_row)
+
+    context = {
+        "level_code": level_code,
+        "level_name": level_name,
+        "students": students,
+        "subjects": subjects,
+        "current_term": current_term,
+        "is_third_term": is_third_term,
+        "broadsheet_data": broadsheet_data,
+        "is_teacher": not (request.user.is_superuser or request.user.is_school_admin),
+    }
+    return render(request, "accounts/class_detail.html", context)

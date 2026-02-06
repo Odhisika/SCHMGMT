@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% load i18n static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/clean-ui.css' %}">
+{% endblock %}
+
+{% block title %}{{ title }} | {% trans 'Payments' %}{% endblock %}
+
+{% block content %}
+<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'fees:dashboard' %}">{% trans 'Payments' %}</a></li>
+        <li class="breadcrumb-item active">{% trans 'Payment History' %}</li>
+    </ol>
+</nav>
+
+<div class="title-1"><i class="fas fa-history"></i> {% trans 'Payment History' %} - {{ student.student.get_full_name }}</div>
+<br>
+
+<div class="card-clean">
+    <div class="card-header-clean">
+        <h3>{% trans 'All Transactions' %}</h3>
+    </div>
+    <div class="card-body-clean">
+        {% if payments %}
+        <table class="table-clean">
+            <thead>
+                <tr>
+                    <th>{% trans 'Date' %}</th>
+                    <th>{% trans 'Fee Category' %}</th>
+                    <th>{% trans 'Amount' %}</th>
+                    <th>{% trans 'Method' %}</th>
+                    <th>{% trans 'Status' %}</th>
+                    <th>{% trans 'Recorded By' %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in payments %}
+                <tr>
+                    <td>{{ p.payment_date|default:p.created_at|date:"Y-m-d" }}</td>
+                    <td>{{ p.assignment.fee_structure.name|default:'General' }}</td>
+                    <td>{{ settings.CURRENCY_SYMBOL }}{{ p.amount }}</td>
+                    <td>{{ p.get_payment_method_display }}</td>
+                    <td>
+                        {% if p.status == 'VERIFIED' %}
+                        <span class="badge-clean badge-success">{{ p.get_status_display }}</span>
+                        {% elif p.status == 'PENDING' %}
+                        <span class="badge-clean badge-warning">{{ p.get_status_display }}</span>
+                        {% else %}
+                        <span class="badge-clean badge-danger">{{ p.get_status_display }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ p.recorded_by.get_full_name|default:'Online/Paystack' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon"><i class="fas fa-receipt"></i></div>
+            <p class="empty-state-text">{% trans 'No transactions recorded for this student.' %}</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

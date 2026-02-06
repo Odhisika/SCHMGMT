@@ -1,0 +1,193 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% block title %} {{ level_name }} | {{ block.super }}{% endblock title %}
+
+{% block content %}
+<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'class_list' %}">{% trans 'Classes' %}</a></li>
+        <li class="breadcrumb-item active" aria-current="page">{{ level_name }}</li>
+    </ol>
+</nav>
+
+<div class="row mb-4">
+    <div class="col-md-8">
+        <h2 class="text-primary"><i class="fas fa-chalkboard"></i> {{ level_name }} {% trans 'Workspace' %}</h2>
+        <p class="text-muted">{% trans 'Managing' %} {{ students.count }} {% trans 'students' %}</p>
+    </div>
+    <div class="col-md-4 text-end">
+        {% if request.user.is_superuser or request.user.is_school_admin %}
+        <a href="{% url 'add_student' %}?level={{ level_code }}" class="btn btn-success shadow-sm">
+            <i class="fas fa-user-plus"></i> {% trans 'Add New Student' %}
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+{% if is_teacher %}
+<div class="alert alert-info small mb-3">
+    <i class="fas fa-info-circle"></i> {% trans 'You are viewing results for your assigned subjects only.' %}
+</div>
+{% endif %}
+
+<!-- Tabs -->
+<ul class="nav nav-tabs mb-4" id="classTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="roster-tab" data-bs-toggle="tab" data-bs-target="#roster" type="button" role="tab" aria-controls="roster" aria-selected="true">
+            <i class="fas fa-list"></i> {% trans 'Student Roster' %}
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="results-tab" data-bs-toggle="tab" data-bs-target="#results" type="button" role="tab" aria-controls="results" aria-selected="false">
+            <i class="fas fa-chart-bar"></i> {% trans 'Results & Broadsheet' %}
+        </button>
+    </li>
+    {% if is_third_term %}
+    <li class="nav-item" role="presentation">
+        <button class="nav-link text-warning" id="promotion-tab" data-bs-toggle="tab" data-bs-target="#promotion" type="button" role="tab" aria-controls="promotion" aria-selected="false">
+            <i class="fas fa-graduation-cap"></i> {% trans 'Promotion Console' %}
+        </button>
+    </li>
+    {% endif %}
+</ul>
+
+<div class="tab-content" id="classTabsContent">
+    
+    <!-- Roster Tab -->
+    <div class="tab-pane fade show active" id="roster" role="tabpanel" aria-labelledby="roster-tab">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                {% if students %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>{% trans 'ID' %}</th>
+                                <th>{% trans 'Full Name' %}</th>
+                                <th>{% trans 'Program' %}</th>
+                                <th>{% trans 'Actions' %}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for student in students %}
+                            <tr>
+                                <td>{{ forloop.counter }}</td>
+                                <td><span class="badge bg-secondary">{{ student.student.username }}</span></td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        {% if student.student.picture %}
+                                        <img src="{{ student.student.picture.url }}" class="rounded-circle me-2" width="30" height="30" alt="">
+                                        {% endif %}
+                                        <a href="{% url 'profile_single' student.student.id %}" class="fw-bold text-decoration-none">{{ student.student.get_full_name }}</a>
+                                    </div>
+                                </td>
+                                <td>{{ student.program }}</td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{% url 'profile_single' student.student.id %}" class="btn btn-outline-info" title="View Profile"><i class="fas fa-eye"></i></a>
+                                        {% if request.user.is_superuser or request.user.is_school_admin %}
+                                        <a href="{% url 'student_edit' pk=student.student.id %}" class="btn btn-outline-warning" title="Edit"><i class="fas fa-edit"></i></a>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-users-slash fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">{% trans 'No students found in' %} {{ level_name }}</h5>
+                    {% if request.user.is_superuser or request.user.is_school_admin %}
+                    <a href="{% url 'add_student' %}?level={{ level_code }}" class="btn btn-primary mt-2">{% trans 'Register First Student' %}</a>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Results Tab -->
+    <div class="tab-pane fade" id="results" role="tabpanel" aria-labelledby="results-tab">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> {% trans 'Quick access to result management for' %} {{ level_name }}.
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="card h-100 border-primary">
+                            <div class="card-body text-center">
+                                <i class="fas fa-edit fa-2x text-primary mb-2"></i>
+                                <h5>{% trans 'Enter Scores' %}</h5>
+                                <p class="small text-muted">{% trans 'Input continuous assessment and exam scores.' %}</p>
+                                <a href="{% url 'add_score' %}" class="btn btn-primary btn-sm">{% trans 'Go to Score Entry' %}</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <hr>
+                <h5 class="mt-4">{% trans 'Class Broadsheet' %}</h5>
+                <p class="text-muted small">{% trans 'Overview of current term performance.' %}</p>
+                <!-- Broadsheet table placeholder -->
+                <div class="table-responsive">
+                    <table class="table table-bordered table-sm table-hover table-striped mb-0">
+                        <thead class="table-dark">
+                            <tr class="small text-center">
+                                <th class="text-start">{% trans 'Student Name' %}</th>
+                                {% for subject in subjects %}
+                                <th title="{{ subject.title }}">{{ subject.title|truncatechars:5 }}</th>
+                                {% endfor %}
+                                <th class="table-primary text-dark">{% trans 'Avg' %}</th>
+                                <th class="table-warning text-dark">{% trans 'Pos' %}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in broadsheet_data %}
+                            <tr class="small text-center align-middle">
+                                <td class="text-start fw-bold">{{ row.student.student.get_full_name }}</td>
+                                {% for score in row.scores %}
+                                <td>{{ score }}</td>
+                                {% endfor %}
+                                <td class="table-primary fw-bold text-dark">{{ row.average }}</td>
+                                <td class="table-warning fw-bold text-dark">{{ row.position }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="100%" class="text-center py-4 text-muted">
+                                    <i class="fas fa-info-circle"></i> {% trans 'No result data available for this term.' %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Promotion Tab (Conditional) -->
+    {% if is_third_term %}
+    <div class="tab-pane fade" id="promotion" role="tabpanel" aria-labelledby="promotion-tab">
+        <div class="card shadow-sm border-warning">
+            <div class="card-body text-center py-5">
+                <h3 class="text-warning"><i class="fas fa-level-up-alt"></i> {% trans 'End of Year Promotion' %}</h3>
+                <p class="lead">{% trans 'You are about to manage promotions for' %} <strong>{{ level_name }}</strong>.</p>
+                <p>{% trans 'This wizard will calculate annual averages and suggest students for promotion to the next class.' %}</p>
+                <form action="{% url 'create_promotion' %}" method="get">
+                    <input type="hidden" name="level" value="{{ level_code }}">
+                    <button type="submit" class="btn btn-warning btn-lg text-dark fw-bold">
+                        {% trans 'Launch Promotion Wizard for' %} {{ level_name }}
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+
+{% endblock content %}

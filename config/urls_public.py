@@ -33,6 +33,8 @@ urlpatterns += i18n_patterns(
     path("quiz/", include("quiz.urls")),
     path("payments/", include("payments.urls")),
     path("school/", include("school.urls")),
+    path("attendance/", include("attendance.urls")),  # Attendance system
+    path("fees/", include("fees.urls")),  # Payment/Fees system
     path("timetable/", include("timetable.urls")),
 )
 

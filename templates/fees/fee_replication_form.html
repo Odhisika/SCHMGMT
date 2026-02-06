@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+{% load i18n static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/clean-ui.css' %}">
+{% endblock %}
+
+{% block title %}{{ title }} | {% trans 'Fees' %}{% endblock %}
+
+{% block content %}
+<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'fees:dashboard' %}">{% trans 'Payments' %}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'fees:fee_list' %}">{% trans 'Fee Structures' %}</a></li>
+        <li class="breadcrumb-item active">{% trans 'Replicate Fee' %}</li>
+    </ol>
+</nav>
+
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card-clean">
+            <div class="card-header-clean">
+                <h3 class="mb-0">{% trans 'Replicate Fee Structure' %}</h3>
+            </div>
+            <div class="card-body-clean">
+                <div class="alert alert-info">
+                    <h5><i class="fas fa-info-circle"></i> {% trans 'Source Fee Structure' %}</h5>
+                    <p class="mb-1"><strong>{% trans 'Name' %}:</strong> {{ source_fee.name }}</p>
+                    <p class="mb-1"><strong>{% trans 'Current Class' %}:</strong> {{ source_fee.get_level_display }}</p>
+                    <p class="mb-1"><strong>{% trans 'Term' %}:</strong> {{ source_fee.term }}</p>
+                    <p class="mb-0"><strong>{% trans 'Total Amount' %}:</strong> {{ settings.CURRENCY_SYMBOL }}{{ source_fee.amount }}</p>
+                    
+                    <hr>
+                    <h6>{% trans 'Components to be copied:' %}</h6>
+                    <ul class="mb-0">
+                        {% for item in source_fee.items.all %}
+                        <li>{{ item.name }} ({{ settings.CURRENCY_SYMBOL }}{{ item.amount }})</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="mb-4">
+                        <label class="form-label" style="font-weight: 500;">{% trans 'Select Target Classes' %}</label>
+                        <div class="replication-grid">
+                            {% for checkbox in form.target_levels %}
+                            <div class="form-check">
+                                {{ checkbox.tag }}
+                                <label class="form-check-label" for="{{ checkbox.id_for_label }}">
+                                    {{ checkbox.choice_label }}
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% if form.target_levels.errors %}
+                        <div class="text-danger small mt-1">{{ form.target_levels.errors }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="{% url 'fees:fee_list' %}" class="btn-outline-clean" style="text-decoration: none;">{% trans 'Cancel' %}</a>
+                        <button type="submit" class="btn-primary-clean" style="display: inline-flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-copy" style="background: rgba(255,255,255,0.2); width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px;"></i>
+                            <span>{% trans 'Replicate Selected' %}</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .replication-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 12px;
+        background: #f8f9fa;
+        padding: 16px;
+        border-radius: 8px;
+        border: 1px solid #e0e0e0;
+    }
+    .form-check {
+        margin-bottom: 0;
+    }
+</style>
+{% endblock %}

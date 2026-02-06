@@ -66,9 +66,20 @@ class TermForm(forms.ModelForm):
         required=True,
     )
 
+    result_released = forms.BooleanField(
+        widget=forms.CheckboxInput(
+            attrs={
+                 "class": "form-check-input",
+            }
+        ),
+        required=False,
+        label="Publish Results?",
+        help_text="Check this to allow students and parents to view their results for this term."
+    )
+
     class Meta:
         model = Term
-        fields = ["term", "year", "is_current_term", "next_term_begins"]
+        fields = ["term", "year", "is_current_term", "next_term_begins", "result_released"]
 
 
 # Keep SemesterForm as alias for backward compatibility

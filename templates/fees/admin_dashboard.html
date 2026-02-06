@@ -1,0 +1,220 @@
+{% extends 'base.html' %}
+{% load i18n static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/clean-ui.css' %}">
+<style>
+    /* Dashboard specific styles matching the requested design */
+    .dashboard-container {
+        padding: 20px 0;
+    }
+    
+    /* Action bar refined style */
+    .action-bar {
+        background: white;
+        padding: 24px;
+        border-radius: 12px;
+        margin-bottom: 32px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        /* Matches bg-white shadow-sm border-0 rounded-3 look roughly, but keeping customized for bar */
+        box-shadow: 0 .125rem .25rem rgba(0,0,0,.075);
+        border: 0;
+    }
+    
+    .section-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #202124;
+        margin-bottom: 16px;
+    }
+</style>
+{% endblock %}
+
+{% block title %}{{ title }} | {% trans 'Payments' %}{% endblock %}
+
+{% block content %}
+<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
+        <li class="breadcrumb-item active">{% trans 'Payments' %}</li>
+    </ol>
+</nav>
+
+{% include 'snippets/messages.html' %}
+
+<div class="action-bar">
+    <div>
+        <h2 style="margin: 0; font-size: 22px; color: #202124;"><i class="fas fa-money-bill-wave" style="margin-right: 10px; color: #1a73e8;"></i>{% trans 'Payment Management' %}</h2>
+        <p style="margin: 4px 0 0; color: #5f6368; font-size: 14px;">{{ current_term }}</p>
+    </div>
+    <div style="display: flex; gap: 12px;">
+        <a href="{% url 'fees:fee_list' %}" class="btn-primary-clean" style="text-decoration: none; display: inline-flex; align-items: center; gap: 8px;">
+            <i class="fas fa-cog" style="background: rgba(0,0,0,0.1); width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px;"></i> 
+            <span>{% trans 'Fee Structure' %}</span>
+        </a>
+        <a href="{% url 'fees:record_payment' %}" class="btn-success-clean" style="text-decoration: none; display: inline-flex; align-items: center; gap: 8px;">
+            <i class="fas fa-plus" style="background: rgba(0,0,0,0.1); width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px;"></i>
+            <span>{% trans 'Record Payment' %}</span>
+        </a>
+        <a href="{% url 'fees:bank_account_list' %}" class="btn-info-clean" style="text-decoration: none; display: inline-flex; align-items: center; gap: 8px; background-color: #00bcd4; color: white;">
+            <i class="fas fa-university" style="background: rgba(0,0,0,0.1); width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px;"></i>
+            <span>{% trans 'Bank Accounts' %}</span>
+        </a>
+    </div>
+</div>
+
+<div class="row users-count px-3">
+    <!-- Core Stats -->
+    <div class="col-6 col-md-3 mb-3 px-2">
+        <div class="card-count p-3 bg-white shadow-sm border-0 rounded-3">
+            <h3><i class="fas fa-wallet text-success"></i></h3>
+            <div class="text-right">
+                {% trans 'Total Collected' %}
+                <h2 class="text-dark">{{ settings.CURRENCY_SYMBOL }}{{ total_collected|floatformat:2 }}</h2>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-6 col-md-3 mb-3 px-2">
+        <div class="card-count p-3 bg-white shadow-sm border-0 rounded-3">
+            <h3><i class="fas fa-hourglass-half text-warning"></i></h3>
+            <div class="text-right">
+                {% trans 'Pending Verification' %}
+                <h2 class="text-dark">{{ settings.CURRENCY_SYMBOL }}{{ total_pending|floatformat:2 }}</h2>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-6 col-md-3 mb-3 px-2">
+        <div class="card-count p-3 bg-white shadow-sm border-0 rounded-3">
+            <h3><i class="fas fa-file-invoice-dollar text-primary"></i></h3>
+            <div class="text-right">
+                {% trans 'Pending Payments' %}
+                <h2 class="text-dark">{{ pending_payments.count }}</h2>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-6 col-md-3 mb-3 px-2">
+        <div class="card-count p-3 bg-white shadow-sm border-0 rounded-3">
+            <h3><i class="fas fa-chart-line text-info"></i></h3>
+            <div class="text-right">
+                {% trans 'Collection Rate' %}
+                <h2 class="text-dark">--%</h2>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Dynamic Fee Breakdown Cards -->
+    {% for fee in fee_breakdown %}
+    <div class="col-6 col-md-3 mb-3 px-2">
+        <div class="card-count p-3 bg-white shadow-sm border-0 rounded-3">
+            <h3><i class="fas fa-tag text-secondary"></i></h3>
+            <div class="text-right">
+                {{ fee.name }}
+                <h2 class="text-dark">{{ settings.CURRENCY_SYMBOL }}{{ fee.amount|floatformat:2 }}</h2>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    
+    <!-- Bank Account Management Card -->
+    <div class="col-6 col-md-3 mb-3 px-2">
+        <div class="card-count p-3 bg-white shadow-sm border-0 rounded-3" style="cursor: pointer;" onclick="window.location='{% url 'fees:bank_account_list' %}'">
+            <h3><i class="fas fa-university text-success"></i></h3>
+            <div class="text-right">
+                {% trans 'Bank Accounts' %}
+                <h2 class="text-dark">{{ bank_accounts.count }}</h2>
+                <small class="text-muted">{% trans 'Click to manage' %}</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-{% if pending_payments %}7{% else %}12{% endif %}">
+        <div class="card-clean">
+            <div class="card-header-clean d-flex justify-content-between align-items-center">
+                <h3 class="section-title mb-0">{% trans 'Recent Payments' %}</h3>
+            </div>
+            <div class="card-body-clean">
+                {% if recent_payments %}
+                <div class="table-responsive">
+                    <table class="table-clean table-hover">
+                        <thead>
+                            <tr>
+                                <th>{% trans 'Date' %}</th>
+                                <th>{% trans 'Student' %}</th>
+                                <th>{% trans 'Amount' %}</th>
+                                <th>{% trans 'Status' %}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for payment in recent_payments %}
+                            <tr>
+                                <td>{{ payment.payment_date }}</td>
+                                <td>
+                                    <div style="font-weight: 500;">{{ payment.student.student.get_full_name }}</div>
+                                    <small style="color: #5f6368;">{{ payment.student.class_id }}</small>
+                                </td>
+                                <td>{{ settings.CURRENCY_SYMBOL }}{{ payment.amount }}</td>
+                                <td>
+                                    {% if payment.status == 'VERIFIED' %}
+                                    <span class="badge-clean badge-success">{% trans 'Verified' %}</span>
+                                    {% elif payment.status == 'PENDING' %}
+                                    <span class="badge-clean badge-warning">{% trans 'Pending' %}</span>
+                                    {% else %}
+                                    <span class="badge-clean badge-danger">{% trans 'Failed' %}</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <div class="empty-state-icon"><i class="fas fa-money-bill"></i></div>
+                    <p class="empty-state-text">{% trans 'No payment records yet' %}</p>
+                    <a href="{% url 'fees:record_payment' %}" class="btn-primary-clean" style="text-decoration: none;">
+                        <i class="fas fa-plus-circle me-1"></i> {% trans 'Record First Payment' %}
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {% if pending_payments %}
+    <div class="col-md-5">
+        <div class="card-clean">
+            <div class="card-header-clean">
+                <h3 class="section-title mb-0">{% trans 'Needs Verification' %}</h3>
+            </div>
+            <div class="card-body-clean p-0">
+                <div class="list-group list-group-flush">
+                    {% for payment in pending_payments %}
+                    <div class="list-group-item p-3 border-bottom" style="border-color: #f1f3f4;">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="badge-clean badge-info">{{ payment.get_payment_method_display }}</span>
+                            <small class="text-muted">{{ payment.created_at|date:"M d, Y" }}</small>
+                        </div>
+                        <h6 class="mb-1">{{ payment.student.student.get_full_name }}</h6>
+                        <div class="d-flex justify-content-between align-items-end mt-2">
+                            <h5 class="mb-0 text-primary">{{ settings.CURRENCY_SYMBOL }}{{ payment.amount }}</h5>
+                            <a href="{% url 'fees:verify_payment' payment.id %}" class="btn-success-clean btn-sm">
+                                {% trans 'Verify' %}
+                            </a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}

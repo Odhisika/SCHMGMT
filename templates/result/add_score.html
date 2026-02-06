@@ -16,6 +16,13 @@
 
 <div class="title-1 mb-3"><i class="fas fa-table"></i>{% trans 'Manage Score' %}</div>
 
+{% if current_term.result_released %}
+<div class="alert alert-warning">
+    <i class="fas fa-lock"></i> 
+    {% trans 'Results for this term have been published. Score entry is locked.' %}
+</div>
+{% endif %}
+
 {% if current_term %}
 <div class="row">
     <div class="col-md-8">

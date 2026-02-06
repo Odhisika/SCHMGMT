@@ -67,6 +67,7 @@ PROJECT_APPS = [
     "payments.apps.PaymentsConfig",
     "school.apps.SchoolConfig",
     "attendance.apps.AttendanceConfig",
+    "fees.apps.FeesConfig",  # Fee management & payment system
     "timetable.apps.TimetableConfig",
     "superadmin.apps.SuperadminConfig",  # Super Admin Portal
 ]
@@ -227,6 +228,11 @@ CRISPY_TEMPLATE_PACK = "bootstrap5"
 LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/"
 
+# Session configuration
+# 30 minutes in seconds
+SESSION_COOKIE_AGE = 1800
+SESSION_SAVE_EVERY_REQUEST = True
+
 # Strip payment config
 STRIPE_SECRET_KEY = config("STRIPE_SECRET_KEY", default="")
 STRIPE_PUBLISHABLE_KEY = config("STRIPE_PUBLISHABLE_KEY", default="")
@@ -260,7 +266,7 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 STUDENT_ID_PREFIX = config("STUDENT_ID_PREFIX", "STU")
 TEACHER_ID_PREFIX = config("TEACHER_ID_PREFIX", "TCH")
-LECTURER_ID_PREFIX = config("LECTURER_ID_PREFIX", "LEC")
+LECTURER_ID_PREFIX = config("LECTURER_ID_PREFIX", "TEA")
 
 
 # Constants for Ghana Education System

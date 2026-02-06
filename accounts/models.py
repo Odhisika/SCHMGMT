@@ -84,6 +84,18 @@ class User(AbstractUser):
         "school.School", on_delete=models.CASCADE, null=True, blank=True, related_name="users"
     )
 
+    department = models.ForeignKey(
+        "course.Program", on_delete=models.SET_NULL, null=True, blank=True, related_name="staff"
+    )
+
+    assigned_level = models.CharField(
+        max_length=25, 
+        choices=LEVEL, 
+        blank=True, 
+        null=True,
+        help_text=_("The class/level this teacher is responsible for (if class teacher)")
+    )
+
     objects = CustomUserManager()
 
     class Meta:

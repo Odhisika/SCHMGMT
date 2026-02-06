@@ -31,14 +31,14 @@ class CourseAddForm(forms.ModelForm):
 
 class CourseAllocationForm(forms.ModelForm):
     courses = forms.ModelMultipleChoiceField(
-        queryset=Course.objects.all().order_by("level"),
+        queryset=Course.objects.none(),
         widget=forms.CheckboxSelectMultiple(
             attrs={"class": "browser-default checkbox"}
         ),
         required=True,
     )
     teacher = forms.ModelChoiceField(
-        queryset=User.objects.filter(is_lecturer=True),
+        queryset=User.objects.none(),
         widget=forms.Select(attrs={"class": "browser-default custom-select"}),
         label="Lecturer",
     )
@@ -48,18 +48,34 @@ class CourseAllocationForm(forms.ModelForm):
         fields = ["teacher", "courses"]
 
     def __init__(self, *args, **kwargs):
+        request = kwargs.pop("request", None)
         super(CourseAllocationForm, self).__init__(*args, **kwargs)
-        self.fields["teacher"].queryset = User.objects.filter(is_lecturer=True)
+        if request:
+            teachers = User.objects.filter(is_lecturer=True, school=request.school)
+            self.fields["teacher"].queryset = teachers
+            self.fields["courses"].queryset = Course.objects.filter(
+                school=request.school
+            ).order_by("program", "level")
+
+            # Update teacher labels to show department
+            teacher_choices = []
+            for t in teachers:
+                dept_label = f" [{t.department.title}]" if t.department else ""
+                teacher_choices.append((t.id, f"{t.get_full_name}{dept_label}"))
+            self.fields["teacher"].choices = [("", "---------")] + teacher_choices
+        else:
+            self.fields["teacher"].queryset = User.objects.filter(is_lecturer=True)
+            self.fields["courses"].queryset = Course.objects.all().order_by("level")
 
 
 class EditCourseAllocationForm(forms.ModelForm):
     courses = forms.ModelMultipleChoiceField(
-        queryset=Course.objects.all().order_by("level"),
+        queryset=Course.objects.none(),
         widget=forms.CheckboxSelectMultiple,
         required=True,
     )
     teacher = forms.ModelChoiceField(
-        queryset=User.objects.filter(is_lecturer=True),
+        queryset=User.objects.none(),
         widget=forms.Select(attrs={"class": "browser-default custom-select"}),
         label="Lecturer",
     )
@@ -69,9 +85,30 @@ class EditCourseAllocationForm(forms.ModelForm):
         fields = ["teacher", "courses"]
 
     def __init__(self, *args, **kwargs):
-        #    user = kwargs.pop('user')
+        request = kwargs.pop("request", None)
         super(EditCourseAllocationForm, self).__init__(*args, **kwargs)
-        self.fields["teacher"].queryset = User.objects.filter(is_lecturer=True)
+        if request:
+            teachers = User.objects.filter(is_lecturer=True, school=request.school)
+            self.fields["teacher"].queryset = teachers
+            courses_qs = Course.objects.filter(school=request.school).order_by(
+                "program", "level"
+            )
+
+            # If we are editing, filter courses by the teacher's department
+            if self.instance and self.instance.teacher.department:
+                courses_qs = courses_qs.filter(program=self.instance.teacher.department)
+
+            self.fields["courses"].queryset = courses_qs
+
+            # Update teacher labels to show department
+            teacher_choices = []
+            for t in teachers:
+                dept_label = f" [{t.department.title}]" if t.department else ""
+                teacher_choices.append((t.id, f"{t.get_full_name}{dept_label}"))
+            self.fields["teacher"].choices = [("", "---------")] + teacher_choices
+        else:
+            self.fields["teacher"].queryset = User.objects.filter(is_lecturer=True)
+            self.fields["courses"].queryset = Course.objects.all().order_by("level")
 
 
 # Upload files to specific course

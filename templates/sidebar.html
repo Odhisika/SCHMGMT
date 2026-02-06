@@ -53,8 +53,11 @@
 			<li class="{% if request.path == lec %}active{% endif %}">
 				<a href="{% url 'lecturer_list' %}"><i class="fas fa-chalkboard-teacher"></i>{% trans 'Teachers' %}</a>
 			</li>
-			<li class="{% if request.path == stu %}active{% endif %}">
-				<a href="{% url 'student_list' %}"><i class="fas fa-user-graduate"></i>{% trans 'Students' %}</a>
+			{% endif %}
+
+			{% if request.user.is_superuser or request.user.is_school_admin or request.user.is_lecturer or request.user.is_teacher %}
+			<li class="{% if '/accounts/classes/' in request.path %}active{% endif %}">
+				<a href="{% url 'class_list' %}"><i class="fas fa-layer-group"></i>{% trans 'Classes & Students' %}</a>
 			</li>
 			{% endif %}
 
@@ -64,6 +67,18 @@
 			</li>
 			<li class="{% if request.path == ttable %}active{% endif %}">
 				<a href="{% url 'timetable:timetable_dashboard' %}"><i class="fas fa-calendar-alt"></i>{% trans 'Timetable' %}</a>
+			</li>
+			{% endif %}
+
+			{% if request.user.is_superuser or request.user.is_school_admin or request.user.is_lecturer or request.user.is_teacher %}
+			<li class="{% if '/attendance/' in request.path %}active{% endif %}">
+				<a href="{% url 'attendance:dashboard' %}"><i class="fas fa-clipboard-check"></i>{% trans 'Attendance' %}</a>
+			</li>
+			{% endif %}
+
+			{% if request.user.is_student or request.user.is_superuser or request.user.is_school_admin %}
+			<li class="{% if '/fees/' in request.path %}active{% endif %}">
+				<a href="{% url 'fees:dashboard' %}"><i class="fas fa-money-bill-wave"></i>{% trans 'Payments' %}</a>
 			</li>
 			{% endif %}
 
@@ -93,6 +108,12 @@
 			<li class="{% if '/result/report-cards/' in request.path %}active{% endif %}">
 				<a href="{% url 'report_cards' %}"><i class="fas fa-file-invoice"></i>{% trans 'Report Cards' %}</a>
 			</li>
+			<li class="{% if '/result/promotion/' in request.path %}active{% endif %}">
+				<a href="{% url 'create_promotion' %}"><i class="fas fa-graduation-cap"></i>{% trans 'Promote Students' %}</a>
+			</li>
+			<li class="{% if '/result/manage-score/requests/' in request.path %}active{% endif %}">
+				<a href="{% url 'result_amendment_requests' %}"><i class="fas fa-clipboard-check"></i>{% trans 'Result Requests' %}</a>
+			</li>
 			<li class="{% if request.path == ttable %}active{% endif %}">
 				<a href="{% url 'timetable:timetable_dashboard' %}"><i class="fas fa-calendar-alt"></i>{% trans 'Timetable' %}</a>
 			</li>
@@ -101,6 +122,9 @@
 			{% if request.user.is_lecturer or request.user.is_teacher %}
 			<li class="{% if request.path == ascore %}active{% endif %}">
 				<a href="{% url 'add_score' %}"><i class="fas fa-table"></i>{% trans 'Manage Scores' %}</a>
+			</li>
+			<li class="{% if '/result/manage-score/requests/' in request.path %}active{% endif %}">
+				<a href="{% url 'result_amendment_requests' %}"><i class="fas fa-clipboard-check"></i>{% trans 'Result Requests' %}</a>
 			</li>
 			{% endif %}
 

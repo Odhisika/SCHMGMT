@@ -14,6 +14,8 @@ urlpatterns = [
     path("i18n/", include("django.conf.urls.i18n")),
 ]
 
+# Force reload for attendance URLs inclusion
+
 urlpatterns += i18n_patterns(
     path("jsi18n/", JavaScriptCatalog.as_view(), name="javascript-catalog"),
     path("", include("core.urls")),
@@ -28,6 +30,8 @@ urlpatterns += i18n_patterns(
     path("quiz/", include("quiz.urls")),
     path("payments/", include("payments.urls")),
     path("school/", include("school.urls")),
+    path("attendance/", include("attendance.urls")),  # Attendance system
+    path("fees/", include("fees.urls")),  # Payment/Fees system
     path("timetable/", include("timetable.urls")),
 )
 

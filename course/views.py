@@ -204,6 +204,11 @@ class CourseAllocationFormView(CreateView):
     form_class = CourseAllocationForm
     template_name = "course/course_allocation_form.html"
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["request"] = self.request
+        return kwargs
+
     def form_valid(self, form):
         teacher = form.cleaned_data["teacher"]
         selected_courses = form.cleaned_data["courses"]
@@ -239,14 +244,16 @@ class CourseAllocationFilterView(FilterView):
 def edit_allocated_course(request, pk):
     allocation = get_object_or_404(CourseAllocation, pk=pk)
     if request.method == "POST":
-        form = EditCourseAllocationForm(request.POST, instance=allocation)
+        form = EditCourseAllocationForm(
+            request.POST, instance=allocation, request=request
+        )
         if form.is_valid():
             form.save()
             messages.success(request, "Course allocation has been updated.")
             return redirect("course_allocation_view")
         messages.error(request, "Correct the error(s) below.")
     else:
-        form = EditCourseAllocationForm(instance=allocation)
+        form = EditCourseAllocationForm(instance=allocation, request=request)
     return render(
         request,
         "course/course_allocation_form.html",

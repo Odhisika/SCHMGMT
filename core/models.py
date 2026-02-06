@@ -72,6 +72,7 @@ class Term(models.Model):
     is_current_term = models.BooleanField(default=False, blank=True, null=True)
     next_term_begins = models.DateField(null=True, blank=True)
     school = models.ForeignKey("school.School", on_delete=models.CASCADE, null=True, blank=True)
+    result_released = models.BooleanField(default=False, help_text="Release results to students for this term")
 
     class Meta:
         unique_together = ["term", "year", "school"]  

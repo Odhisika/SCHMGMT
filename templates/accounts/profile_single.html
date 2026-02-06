@@ -90,6 +90,9 @@
                     <p><strong>{% trans 'First Name' %}:</strong> {{ user.first_name|title }}</p>
                     <p><strong>{% trans 'Last Name' %}:</strong> {{ user.last_name|title }}</p>
                     <p><strong>{% trans 'ID No.' %}:</strong> {{ user.username }}</p>
+                    {% if user.department %}
+                    <p><strong>{% trans 'Department/Section' %}:</strong> {{ user.department.title }}</p>
+                    {% endif %}
                 </div>
                 {% if user.is_student %}
                 <hr>

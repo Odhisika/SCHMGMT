@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+{% load i18n static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/clean-ui.css' %}">
+{% endblock %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'fees:dashboard' %}">{% trans 'Payments' %}</a></li>
+        <li class="breadcrumb-item active">{% trans 'Reference Lookup' %}</li>
+    </ol>
+</nav>
+
+<div class="title-1"><i class="fas fa-search"></i> {% trans 'Payment Reference Lookup' %}</div>
+<br>
+
+{% include 'snippets/messages.html' %}
+
+<div class="row">
+    <div class="col-md-6 offset-md-3">
+        <div class="card-clean">
+            <div class="card-body-clean">
+                <form method="get" class="form-clean">
+                    <div class="form-group">
+                        <label>{% trans 'Enter Payment Reference' %}</label>
+                        <div class="input-group">
+                            <input type="text" name="ref" class="form-control" placeholder="SCH-..." value="{{ reference }}">
+                            <button type="submit" class="btn-success-clean" style="margin-top: 0; border-top-left-radius: 0; border-bottom-left-radius: 0;">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        {% if student %}
+            <div class="card-clean mt-4" style="border-left: 4px solid #28a745;">
+                <div class="card-body-clean">
+                    <h4 class="mb-3 text-success">{% trans 'Student Found' %}</h4>
+                    
+                    <div class="d-flex align-items-center mb-3">
+                        {% if student.student.picture %}
+                            <img src="{{ student.student.get_picture }}" alt="Profile" class="rounded-circle mr-3" style="width: 60px; height: 60px; object-fit: cover;">
+                        {% else %}
+                            <div class="rounded-circle bg-light d-flex align-items-center justify-content-center mr-3" style="width: 60px; height: 60px;">
+                                <i class="fas fa-user fa-2x text-muted"></i>
+                            </div>
+                        {% endif %}
+                        <div style="margin-left: 15px;">
+                            <h5 class="mb-0">{{ student.student.get_full_name }}</h5>
+                            <small class="text-muted">{{ student.student.username }}</small>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="row">
+                        <div class="col-6">
+                            <strong>{% trans 'Class/Level:' %}</strong><br>
+                            {{ student.level }}
+                        </div>
+                        <div class="col-6">
+                            <strong>{% trans 'Reference:' %}</strong><br>
+                            <span class="badge bg-success">{{ reference }}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4 text-center">
+                        <a href="{% url 'fees:record_payment_student' student.id %}" class="btn-success-clean btn-block">
+                            <i class="fas fa-cash-register"></i> {% trans 'Record Payment for Student' %}
+                        </a>
+                    </div>
+                </div>
+            </div>
+        {% elif reference %}
+            <div class="alert alert-warning mt-4">
+                <i class="fas fa-exclamation-triangle"></i> {% trans 'No student found with reference code:' %} <strong>{{ reference }}</strong>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

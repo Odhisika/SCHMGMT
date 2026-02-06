@@ -15,6 +15,14 @@ from .utils import (
 
 
 class StaffAddForm(UserCreationForm):
+    def __init__(self, *args, **kwargs):
+        self.school = kwargs.pop("school", None)
+        super(StaffAddForm, self).__init__(*args, **kwargs)
+        if self.school:
+            self.fields["department"].queryset = Program.objects.filter(
+                school=self.school
+            )
+
     username = forms.CharField(
         max_length=30,
         widget=forms.TextInput(
@@ -56,6 +64,14 @@ class StaffAddForm(UserCreationForm):
                 "class": "browser-default custom-select form-control",
             },
         ),
+    )
+
+    department = forms.ModelChoiceField(
+        queryset=Program.objects.all(),
+        widget=forms.Select(
+            attrs={"class": "browser-default custom-select form-control"}
+        ),
+        label="Department / Section (e.g. Primary, JHS)",
     )
 
     address = forms.CharField(
@@ -127,6 +143,7 @@ class StaffAddForm(UserCreationForm):
         user.phone = self.cleaned_data.get("phone")
         user.address = self.cleaned_data.get("address")
         user.email = self.cleaned_data.get("email")
+        user.department = self.cleaned_data.get("department")
 
         # Generate credentials if username is missing (which implies new user via this form)
         password = None
@@ -139,7 +156,7 @@ class StaffAddForm(UserCreationForm):
         if commit:
             user.save()
             if password:
-               send_new_account_email(user, password)
+                send_new_account_email(user, password)
 
         return user
 
@@ -315,6 +332,14 @@ class StudentAddForm(UserCreationForm):
 
 
 class ProfileUpdateForm(UserChangeForm):
+    def __init__(self, *args, **kwargs):
+        self.school = kwargs.pop("school", None)
+        super(ProfileUpdateForm, self).__init__(*args, **kwargs)
+        if self.school:
+            self.fields["department"].queryset = Program.objects.filter(
+                school=self.school
+            )
+
     email = forms.EmailField(
         widget=forms.TextInput(
             attrs={
@@ -374,6 +399,15 @@ class ProfileUpdateForm(UserChangeForm):
         label="Address / city",
     )
 
+    department = forms.ModelChoiceField(
+        queryset=Program.objects.all(),
+        widget=forms.Select(
+            attrs={"class": "browser-default custom-select form-control"}
+        ),
+        label="Department / Section",
+        required=False,
+    )
+
     class Meta:
         model = User
         fields = [
@@ -383,6 +417,7 @@ class ProfileUpdateForm(UserChangeForm):
             "email",
             "phone",
             "address",
+            "department",
             "picture",
         ]
 

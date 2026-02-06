@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% load i18n static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/clean-ui.css' %}">
+{% endblock %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'fees:dashboard' %}">{% trans 'Payments' %}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'fees:fee_list' %}">{% trans 'Fee Structures' %}</a></li>
+        <li class="breadcrumb-item active">{{ title }}</li>
+    </ol>
+</nav>
+
+<div class="card-clean" style="max-width: 600px; margin-top: 40px;">
+    <div class="card-header-clean bg-danger text-white">
+        <h3 style="color: #d93025;"><i class="fas fa-exclamation-triangle"></i> {% trans 'Confirm Deletion' %}</h3>
+    </div>
+    <div class="card-body-clean">
+        <p style="font-size: 16px;">
+            {% trans 'Are you sure you want to delete the fee structure' %} 
+            <strong>"{{ fee.name }}"</strong>?
+        </p>
+        <p style="color: #5f6368;">
+            {% trans 'This action cannot be undone.' %}
+        </p>
+
+        <form method="post" style="margin-top: 30px;">
+            {% csrf_token %}
+            <div style="display: flex; gap: 12px;">
+                <button type="button" class="btn-outline-clean" onclick="window.history.back()">
+                    {% trans 'Cancel' %}
+                </button>
+                <button type="submit" class="btn-danger-clean" style="background-color: #d93025; color: white; border: none; padding: 10px 24px; border-radius: 6px; cursor: pointer; font-weight: 500;">
+                    {% trans 'Confirm Delete' %}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

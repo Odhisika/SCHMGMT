@@ -54,7 +54,7 @@
                 {% if request.user.is_superuser or request.user.is_school_admin %}
                 <td>
                     <div class="dropdown">
-                        <button class="btn btn-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <button class="btn btn-sm" type="button" data-bs-toggle="dropdown" data-bs-boundary="window" data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false">
                             <i class="fa fa-ellipsis-vertical"></i>
                         </button>
                         <ul class="dropdown-menu">

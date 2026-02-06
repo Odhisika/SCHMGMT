@@ -22,13 +22,22 @@ class ProgramFilter(django_filters.FilterSet):
 class CourseAllocationFilter(django_filters.FilterSet):
     teacher = django_filters.CharFilter(method="filter_by_teacher", label="")
     course = django_filters.filters.CharFilter(method="filter_by_course", label="")
+    department = django_filters.ModelChoiceFilter(
+        queryset=Program.objects.all(),
+        field_name="teacher__department",
+        label="Department/Section",
+    )
 
     class Meta:
         model = CourseAllocation
-        fields = []
+        fields = ["department"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if hasattr(self, "request") and self.request:
+            self.filters["department"].queryset = Program.objects.filter(
+                school=self.request.school
+            )
 
         # Change html classes and placeholders
         self.filters["teacher"].field.widget.attrs.update(
@@ -37,6 +46,10 @@ class CourseAllocationFilter(django_filters.FilterSet):
         self.filters["course"].field.widget.attrs.update(
             {"class": "au-input", "placeholder": "Course"}
         )
+        if "department" in self.filters:
+            self.filters["department"].field.widget.attrs.update(
+                {"class": "au-input"}
+            )
 
     def filter_by_teacher(self, queryset, name, value):
         return queryset.filter(

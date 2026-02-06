@@ -22,6 +22,8 @@ urlpatterns = [
     
     # We still need authentication
     path("accounts/", include("accounts.urls")),
+    path("attendance/", include("attendance.urls")),
+    path("fees/", include("fees.urls")),
     
     # Django Admin for low-level debugging
     path("django-admin/", admin.site.urls),

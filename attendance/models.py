@@ -20,6 +20,58 @@ ATTENDANCE_STATUS = (
 )
 
 
+class AttendanceSession(models.Model):
+    """Daily attendance session for a class/level - enables bulk marking"""
+    school = models.ForeignKey("school.School", on_delete=models.CASCADE)
+    term = models.ForeignKey(Term, on_delete=models.CASCADE)
+    level = models.CharField(max_length=25, choices=settings.LEVEL_CHOICES)
+    date = models.DateField()
+    marked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='marked_attendance_sessions'
+    )
+    marked_at = models.DateTimeField(auto_now_add=True)
+    notes = models.TextField(blank=True, help_text=_("General notes for this session"))
+    
+    class Meta:
+        unique_together = ['school', 'level', 'date']
+        ordering = ['-date', 'level']
+        verbose_name = _("Attendance Session")
+        verbose_name_plural = _("Attendance Sessions")
+    
+    def __str__(self):
+        return f"{dict(settings.LEVEL_CHOICES).get(self.level, self.level)} - {self.date}"
+    
+    @property
+    def total_students(self):
+        """Count linked attendance records"""
+        return Attendance.objects.filter(
+            date=self.date,
+            student__level=self.level,
+            school=self.school
+        ).count()
+    
+    @property
+    def present_count(self):
+        return Attendance.objects.filter(
+            date=self.date,
+            student__level=self.level,
+            school=self.school,
+            status=PRESENT
+        ).count()
+    
+    @property
+    def absent_count(self):
+        return Attendance.objects.filter(
+            date=self.date,
+            student__level=self.level,
+            school=self.school,
+            status=ABSENT
+        ).count()
+
+
 class Attendance(models.Model):
     """Daily attendance records for students"""
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name="attendance_records")
@@ -76,7 +128,7 @@ class AttendanceSummary(models.Model):
         # Get attendance records for this term
         records = Attendance.objects.filter(
             student=self.student,
-            date__gte=self.term.session.session  # Simplified - should use term dates
+            date__gte=self.term.start_date if hasattr(self.term, 'start_date') else self.term.year
         )
         
         # Count by status

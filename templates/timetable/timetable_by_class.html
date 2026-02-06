@@ -94,7 +94,11 @@
             {% empty %}
             <tr>
                 <td colspan="6" class="text-center text-danger">
+                    {% if request.user.is_superuser or request.user.is_school_admin %}
                     {% trans 'No periods defined. Please' %} <a href="{% url 'timetable:period_list' %}">{% trans 'add periods' %}</a> {% trans 'first.' %}
+                    {% else %}
+                    {% trans 'No timetable has been generated for this class yet.' %}
+                    {% endif %}
                 </td>
             </tr>
             {% endfor %}

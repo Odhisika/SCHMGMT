@@ -28,7 +28,10 @@ from .views import (
     register,
     render_lecturer_pdf_list,  # new
     render_student_pdf_list,  # new
+    class_list_view,
+    class_detail_view,
 )
+
 
 # from .forms import EmailValidationOnForgotPassword
 
@@ -45,6 +48,8 @@ urlpatterns = [
     path("staff/<int:pk>/edit/", edit_staff, name="staff_edit"),
     path("lecturers/<int:pk>/delete/", delete_staff, name="lecturer_delete"),
     path("students/", StudentListView.as_view(), name="student_list"),
+    path("classes/", class_list_view, name="class_list"),
+    path("classes/<str:level_code>/", class_detail_view, name="class_detail"),
     path("student/add/", student_add_view, name="add_student"),
     path("student/<int:pk>/edit/", edit_student, name="student_edit"),
     path("students/<int:pk>/delete/", delete_student, name="student_delete"),

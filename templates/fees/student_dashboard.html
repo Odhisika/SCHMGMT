@@ -1,0 +1,150 @@
+{% extends 'base.html' %}
+{% load i18n static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/clean-ui.css' %}">
+{% endblock %}
+
+{% block title %}{{ title }} | {% trans 'My Payments' %}{% endblock %}
+
+{% block content %}
+<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
+        <li class="breadcrumb-item active">{% trans 'My Payments' %}</li>
+    </ol>
+</nav>
+
+<div class="title-1 mb-30"><i class="fas fa-wallet"></i> {% trans 'My Payments' %}</div>
+
+{% include 'snippets/messages.html' %}
+
+{% if current_term %}
+<div class="alert-info-clean mb-30">
+    <i class="fas fa-info-circle"></i> {% trans 'Current Term' %}: <strong>{{ current_term }}</strong>
+</div>
+{% endif %}
+
+{% if payment_reference %}
+<div class="payment-ref-card">
+    <div>
+        <p style="margin: 0; opacity: 0.8; font-size: 13px;">{% trans 'Your Payment Reference' %}</p>
+        <h2 style="margin: 8px 0 0; font-size: 28px; font-weight: 700; letter-spacing: 2px;">{{ payment_reference }}</h2>
+        <p style="margin: 12px 0 0; font-size: 12px; opacity: 0.7;">
+            <i class="fas fa-info-circle"></i> {% trans 'Use this reference when making payments' %}
+        </p>
+    </div>
+    <div style="background: rgba(255,255,255,0.2); padding: 16px; border-radius: 50%; width: 64px; height: 64px; display: flex; align-items: center; justify-content: center;">
+        <i class="fas fa-barcode" style="font-size: 32px;"></i>
+    </div>
+</div>
+{% endif %}
+
+<div class="stats-grid mb-30">
+    <div class="balance-card-gradient">
+        <p class="stat-label" style="color: rgba(255,255,255,0.9); text-align: left; margin: 0 0 10px 0;">{% trans 'Outstanding Balance' %}</p>
+        <p class="stat-value" style="color: white; text-align: left; font-weight: 700; font-size: 36px;">{{ settings.CURRENCY_SYMBOL }}{{ total_balance|floatformat:2 }}</p>
+    </div>
+</div>
+
+{% if assignments %}
+<div class="table-responsive p-3 mt-3">
+    <h6 class="fw-bold text-primary"><u>{% trans 'Fee Summary:' %}</u></h6>
+    <div class="table-shadow">
+        <table class="table table-light table-clean">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>{% trans 'Fee Type' %}</th>
+                    <th>{% trans 'Amount' %}</th>
+                    <th>{% trans 'Paid' %}</th>
+                    <th>{% trans 'Balance' %}</th>
+                    <th>{% trans 'Actions' %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for assignment in assignments %}
+                <tr>
+                    <td>{{ forloop.counter }}.</td>
+                    <td><strong>{{ assignment.fee_structure.name }}</strong></td>
+                    <td>{{ settings.CURRENCY_SYMBOL }}{{ assignment.amount }}</td>
+                    <td><span class="badge-success">{{ settings.CURRENCY_SYMBOL }}{{ assignment.amount_paid }}</span></td>
+                    <td>
+                        {% if assignment.balance > 0 %}
+                        <span class="badge-warning">{{ settings.CURRENCY_SYMBOL }}{{ assignment.balance }}</span>
+                        {% else %}
+                        <span class="badge-success">{% trans 'Paid' %}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if assignment.balance > 0 %}
+                        <a href="{% url 'fees:initiate_payment' assignment.id %}" class="btn-primary-clean" style="text-decoration: none; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; padding: 10px 20px;">
+                            <i class="fas fa-credit-card"></i> 
+                            <span>{% trans 'Pay Now' %}</span>
+                        </a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<div class="table-responsive p-3">
+    <h6 class="fw-bold text-primary"><u>{% trans 'Payment History:' %}</u></h6>
+    <div class="table-shadow">
+        {% if payments %}
+        <table class="table table-light table-clean">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>{% trans 'Date' %}</th>
+                    <th>{% trans 'Amount' %}</th>
+                    <th>{% trans 'Method' %}</th>
+                    <th>{% trans 'Status' %}</th>
+                    <th>{% trans 'Reference' %}</th>
+                    <th>{% trans 'Receipt' %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for payment in payments %}
+                <tr>
+                    <td>{{ forloop.counter }}.</td>
+                    <td>{{ payment.payment_date|date:"M. d, Y" }}</td>
+                    <td>{{ settings.CURRENCY_SYMBOL }}{{ payment.amount }}</td>
+                    <td>{{ payment.get_payment_method_display }}</td>
+                    <td>
+                        {% if payment.status == 'VERIFIED' %}
+                        <span class="badge-success">{{ payment.get_status_display }}</span>
+                        {% elif payment.status == 'PENDING' %}
+                        <span class="badge-warning">{{ payment.get_status_display }}</span>
+                        {% else %}
+                        <span class="badge-danger">{{ payment.get_status_display }}</span>
+                        {% endif %}
+                    </td>
+                    <td><small class="text-muted">{{ payment.receipt_number|default:payment.paystack_reference|default:'-' }}</small></td>
+                    <td>
+                        {% if payment.status == 'VERIFIED' %}
+                        <a href="{% url 'fees:download_receipt' payment.id %}" class="btn-secondary-clean btn-sm" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px;" target="_blank">
+                            <i class="fas fa-download"></i> {% trans 'Download' %}
+                        </a>
+                        {% else %}
+                        <span class="text-muted" style="font-size: 12px;">-</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon"><i class="fas fa-receipt"></i></div>
+            <p class="empty-state-text">{% trans 'No payment history yet' %}</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}

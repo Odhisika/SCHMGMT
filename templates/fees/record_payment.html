@@ -1,0 +1,319 @@
+{% extends 'base.html' %}
+{% load i18n static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/clean-ui.css' %}">
+<style>
+    .student-result {
+        cursor: pointer;
+        padding: 12px;
+        border: 1px solid #eee;
+        margin-bottom: 8px;
+        border-radius: 8px;
+        transition: all 0.2s;
+    }
+    .student-result:hover {
+        background: #f8f9fa;
+        border-color: #4285f4;
+    }
+    .student-selected {
+        background: #e3f2fd !important;
+        border-color: #4285f4 !important;
+    }
+    .payment-ref {
+        background: #ff6f00;
+        color: white;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    .student-info-card {
+        background: #f8f9fa;
+        border-left: 4px solid #4285f4;
+        padding: 16px;
+        margin-bottom: 20px;
+        border-radius: 8px;
+    }
+    .search-box {
+        position: relative;
+    }
+    .search-box .spinner {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        display: none;
+    }
+</style>
+{% endblock %}
+
+{% block title %}{{ title }} | {% trans 'Record Payment' %}{% endblock %}
+
+{% block content %}
+<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'fees:dashboard' %}">{% trans 'Payments' %}</a></li>
+        <li class="breadcrumb-item active">{% trans 'Record Payment' %}</li>
+    </ol>
+</nav>
+
+<div class="title-1"><i class="fas fa-cash-register"></i> {% trans 'Record Manual Payment' %}</div>
+<br>
+
+{% include 'snippets/messages.html' %}
+
+<!-- Student Search Section -->
+<div class="card-clean" style="margin-bottom: 24px;">
+    <div class="card-header-clean">
+        <h3>{% trans 'Find Student' %}</h3>
+    </div>
+    <div class="card-body-clean">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="form-group search-box">
+                    <label>{% trans 'Search by Name or ID' %}</label>
+                    <input type="text" id="student-search" class="form-control" placeholder="{% trans 'Type student name or ID...' %}">
+                    <i class="fas fa-spinner fa-spin spinner"></i>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label>{% trans 'Filter by Class' %}</label>
+                    <select id="class-filter" class="form-select">
+                        <option value="">{% trans 'All Classes' %}</option>
+                        {% for value, label in level_choices %}
+                            <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <div id="student-search-results" style="margin-top: 16px; max-height: 400px; overflow-y: auto;">
+            <!-- Search results will appear here -->
+        </div>
+    </div>
+</div>
+
+<!-- Selected Student Info -->
+<div id="selected-student-info" style="display: none;">
+    <div class="student-info-card">
+        <div class="row">
+            <div class="col-md-6">
+                <p style="margin: 0;"><strong>{% trans 'Student Name:' %}</strong> <span id="info-name"></span></p>
+                <p style="margin: 8px 0 0 0;"><strong>{% trans 'Class:' %}</strong> <span id="info-level"></span></p>
+            </div>
+            <div class="col-md-6">
+                <p style="margin: 0;"><strong>{% trans 'Payment Reference:' %}</strong> <span class="payment-ref" id="info-reference"></span></p>
+                <p style="margin: 8px 0 0 0;"><strong>{% trans 'Outstanding Balance:' %}</strong> GH₵<span id="info-balance">0.00</span></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Payment Form -->
+<div class="row">
+    <div class="col-md-8">
+        <div class="card-clean">
+            <div class="card-header-clean">
+                <h3>{% trans 'Payment Details' %}</h3>
+            </div>
+            <div class="card-body-clean">
+                <form method="post" class="form-clean" id="payment-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="student" id="selected-student-id">
+                    
+                    <div class="row">
+                        <div class="col-md-6 form-group">
+                            <label for="{{ form.amount.id_for_label }}">{{ form.amount.label }}*</label>
+                            {{ form.amount }}
+                            {{ form.amount.errors }}
+                        </div>
+                        <div class="col-md-6 form-group">
+                            <label for="{{ form.payment_date.id_for_label }}">{{ form.payment_date.label }}</label>
+                            {{ form.payment_date }}
+                            {{ form.payment_date.errors }}
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 form-group">
+                            <label for="{{ form.payment_method.id_for_label }}">{{ form.payment_method.label }}*</label>
+                            {{ form.payment_method }}
+                            {{ form.payment_method.errors }}
+                        </div>
+                        <div class="col-md-6 form-group">
+                            <label for="{{ form.receipt_number.id_for_label }}">{{ form.receipt_number.label }}</label>
+                            {{ form.receipt_number }}
+                            {{ form.receipt_number.errors }}
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="{{ form.notes.id_for_label }}">{{ form.notes.label }}</label>
+                        {{ form.notes }}
+                        {{ form.notes.errors }}
+                    </div>
+                    
+                    <div style="margin-top: 24px; display: flex; gap: 12px;">
+                        <button type="submit" class="btn-success-clean" style="display: inline-flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-check-circle" style="background: rgba(0,0,0,0.1); width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px;"></i>
+                            <span>{% trans 'Record Payment' %}</span>
+                        </button>
+                        <a href="{% url 'fees:dashboard' %}" class="btn-outline-clean" style="text-decoration: none;">
+                            {% trans 'Cancel' %}
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card-clean bg-light">
+            <div class="card-body-clean">
+                <h5><i class="fas fa-info-circle"></i> {% trans 'Instructions' %}</h5>
+                <p class="text-muted small">
+                    {% trans 'Use this form to record payments received offline (Cash, Bank Transfer, etc.).' %}
+                </p>
+                <ul class="text-muted small pl-3">
+                    <li>{% trans 'Search and select the student first.' %}</li>
+                    <li>{% trans 'The outstanding balance will be displayed.' %}</li>
+                    <li>{% trans 'Payment reference is shown for verification.' %}</li>
+                    <li>{% trans 'Receipt number is optional but recommended for tracking.' %}</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    function initPaymentPage() {
+        console.log('Initializing payment page script...');
+        const searchInput = document.getElementById('student-search');
+        const classFilter = document.getElementById('class-filter');
+        const resultsDiv = document.getElementById('student-search-results');
+        const spinner = document.querySelector('.spinner');
+        const selectedInfoDiv = document.getElementById('selected-student-info');
+        const paymentForm = document.getElementById('payment-form');
+        
+        if (!searchInput || !paymentForm) {
+            console.warn('Required elements not found, retrying in 500ms...');
+            setTimeout(initPaymentPage, 500);
+            return;
+        }
+
+        // Disable browser autocomplete
+        searchInput.setAttribute('autocomplete', 'off');
+        
+        let searchTimeout;
+        let selectedStudent = null;
+    
+    function performSearch() {
+        const query = searchInput.value.trim();
+        const classValue = classFilter.value;
+        
+        if (!query && !classValue) {
+            resultsDiv.innerHTML = '';
+            return;
+        }
+        
+        spinner.style.display = 'block';
+        
+        fetch(`{% url 'fees:student_search_api' %}?q=${encodeURIComponent(query)}&class=${encodeURIComponent(classValue)}`)
+            .then(response => response.json())
+            .then(data => {
+                spinner.style.display = 'none';
+                displayResults(data.students);
+            })
+            .catch(error => {
+                spinner.style.display = 'none';
+                console.error('Search error:', error);
+            });
+    }
+    
+    function displayResults(students) {
+        if (students.length === 0) {
+            resultsDiv.innerHTML = '<p class="text-muted small">{% trans "No students found" %}</p>';
+            return;
+        }
+        
+        let html = '';
+        students.forEach(student => {
+            html += `
+                <div class="student-result" data-student='${JSON.stringify(student)}'>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>${student.name}</strong> (${student.username})<br>
+                            <small class="text-muted">${student.level || 'N/A'} | Ref: ${student.payment_reference || 'N/A'}</small>
+                        </div>
+                        <div class="text-end">
+                            <strong style="color: #d32f2f;">GH₵${student.outstanding_balance.toFixed(2)}</strong><br>
+                            <small class="text-muted">{% trans "Outstanding" %}</small>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        resultsDiv.innerHTML = html;
+        
+        // Add click handlers
+        document.querySelectorAll('.student-result').forEach(el => {
+            el.addEventListener('click', function(e) {
+                const student = JSON.parse(this.getAttribute('data-student'));
+                selectStudent(student, this);
+            });
+        });
+    }
+    
+    function selectStudent(student, clickedElement) {
+        selectedStudent = student;
+        
+        // Update UI
+        document.querySelectorAll('.student-result').forEach(el => el.classList.remove('student-selected'));
+        if (clickedElement) {
+            clickedElement.classList.add('student-selected');
+        }
+        
+        // Show student info
+        document.getElementById('info-name').textContent = student.name;
+        document.getElementById('info-level').textContent = student.level || 'N/A';
+        document.getElementById('info-reference').textContent = student.payment_reference || 'N/A';
+        document.getElementById('info-balance').textContent = student.outstanding_balance.toFixed(2);
+        selectedInfoDiv.style.display = 'block';
+        
+        // Set form values
+        document.getElementById('selected-student-id').value = student.id;
+        document.getElementById('{{ form.amount.id_for_label }}').value = student.outstanding_balance.toFixed(2);
+    }
+    
+    searchInput.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(performSearch, 300);
+    });
+    
+    classFilter.addEventListener('change', performSearch);
+    
+    // Form validation
+    paymentForm.addEventListener('submit', function(e) {
+        if (!selectedStudent) {
+            e.preventDefault();
+            alert('{% trans "Please select a student first" %}');
+        }
+    });
+    
+    console.log('Payment page script initialized successfully');
+    }
+
+    // Robust initialization
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initPaymentPage);
+    } else {
+        initPaymentPage();
+    }
+})();
+</script>
+{% endblock %}

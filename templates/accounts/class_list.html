@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% load custom_filters %}
+{% block title %} {% trans 'Manage Classes' %} | {{ block.super }}{% endblock title %}
+
+{% block content %}
+<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
+        <li class="breadcrumb-item active" aria-current="page">{% trans 'Classes' %}</li>
+    </ol>
+</nav>
+
+<div class="card">
+    <div class="card-header bg-white">
+        <h3 class="card-title text-primary"><i class="fas fa-layer-group"></i> {% trans 'Class Management Dashboard' %}</h3>
+    </div>
+    <div class="card-body">
+        {% if is_teacher %}
+        <div class="alert alert-info mb-4">
+            <i class="fas fa-info-circle"></i> {% trans 'You are viewing only the classes where you have assigned subjects.' %}
+        </div>
+        {% endif %}
+
+        {% if levels %}
+        <div class="row g-4">
+            {% for level_code, level_name in levels %}
+            <div class="col">
+                <div class="card h-100 shadow border-0" style="border-radius: 8px;">
+                    <div class="card-body p-4 text-center">
+                        <h3 class="card-title fw-bold text-dark mb-1">{{ level_name }}</h3>
+                        <div class="mb-3">
+                            <span class="display-4 fw-bold text-primary">{{ students_counts|get_item:level_code|default:0 }}</span>
+                            <span class="text-muted d-block small text-uppercase fw-bold">Students</span>
+                        </div>
+                        <p class="card-text text-muted mb-4 small">
+                            {% trans 'Manage students, view results, and handle promotions for' %} {{ level_name }}.
+                        </p> 
+                        <a href="{% url 'class_detail' level_code %}" class="btn btn-primary w-100 py-2">
+                            {% trans 'Open Class Workspace' %}
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class=\"text-center py-5\">
+            <i class=\"fas fa-calendar-times fa-4x text-muted mb-3\"></i>
+            <h4>{% trans 'No Classes Assigned' %}</h4>
+            <p class=\"text-muted\">
+                {% if is_teacher %}
+                {% trans 'You currently have no course allocations. Please contact your administrator to get subjects assigned.' %}
+                {% else %}
+                {% trans 'No classes are currently set up in the system.' %}
+                {% endif %}
+            </p>
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+{% endblock content %}

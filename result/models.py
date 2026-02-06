@@ -290,3 +290,40 @@ class BECEMockResult(models.Model):
                 break
         super().save(*args, **kwargs)
 
+
+class ResultEditRequest(models.Model):
+    """
+    Request from teacher to alter results after publication.
+    Requires admin approval.
+    """
+    PENDING = "Pending"
+    APPROVED = "Approved"
+    REJECTED = "Rejected"
+    
+    STATUS_CHOICES = (
+        (PENDING, "Pending"),
+        (APPROVED, "Approved"),
+        (REJECTED, "Rejected"),
+    )
+
+    TEACHER_REQUEST = "TEACHER_TO_ADMIN"
+    ADMIN_REQUEST = "ADMIN_TO_TEACHER"
+    
+    REQUEST_TYPE = (
+        (TEACHER_REQUEST, "Teacher requests Admin approval"),
+        (ADMIN_REQUEST, "Admin requests Teacher approval"),
+    )
+    
+    teacher = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="result_edit_requests")
+    course = models.ForeignKey(Course, on_delete=models.CASCADE)
+    term = models.ForeignKey(Term, on_delete=models.CASCADE)
+    requested_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="requests_made", null=True)
+    request_type = models.CharField(max_length=20, choices=REQUEST_TYPE, default=TEACHER_REQUEST)
+    reason = models.TextField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=PENDING)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    school = models.ForeignKey("school.School", on_delete=models.CASCADE, null=True, blank=True)
+
+    def __str__(self):
+        return f"Edit Request: {self.course} by {self.teacher} ({self.status})"

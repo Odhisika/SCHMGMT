@@ -1,70 +1,114 @@
 {% extends 'registration/registration_base.html' %}
-{% load i18n %}
-{% block title %}{% trans 'Dj Learning Management System - Login' %}{% endblock title %}
-{% load crispy_forms_tags %}
-{% block content %}
+{% load i18n static %}
 
-<div class="col-md-4 mx-auto mt-5">
-  <div class="card">
-    <div class="form-title">
-      <i class="fas fa-lock me-2"></i>
-      {% trans 'Sign in' %}
-    </div>
-    <div class="card-body">
-        <form action="" method="POST" id="login-form">{% csrf_token %}
-          <div class="form-group mb-3">
-              <label class="mb-2" for="username_id"><i class="fas fa-address-card me-2"></i>{% trans 'ID Number' %}</label>
-              <input type="text" name="username" id="username_id" class="form-control" required>
-              <div id="message-wrapper"></div>
-          </div>
-          <div class="form-group mb-3">
-              <label class="mb-2" for="password_id"><i class="fas fa-key me-2"></i>{% trans 'Password' %}</label>
-              <input type="password" name="password" id="password_id" class="form-control" required>
-          </div>
-          {% if form.errors %}
-                <span class="text-danger"><i class="fas fa-exclamation-circle"></i> {% trans 'Invalid ID & Password.' %}</span><br>
-          {% endif %}
-      
-          <button type="submit" class="btn btn-primary" id="login-btn"><i class="fas fa-sign-in-alt"></i><small>{% trans 'SIGN IN' %}</small></button>
-        </form>
-        <br>
-        <div class="login-bottom">
-          <a href="{% url 'password_reset' %}" class="link">{% trans 'Forgot password ?' %}</a>
+{% block title %}{% trans 'Login' %} | Scolaa{% endblock title %}
+
+{% block header %}
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'css/clean-ui.css' %}?v={{ now|date:'U' }}">
+<style>
+    body { margin: 0 !important; padding: 0 !important; background: none !important; }
+    #main, #main-content, .container-fluid { padding: 0 !important; margin: 0 !important; max-width: 100% !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="login-page-body">
+    <div class="login-card">
+        <!-- Left Side: Illustration & Quote -->
+        <div class="login-left">
+            <div class="login-quote">
+                "A Building With Four Walls And Tomorrow Inside."
+            </div>
+            <img src="{% static 'img/graduation_login_illustration.png' %}" alt="LMS Illustration" class="login-illustration" onerror="this.src='/static/img/default-login.png'; this.onerror=null;">
         </div>
-      </div>
-  </div>
+
+        <!-- Right Side: Login Form -->
+        <div class="login-right">
+            <div class="login-header-tab"></div>
+            <div class="login-avatar">
+                <i class="fas fa-user-graduate"></i>
+            </div>
+
+            <div class="login-form-container">
+                <div class="login-form-title">
+                    <h2><span class="logo-highlight">LuckyTech</span> Innovation Ground</h2>
+                    <p class="text-muted small">{% trans 'Educational Management Portal' %}</p>
+                </div>
+
+                <form action="" method="POST" id="login-form">
+                    {% csrf_token %}
+                    
+                    <div class="form-group-login">
+                        <label for="username_id">{% trans 'ID Number' %}</label>
+                        <div class="login-input-wrapper">
+                            <i class="far fa-address-card"></i>
+                            <input type="text" name="username" id="username_id" class="login-input" placeholder="{% trans 'Enter your ID' %}" required autofocus>
+                        </div>
+                        <div id="message-wrapper"></div>
+                    </div>
+
+                    <div class="form-group-login">
+                        <label for="password_id">{% trans 'Password' %}</label>
+                        <div class="login-input-wrapper">
+                            <i class="fas fa-lock"></i>
+                            <input type="password" name="password" id="password_id" class="login-input" placeholder="{% trans 'Enter password' %}" required>
+                            <i class="fas fa-eye-slash" id="togglePassword" style="position: absolute; right: 0; left: auto; cursor: pointer; color: #9aa0a6; background: white; padding-left: 10px;"></i>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="rememberMe">
+                            <label class="form-check-label small" for="rememberMe" style="display:inline; margin-bottom:0;">{% trans 'Remember me' %}</label>
+                        </div>
+                        <a href="{% url 'password_reset' %}" class="small text-decoration-none" style="color: var(--primary);">{% trans 'Forgot Password?' %}</a>
+                    </div>
+
+                    {% if form.errors %}
+                        <div class="alert alert-danger py-2 px-3 small border-0 mb-3" style="background: #fce8e6; color: #d93025; border-radius: 8px;">
+                            <i class="fas fa-exclamation-circle me-2"></i> {% trans 'Invalid ID or Password.' %}
+                        </div>
+                    {% endif %}
+
+                    <button type="submit" class="login-btn-pill" id="login-btn">
+                        {% trans 'LOGIN AS A USER' %}
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer Links -->
+    <div class="login-footer">
+        <a href="#">{% trans 'Terms of Services' %}</a>
+        <a href="#">{% trans 'Privacy Policy' %}</a>
+        <a href="#">{% trans 'Contact Us' %}</a>
+        <a href="#">{% trans 'Help' %}</a>
+        <span>&copy; {{ now|date:"Y" }} LuckyTech. All Rights Reserved.</span>
+    </div>
 </div>
 {% endblock content %}
 
 {% block js %}
-
 <script>
-  $('#login-form').submit(function (e) {
-    // e.preventDefault();
-    $('#login-btn').addClass('disabled')
-    $('#login-btn').html(`<i class="fas fa-sign-in-alt"></i> Signining you in . . .`)
-  })
+    const loginForm = document.getElementById('login-form');
+    const togglePassword = document.querySelector('#togglePassword');
+    const password = document.querySelector('#password_id');
 
-  $("#username").on("input", function () {
-    username = $(this).val();
+    togglePassword.addEventListener('click', function (e) {
+        // toggle the type attribute
+        const type = password.getAttribute('type') === 'password' ? 'text' : 'password';
+        password.setAttribute('type', type);
+        // toggle the eye / eye slash icon
+        this.classList.toggle('fa-eye');
+        this.classList.toggle('fa-eye-slash');
+    });
 
-    $.ajax({
-      url: "/accounts/ajax/validate-username/",
-      data: {
-        username: username
-      },
-      dataType: 'json',
-      success: function (data) {
-        if (data.is_taken) {
-          console.log(data.is_taken);
-          $('#message-wrapper').html(`<p class="my-2 text-danger"><span class="bg-error p-2"><b>${username}</b> already taken :( try another one </span></p>`)
-        }
-        else {
-          $('#message-wrapper').html(`<p class="my-2 text-success"><span class="bg-correct p-2"><b>${username}</b> is valid </span></p>`)
-        }
-      }
-
-    })
-  })
+    loginForm.addEventListener('submit', function(e) {
+        const btn = document.getElementById('login-btn');
+        btn.classList.add('disabled');
+        btn.innerHTML = `{% trans 'Signing you in...' %}`;
+    });
 </script>
 {% endblock %}

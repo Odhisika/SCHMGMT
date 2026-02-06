@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+{% load i18n static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/clean-ui.css' %}">
+{% endblock %}
+
+{% block title %}{{ title }} | {% trans 'Payments' %}{% endblock %}
+
+{% block content %}
+<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'fees:dashboard' %}">{% trans 'Payments' %}</a></li>
+        <li class="breadcrumb-item active">{% trans 'Verify Payment' %}</li>
+    </ol>
+</nav>
+
+<div class="title-1"><i class="fas fa-user-check"></i> {% trans 'Verify Payment' %}</div>
+<br>
+
+<div class="card-clean" style="max-width: 700px;">
+    <div class="card-header-clean">
+        <h3>{% trans 'Payment Details' %}</h3>
+    </div>
+    <div class="card-body-clean">
+        <div class="row mb-4">
+            <div class="col-sm-4 text-secondary">{% trans 'Student' %}</div>
+            <div class="col-sm-8"><strong>{{ payment.student.student.get_full_name }}</strong></div>
+        </div>
+        <hr>
+        <div class="row mb-4">
+            <div class="col-sm-4 text-secondary">{% trans 'Amount' %}</div>
+            <div class="col-sm-8 text-primary h4"><strong>{{ settings.CURRENCY_SYMBOL }}{{ payment.amount }}</strong></div>
+        </div>
+        <hr>
+        <div class="row mb-4">
+            <div class="col-sm-4 text-secondary">{% trans 'Reason' %}</div>
+            <div class="col-sm-8">{{ payment.assignment.fee_structure.name|default:'General Payment' }}</div>
+        </div>
+        <hr>
+        <div class="row mb-4">
+            <div class="col-sm-4 text-secondary">{% trans 'Method' %}</div>
+            <div class="col-sm-8">{{ payment.get_payment_method_display }}</div>
+        </div>
+        {% if payment.receipt_number %}
+        <hr>
+        <div class="row mb-4">
+            <div class="col-sm-4 text-secondary">{% trans 'Receipt #' %}</div>
+            <div class="col-sm-8">{{ payment.receipt_number }}</div>
+        {% endif %}
+        </div>
+        
+        <div class="alert-warning-clean mb-4">
+            <i class="fas fa-exclamation-triangle"></i> {% trans 'Please ensure the funds have been physically received before verifying.' %}
+        </div>
+        
+        <form method="post" class="d-flex gap-3">
+            {% csrf_token %}
+            <button type="submit" name="action" value="verify" class="btn-primary-clean" style="display: inline-flex; align-items: center; gap: 8px;">
+                <i class="fas fa-check-circle" style="background: rgba(0,0,0,0.1); width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px;"></i>
+                <span>{% trans 'Approve & Verify' %}</span>
+            </button>
+            <button type="submit" name="action" value="reject" class="btn-danger-clean" style="display: inline-flex; align-items: center; gap: 8px;">
+                <i class="fas fa-times-circle" style="background: rgba(0,0,0,0.1); width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px;"></i>
+                <span>{% trans 'Reject Payment' %}</span>
+            </button>
+            <a href="{% url 'fees:dashboard' %}" class="btn-outline-clean" style="text-decoration: none;">
+                {% trans 'Back' %}
+            </a>
+        </form>
+    </div>
+</div>
+{% endblock %}

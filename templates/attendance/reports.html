@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+{% load i18n static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/clean-ui.css' %}">
+{% endblock %}
+
+{% block title %}{{ title }} | {% trans 'Attendance' %}{% endblock %}
+
+{% block content %}
+<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'attendance:dashboard' %}">{% trans 'Attendance' %}</a></li>
+        <li class="breadcrumb-item active">{% trans 'Reports' %}</li>
+    </ol>
+</nav>
+
+<div class="title-1"><i class="fas fa-chart-pie"></i> {% trans 'Attendance Reports' %}</div>
+<br>
+
+<div class="card-clean">
+    <div class="card-header-clean">
+        <h3>{% trans 'Filter Records' %}</h3>
+    </div>
+    <div class="card-body-clean">
+        <form method="get" class="form-clean">
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label>{% trans 'Class Level' %}</label>
+                        <select name="level" class="form-select">
+                            <option value="">{% trans 'All Classes' %}</option>
+                            {% for code, name in levels %}
+                            <option value="{{ code }}" {% if filter_level == code %}selected{% endif %}>{{ name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label>{% trans 'Start Date' %}</label>
+                        <input type="date" name="start_date" value="{{ filter_start|date:'Y-m-d' }}" class="form-control">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label>{% trans 'End Date' %}</label>
+                        <input type="date" name="end_date" value="{{ filter_end|date:'Y-m-d' }}" class="form-control">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group" style="padding-top: 25px;">
+                        <button type="submit" class="btn-primary-clean w-100">
+                            <i class="fas fa-filter"></i> {% trans 'Filter' %}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <p class="stat-value">{{ total_records }}</p>
+        <p class="stat-label">{% trans 'Total Records' %}</p>
+    </div>
+    <div class="stat-card">
+        <p class="stat-value text-success">{{ present_count }}</p>
+        <p class="stat-label">{% trans 'Present' %}</p>
+    </div>
+    <div class="stat-card">
+        <p class="stat-value text-danger">{{ absent_count }}</p>
+        <p class="stat-label">{% trans 'Absent' %}</p>
+    </div>
+</div>
+
+<div class="card-clean">
+    <div class="card-header-clean">
+        <h3>{% trans 'Attendance List' %}</h3>
+    </div>
+    <div class="card-body-clean">
+        {% if records %}
+        <table class="table-clean">
+            <thead>
+                <tr>
+                    <th>{% trans 'Date' %}</th>
+                    <th>{% trans 'Student' %}</th>
+                    <th>{% trans 'Class' %}</th>
+                    <th>{% trans 'Status' %}</th>
+                    <th>{% trans 'Remarks' %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in records %}
+                <tr>
+                    <td>{{ record.date }}</td>
+                    <td>{{ record.student.student.get_full_name }}</td>
+                    <td>{{ record.student.get_level_display }}</td>
+                    <td>
+                        {% if record.status == 'Present' %}
+                        <span class="badge-clean badge-success">{{ record.status }}</span>
+                        {% elif record.status == 'Absent' %}
+                        <span class="badge-clean badge-danger">{{ record.status }}</span>
+                        {% else %}
+                        <span class="badge-clean badge-warning">{{ record.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td><small>{{ record.remarks|default:'-' }}</small></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon"><i class="fas fa-search"></i></div>
+            <p class="empty-state-text">{% trans 'No records found for the selected filters.' %}</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

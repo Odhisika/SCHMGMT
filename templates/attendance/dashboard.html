@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+{% load i18n static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/clean-ui.css' %}">
+{% endblock %}
+
+{% block title %}{{ title }} | {% trans 'Attendance' %}{% endblock %}
+
+{% block content %}
+<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
+        <li class="breadcrumb-item active">{% trans 'Attendance' %}</li>
+    </ol>
+</nav>
+
+<div class="title-1"><i class="fas fa-clipboard-check"></i> {% trans 'Attendance Dashboard' %}</div>
+<br>
+
+{% include 'snippets/messages.html' %}
+
+{% if current_term %}
+<div class="alert-info-clean">
+    <i class="fas fa-info-circle"></i> {% trans 'Current Term' %}: <strong>{{ current_term }}</strong>
+</div>
+{% endif %}
+
+<div class="row users-count mb-4">
+    <div class="col-6 col-md-3 mb-3">
+        <div class="card-count p-3 bg-white shadow-sm border-0 rounded-3">
+            <h3><i class="fas fa-check-circle text-success"></i></h3>
+            <div class="text-right">
+                {% trans 'Marked Today' %}
+                <h2 class="text-dark">{{ today_sessions.count }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3 mb-3">
+        <div class="card-count p-3 bg-white shadow-sm border-0 rounded-3">
+            <h3><i class="fas fa-clock text-warning"></i></h3>
+            <div class="text-right">
+                {% trans 'Pending Classes' %}
+                <h2 class="text-dark">{{ pending_levels|length }}</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if pending_levels %}
+<div class="card-clean">
+    <div class="card-header-clean">
+        <h3>{% trans 'Classes to Mark Today' %}</h3>
+    </div>
+    <div class="card-body-clean">
+        <div class="row">
+            {% for code, name in pending_levels %}
+            <div class="col-6 col-md-3 mb-3">
+                <a href="{% url 'attendance:mark_attendance' level=code %}?date={{ today|date:'Y-m-d' }}" style="text-decoration: none;">
+                    <div class="card-clean p-3 text-center h-100 d-flex align-items-center justify-content-center shadow" style="margin-bottom: 0; min-height: 80px; transition: transform 0.2s;">
+                        <h5 class="m-0" style="color: #202124; font-weight: 600;">{{ name }}</h5>
+                    </div>
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="card-clean">
+    <div class="card-header-clean">
+        <h3>{% trans 'Recent Attendance Sessions' %}</h3>
+    </div>
+    <div class="card-body-clean">
+        {% if recent_sessions %}
+        <table class="table-clean">
+            <thead>
+                <tr>
+                    <th>{% trans 'Date' %}</th>
+                    <th>{% trans 'Class' %}</th>
+                    <th>{% trans 'Present' %}</th>
+                    <th>{% trans 'Absent' %}</th>
+                    <th>{% trans 'Marked By' %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for session in recent_sessions %}
+                <tr>
+                    <td>{{ session.date }}</td>
+                    <td>{{ session }}</td>
+                    <td><span class="badge-success">{{ session.present_count }}</span></td>
+                    <td><span class="badge-danger">{{ session.absent_count }}</span></td>
+                    <td>{{ session.marked_by.get_full_name }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon"><i class="fas fa-clipboard"></i></div>
+            <p class="empty-state-text">{% trans 'No attendance records yet' %}</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div style="margin-top: 20px;">
+    <a href="{% url 'attendance:reports' %}" class="btn-outline-clean">
+        <i class="fas fa-chart-bar"></i> {% trans 'View Reports' %}
+    </a>
+</div>
+
+{% endblock %}

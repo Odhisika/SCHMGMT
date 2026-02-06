@@ -1,0 +1,195 @@
+{% extends 'base.html' %}
+{% load i18n static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/clean-ui.css' %}">
+{% endblock %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'fees:dashboard' %}">{% trans 'Payments' %}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'fees:fee_list' %}">{% trans 'Fee Structures' %}</a></li>
+        <li class="breadcrumb-item active">{{ title }}</li>
+    </ol>
+</nav>
+
+<div class="title-1"><i class="fas fa-edit"></i> {{ title }}</div>
+<br>
+
+<div class="card-clean" style="max-width: 800px;">
+    <div class="card-header-clean">
+        <h3>{% trans 'Fee Details' %}</h3>
+    </div>
+    <div class="card-body-clean">
+        <form method="post" class="form-clean" id="feeForm">
+            {% csrf_token %}
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <h5 class="section-title">{% trans 'Basic Information' %}</h5>
+                    {% for field in form %}
+                    <div class="form-group mb-3">
+                        <label for="{{ field.id_for_label }}" class="form-label">
+                            {{ field.label }}{% if field.field.required %} <span style="color: #d93025;">*</span>{% endif %}
+                        </label>
+                        {{ field }}
+                        {% if field.errors %}
+                        <div class="text-danger small">{{ field.errors }}</div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div class="col-md-6">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="section-title mb-0">{% trans 'Fee Breakdown' %}</h5>
+                        <div class="badge bg-primary fs-6">
+                            {% trans 'Total: ' %}{{ settings.CURRENCY_SYMBOL }}<span id="total-display">0.00</span>
+                        </div>
+                    </div>
+                    
+                    {{ formset.management_form }}
+                    <div id="fee-items-container">
+                        {% for form in formset %}
+                        <div class="fee-item-row d-flex gap-2 mb-2 align-items-start">
+                            {{ form.id }}
+                            <div class="flex-grow-1">
+                                {{ form.name }}
+                                {% if form.name.errors %}<div class="text-danger small">{{ form.name.errors }}</div>{% endif %}
+                            </div>
+                            <div style="width: 120px;">
+                                {{ form.amount }}
+                                {% if form.amount.errors %}<div class="text-danger small">{{ form.amount.errors }}</div>{% endif %}
+                            </div>
+                            <div class="d-flex align-items-center pt-1">
+                                {% if formset.can_delete %}
+                                    <div class="form-check d-none">
+                                        {{ form.DELETE }}
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-danger remove-item">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    
+                    <button type="button" id="add-item" class="btn btn-sm btn-outline-primary mt-2">
+                        <i class="fas fa-plus"></i> {% trans 'Add Item' %}
+                    </button>
+                    
+                    <!-- Empty form template for JS -->
+                    <div id="empty-form" class="d-none">
+                        <div class="fee-item-row d-flex gap-2 mb-2 align-items-start">
+                            {{ formset.empty_form.id }}
+                            <div class="flex-grow-1">
+                                {{ formset.empty_form.name }}
+                            </div>
+                            <div style="width: 120px;">
+                                {{ formset.empty_form.amount }}
+                            </div>
+                            <div class="d-flex align-items-center pt-1">
+                                <div class="form-check d-none">
+                                    {{ formset.empty_form.DELETE }}
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-danger remove-item">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="margin-top: 32px; display: flex; gap: 12px; border-top: 1px solid #eee; padding-top: 20px;">
+                <button type="submit" class="btn-primary-clean" style="display: inline-flex; align-items: center; gap: 8px;">
+                    <i class="fas fa-save" style="background: rgba(0,0,0,0.1); width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px;"></i>
+                    <span>{% trans 'Save Fee Structure' %}</span>
+                </button>
+                <a href="{% url 'fees:fee_list' %}" class="btn-outline-clean" style="text-decoration: none;">
+                    {% trans 'Cancel' %}
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const container = document.getElementById('fee-items-container');
+        const addButton = document.getElementById('add-item');
+        const totalDisplay = document.getElementById('total-display');
+        const totalFormsInput = document.getElementById('id_fee_structures-TOTAL_FORMS'); // Note: 'fee_structures' prefix comes from formset default if not specified, usually 'form' or model name 'items'
+        // Actually inlineformset_factory uses 'items' relative_name by default or 'items' we defined? No, default is 'items'.
+        // Let's check the management form ID in browser or assume 'items'.
+        // Wait, I defined generic FeeItemFormSet without prefix. Default prefix is 'items'.
+        
+        // Correct prefix handling
+        const prefix = 'items'; 
+        const totalForms = document.getElementById(`id_${prefix}-TOTAL_FORMS`);
+
+        function calculateTotal() {
+            let total = 0;
+            const amounts = document.querySelectorAll('.item-amount');
+            amounts.forEach(input => {
+                // Check if row is deleted
+                const row = input.closest('.fee-item-row');
+                const deleteInput = row.querySelector('input[name$="-DELETE"]');
+                if (!deleteInput || !deleteInput.checked) {
+                    const val = parseFloat(input.value) || 0;
+                    total += val;
+                }
+            });
+            totalDisplay.textContent = total.toFixed(2);
+        }
+
+        // Initial calculation
+        calculateTotal();
+
+        // Event delegation for inputs
+        container.addEventListener('input', function(e) {
+            if (e.target.classList.contains('item-amount')) {
+                calculateTotal();
+            }
+        });
+
+        // Add new row
+        addButton.addEventListener('click', function() {
+            const formIdx = totalForms.value;
+            const emptyHtml = document.getElementById('empty-form').innerHTML;
+            const newHtml = emptyHtml.replace(/__prefix__/g, formIdx);
+            
+            const div = document.createElement('div');
+            div.innerHTML = newHtml;
+            const newRow = div.firstElementChild;
+            
+            container.appendChild(newRow);
+            totalForms.value = parseInt(formIdx) + 1;
+        });
+
+        // Remove row
+        container.addEventListener('click', function(e) {
+            if (e.target.closest('.remove-item')) {
+                const row = e.target.closest('.fee-item-row');
+                const deleteInput = row.querySelector('input[name$="-DELETE"]');
+                
+                if (deleteInput) {
+                    // Existing item: mark for deletion and hide
+                    deleteInput.checked = true;
+                    row.style.display = 'none';
+                } else {
+                    // New item: remove from DOM
+                    row.remove();
+                    // Optional: re-index forms (not strictly necessary for django formsets if strictly appending)
+                }
+                calculateTotal();
+            }
+        });
+    });
+</script>
+{% endblock %}
