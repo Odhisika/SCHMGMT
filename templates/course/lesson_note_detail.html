@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}{{ lesson_note.title }} | {{ block.super }}{% endblock title %}
+
+{% block content %}
+<div class="container">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'lesson_note_list' %}">{% trans 'Lesson Notes' %}</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ lesson_note.title }}</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0 text-gray-800">{{ lesson_note.title }}</h1>
+            <p class="text-muted mb-0">
+                {{ lesson_note.course }} | Week {{ lesson_note.week_number }} | {{ lesson_note.term }}
+            </p>
+        </div>
+        <div>
+            <span class="badge bg-{{ lesson_note.get_status_display_class }} fs-6 p-2">
+                {{ lesson_note.get_status_display }}
+            </span>
+        </div>
+    </div>
+    
+    {% if lesson_note.admin_comments %}
+    <div class="alert alert-{% if lesson_note.status == 'APPROVED' %}success{% else %}warning{% endif %}" role="alert">
+        <h5 class="alert-heading"><i class="fas fa-comment-dots"></i> {% trans 'Admin Feedback' %}</h5>
+        <p class="mb-0">{{ lesson_note.admin_comments }}</p>
+        <hr>
+        <p class="mb-0 small">{% trans 'Reviewed by' %} {{ lesson_note.reviewed_by.get_full_name }} {% trans 'on' %} {{ lesson_note.reviewed_at|date:"M d, Y" }}</p>
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <!-- Main Content -->
+        <div class="col-lg-8">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">{% trans 'Lesson Details' %}</h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-4">
+                        <h5 class="text-dark font-weight-bold">{% trans 'Topic' %}</h5>
+                        <p>{{ lesson_note.topic }}</p>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <h5 class="text-dark font-weight-bold">{% trans 'Learning Objectives' %}</h5>
+                        <div class="p-3 bg-light rounded">{{ lesson_note.objectives|linebreaks }}</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <h5 class="text-dark font-weight-bold">{% trans 'Content' %}</h5>
+                        <div class="p-3 bg-light rounded">{{ lesson_note.content|linebreaks }}</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <h5 class="text-dark font-weight-bold">{% trans 'Methodology' %}</h5>
+                        <p>{{ lesson_note.methodology|linebreaks }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">{% trans 'Resources & Homework' %}</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <h6 class="font-weight-bold">{% trans 'Assessment' %}</h6>
+                            <p>{{ lesson_note.assessment|default:"None specified"|linebreaks }}</p>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <h6 class="font-weight-bold">{% trans 'Resources Needed' %}</h6>
+                            <p>{{ lesson_note.resources_needed|default:"None specified"|linebreaks }}</p>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <h6 class="font-weight-bold">{% trans 'Homework' %}</h6>
+                        <p>{{ lesson_note.homework|default:"None assigned"|linebreaks }}</p>
+                    </div>
+                    
+                    {% if lesson_note.attachment %}
+                    <div class="mt-4 p-3 border rounded bg-light">
+                        <h6 class="font-weight-bold mb-2"><i class="fas fa-paperclip"></i> {% trans 'Attachment' %}</h6>
+                        <a href="{{ lesson_note.attachment.url }}" class="btn btn-sm btn-outline-primary" target="_blank">
+                            {% trans 'Download Attached File' %}
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar Actions -->
+        <div class="col-lg-4">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">{% trans 'Actions' %}</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        {% if lesson_note.can_submit %}
+                        <form action="{% url 'lesson_note_submit' lesson_note.pk %}" method="post" class="d-grid">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-success btn-lg mb-2" onclick="return confirm('Submit this lesson note for review? You will not be able to edit it until it is reviewed.');">
+                                <i class="fas fa-paper-plane"></i> {% trans 'Submit for Review' %}
+                            </button>
+                        </form>
+                        {% endif %}
+
+                        {% if lesson_note.can_edit %}
+                        <a href="{% url 'lesson_note_edit' lesson_note.pk %}" class="btn btn-warning mb-2">
+                            <i class="fas fa-edit"></i> {% trans 'Edit Lesson Note' %}
+                        </a>
+                        {% endif %}
+
+                        <a href="{% url 'lesson_note_list' %}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> {% trans 'Back to List' %}
+                        </a>
+                    </div>
+
+                    <hr>
+                    <div class="small">
+                        <p class="mb-1"><strong>{% trans 'Created:' %}</strong> {{ lesson_note.created_at|date:"M d, Y H:i" }}</p>
+                        <p class="mb-1"><strong>{% trans 'Last Updated:' %}</strong> {{ lesson_note.updated_at|date:"M d, Y H:i" }}</p>
+                        {% if lesson_note.submitted_at %}
+                        <p class="mb-0"><strong>{% trans 'Submitted:' %}</strong> {{ lesson_note.submitted_at|date:"M d, Y H:i" }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}

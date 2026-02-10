@@ -92,23 +92,86 @@ def period_delete(request, pk):
 
 @login_required
 def timetable_dashboard(request):
-    """Main timetable dashboard"""
+    """Main timetable dashboard - with role-based filtering"""
     current_term = Term.objects.filter(is_current_term=True, school=request.school).first()
     
+    # Determine accessible levels
+    if request.user.is_superuser or request.user.is_school_admin:
+        levels = settings.LEVEL_CHOICES
+    elif request.user.is_student:
+        # Students see only their own level
+        student = Student.objects.get(student=request.user)
+        # Find the display name for the student's level
+        level_name = dict(settings.LEVEL_CHOICES).get(student.level, student.level)
+        levels = [(student.level, level_name)]
+    elif request.user.is_teacher or request.user.is_lecturer:
+        # Teachers see only levels in their division
+        from accounts.utils import filter_levels_by_division
+        levels = filter_levels_by_division(request.user)
+    else:
+        levels = []
+
+    # Organize levels by division/section for display
+    # We can try to group them: Nursery, Primary, JHS
+    # Or just pass the list and let template iterate. 
+    # Given the template was hardcoded, passing a structured dict might be better.
+    
+    from accounts.utils import get_division_for_level
+    
+    grouped_levels = {}
+    for code, name in levels:
+        division = get_division_for_level(code)
+        if not division:
+            division = "Other"
+        
+        if division not in grouped_levels:
+            grouped_levels[division] = []
+        grouped_levels[division].append((code, name))
+        
+    # Sort order for divisions
+    division_order = [settings.DIVISION_NURSERY, settings.DIVISION_PRIMARY, settings.DIVISION_JHS, "Other"]
+    sorted_grouped_levels = []
+    for div in division_order:
+        if div in grouped_levels:
+            sorted_grouped_levels.append((dict(settings.DIVISION_CHOICES).get(div, div), grouped_levels[div]))
+
     context = {
         'title': _('Timetable Dashboard'),
         'current_term': current_term,
+        'grouped_levels': sorted_grouped_levels,
     }
     return render(request, 'timetable/dashboard.html', context)
 
 
 @login_required
 def timetable_by_class(request, level):
-    """View timetable for a specific class/level"""
+    """View timetable for a specific class/level - with strict access control"""
     current_term = Term.objects.filter(is_current_term=True, school=request.school).first()
     
     if not current_term:
         messages.error(request, _('No active term found.'))
+        return redirect('timetable:timetable_dashboard')
+
+    # ACCESS CONTROL CHECK
+    has_access = False
+    if request.user.is_superuser or request.user.is_school_admin:
+        has_access = True
+    elif request.user.is_student:
+        # Student can only access their own level
+        try:
+            student = Student.objects.get(student=request.user)
+            if student.level == level:
+                has_access = True
+        except Student.DoesNotExist:
+            pass
+    elif request.user.is_teacher or request.user.is_lecturer:
+        # Teacher can only access levels in their division
+        from accounts.utils import check_teacher_division_access
+        if check_teacher_division_access(request.user, level):
+            has_access = True
+    
+    if not has_access:
+        messages.error(request, _("You do not have permission to view this timetable."))
         return redirect('timetable:timetable_dashboard')
     
     # Get all periods for this school (lesson periods only for the grid)

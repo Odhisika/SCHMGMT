@@ -53,58 +53,24 @@
                 <i class="fas fa-table"></i> {% trans 'View Timetables' %}
             </div>
             <div class="card-body">
-                <h5>{% trans 'Primary School' %}</h5>
-                <div class="row mb-3">
-                    <div class="col-md-4 mb-2">
-                        <a href="{% url 'timetable:timetable_by_class' level='Primary 1' %}" class="btn btn-outline-primary w-100">
-                            {% trans 'Primary 1' %}
-                        </a>
+                {% if grouped_levels %}
+                    {% for division_name, levels in grouped_levels %}
+                    <h5 class="mt-3">{{ division_name }}</h5>
+                    <div class="row mb-3">
+                        {% for code, name in levels %}
+                        <div class="col-md-4 mb-2">
+                            <a href="{% url 'timetable:timetable_by_class' level=code %}" class="btn {% if division_name == 'Primary School' %}btn-outline-primary{% elif division_name == 'Junior High School' %}btn-outline-success{% else %}btn-outline-info{% endif %} w-100">
+                                {{ name }}
+                            </a>
+                        </div>
+                        {% endfor %}
                     </div>
-                    <div class="col-md-4 mb-2">
-                        <a href="{% url 'timetable:timetable_by_class' level='Primary 2' %}" class="btn btn-outline-primary w-100">
-                            {% trans 'Primary 2' %}
-                        </a>
+                    {% endfor %}
+                {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> {% trans 'No classes available for your account type.' %}
                     </div>
-                    <div class="col-md-4 mb-2">
-                        <a href="{% url 'timetable:timetable_by_class' level='Primary 3' %}" class="btn btn-outline-primary w-100">
-                            {% trans 'Primary 3' %}
-                        </a>
-                    </div>
-                    <div class="col-md-4 mb-2">
-                        <a href="{% url 'timetable:timetable_by_class' level='Primary 4' %}" class="btn btn-outline-primary w-100">
-                            {% trans 'Primary 4' %}
-                        </a>
-                    </div>
-                    <div class="col-md-4 mb-2">
-                        <a href="{% url 'timetable:timetable_by_class' level='Primary 5' %}" class="btn btn-outline-primary w-100">
-                            {% trans 'Primary 5' %}
-                        </a>
-                    </div>
-                    <div class="col-md-4 mb-2">
-                        <a href="{% url 'timetable:timetable_by_class' level='Primary 6' %}" class="btn btn-outline-primary w-100">
-                            {% trans 'Primary 6' %}
-                        </a>
-                    </div>
-                </div>
-
-                <h5>{% trans 'Junior High School' %}</h5>
-                <div class="row">
-                    <div class="col-md-4 mb-2">
-                        <a href="{% url 'timetable:timetable_by_class' level='JHS 1' %}" class="btn btn-outline-success w-100">
-                            {% trans 'JHS 1' %}
-                        </a>
-                    </div>
-                    <div class="col-md-4 mb-2">
-                        <a href="{% url 'timetable:timetable_by_class' level='JHS 2' %}" class="btn btn-outline-success w-100">
-                            {% trans 'JHS 2' %}
-                        </a>
-                    </div>
-                    <div class="col-md-4 mb-2">
-                        <a href="{% url 'timetable:timetable_by_class' level='JHS 3' %}" class="btn btn-outline-success w-100">
-                            {% trans 'JHS 3' %}
-                        </a>
-                    </div>
-                </div>
+                {% endif %}
             </div>
         </div>
     </div>

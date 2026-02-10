@@ -119,18 +119,33 @@
 			</li>
 			{% endif %}
 
+			{% if request.user.is_superuser or request.user.is_school_admin %}
+			<li class="{% if '/admin/lesson-notes/' in request.path %}active{% endif %}">
+				<a href="{% url 'lesson_note_admin_list' %}"><i class="fas fa-clipboard-list"></i>{% trans 'Review Lesson Notes' %}</a>
+			</li>
+			{% endif %}
+
 			{% if request.user.is_lecturer or request.user.is_teacher %}
 			<li class="{% if request.path == ascore %}active{% endif %}">
 				<a href="{% url 'add_score' %}"><i class="fas fa-table"></i>{% trans 'Manage Scores' %}</a>
 			</li>
+			<li class="{% if '/lesson-notes/' in request.path and '/admin/' not in request.path %}active{% endif %}">
+				<a href="{% url 'lesson_note_list' %}"><i class="fas fa-book-reader"></i>{% trans 'Lesson Notes' %}</a>
+			</li>
 			<li class="{% if '/result/manage-score/requests/' in request.path %}active{% endif %}">
 				<a href="{% url 'result_amendment_requests' %}"><i class="fas fa-clipboard-check"></i>{% trans 'Result Requests' %}</a>
+			</li>
+			<li class="{% if request.path == ucl %}active{% endif %}">
+				<a href="{% url 'user_course_list' %}"><i class="fas fa-list-alt"></i>{% trans 'Quizzes' %}</a>
 			</li>
 			{% endif %}
 
 			{% if request.user.is_student %}
 			<li class="{% if request.path == qpr %}active{% endif %}">
 				<a href="{% url 'quiz_progress' %}"><i class="fas fa-record-vinyl"></i>{% trans 'Quiz Progress Rec' %}</a>
+			</li>
+			<li class="{% if request.path == ucl %}active{% endif %}">
+				<a href="{% url 'user_course_list' %}"><i class="fas fa-list-alt"></i>{% trans 'Quizzes' %}</a>
 			</li>
 			<li class="{% if request.path == vr %}active{% endif %}">
 				<a href="{% url 'grade_results' %}"><i class="fa fa-spell-check"></i>{% trans 'Report Card' %}</a>

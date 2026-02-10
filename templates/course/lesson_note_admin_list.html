@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans 'Admin Review' %} | {{ block.super }}{% endblock title %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0 text-gray-800">{% trans 'Lesson Note Review' %}</h1>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label">{% trans 'Status' %}</label>
+                    <select name="status" class="form-select">
+                        <option value="SUBMITTED" {% if selected_status == 'SUBMITTED' %}selected{% endif %}>{% trans 'Pending Review' %}</option>
+                        <option value="APPROVED" {% if selected_status == 'APPROVED' %}selected{% endif %}>{% trans 'Approved' %}</option>
+                        <option value="REJECTED" {% if selected_status == 'REJECTED' %}selected{% endif %}>{% trans 'Needs Revision' %}</option>
+                        <option value="">{% trans 'All Statuses' %}</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">{% trans 'Teacher' %}</label>
+                    <select name="teacher" class="form-select">
+                        <option value="">{% trans 'All Teachers' %}</option>
+                        {% for teacher in teachers %}
+                        <option value="{{ teacher.id }}" {% if selected_teacher == teacher.id|stringformat:"s" %}selected{% endif %}>{{ teacher.get_full_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">{% trans 'Term' %}</label>
+                    <select name="term" class="form-select">
+                        <option value="">{% trans 'All Terms' %}</option>
+                        {% for term in terms %}
+                        <option value="{{ term.id }}" {% if selected_term == term.id|stringformat:"s" %}selected{% endif %}>{{ term }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-secondary w-100">{% trans 'Filter' %}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card shadow mb-4">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped" width="100%" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th>{% trans 'Teacher' %}</th>
+                            <th>{% trans 'Week' %}</th>
+                            <th>{% trans 'Course' %}</th>
+                            <th>{% trans 'Title' %}</th>
+                            <th>{% trans 'Status' %}</th>
+                            <th>{% trans 'Submitted' %}</th>
+                            <th>{% trans 'Actions' %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for note in lesson_notes %}
+                        <tr>
+                            <td>{{ note.teacher.get_full_name }}</td>
+                            <td>{{ note.week_number }}</td>
+                            <td>{{ note.course }}</td>
+                            <td>
+                                <a href="{% url 'lesson_note_admin_review' note.pk %}">{{ note.title }}</a>
+                            </td>
+                            <td>
+                                <span class="badge bg-{{ note.get_status_display_class }}">
+                                    {{ note.get_status_display }}
+                                </span>
+                            </td>
+                            <td>{{ note.submitted_at|date:"M d, Y H:i" }}</td>
+                            <td>
+                                <a href="{% url 'lesson_note_admin_review' note.pk %}" class="btn btn-sm btn-primary">
+                                    <i class="fas fa-search"></i> {% trans 'Review' %}
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center">{% trans 'No lesson notes found matching your filters.' %}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}

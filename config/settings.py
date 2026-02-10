@@ -271,6 +271,12 @@ LECTURER_ID_PREFIX = config("LECTURER_ID_PREFIX", "TEA")
 
 # Constants for Ghana Education System
 
+# Nursery/Pre-school levels
+NURSERY_1 = "Nursery 1"
+NURSERY_2 = "Nursery 2"
+KG_1 = "KG 1"
+KG_2 = "KG 2"
+
 # Grade levels for Ghana Basic Education
 PRIMARY_1 = "Primary 1"
 PRIMARY_2 = "Primary 2"
@@ -283,6 +289,10 @@ JHS_2 = "JHS 2"
 JHS_3 = "JHS 3"
 
 LEVEL_CHOICES = (
+    (NURSERY_1, _("Nursery 1")),
+    (NURSERY_2, _("Nursery 2")),
+    (KG_1, _("KG 1")),
+    (KG_2, _("KG 2")),
     (PRIMARY_1, _("Primary 1")),
     (PRIMARY_2, _("Primary 2")),
     (PRIMARY_3, _("Primary 3")),
@@ -293,6 +303,24 @@ LEVEL_CHOICES = (
     (JHS_2, _("JHS 2")),
     (JHS_3, _("JHS 3")),
 )
+
+# Division constants for teacher access control
+DIVISION_NURSERY = "Nursery"
+DIVISION_PRIMARY = "Primary"
+DIVISION_JHS = "JHS"
+
+DIVISION_CHOICES = (
+    (DIVISION_NURSERY, _("Nursery/Pre-School")),
+    (DIVISION_PRIMARY, _("Primary School")),
+    (DIVISION_JHS, _("Junior High School")),
+)
+
+# Map each level to its division
+DIVISION_LEVEL_MAPPING = {
+    DIVISION_NURSERY: [NURSERY_1, NURSERY_2, KG_1, KG_2],
+    DIVISION_PRIMARY: [PRIMARY_1, PRIMARY_2, PRIMARY_3, PRIMARY_4, PRIMARY_5, PRIMARY_6],
+    DIVISION_JHS: [JHS_1, JHS_2, JHS_3],
+}
 
 # Academic terms (Ghana uses 3-term system)
 FIRST_TERM = "First"

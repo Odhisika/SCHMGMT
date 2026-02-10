@@ -5,6 +5,7 @@ from django.contrib.auth.forms import (
     UserChangeForm,
 )
 from django.contrib.auth.forms import PasswordResetForm
+from django.conf import settings
 from course.models import Program
 from .models import User, Student, Parent, RELATION_SHIP, LEVEL, GENDERS
 from .utils import (
@@ -74,6 +75,16 @@ class StaffAddForm(UserCreationForm):
         label="Department / Section (e.g. Primary, JHS)",
     )
 
+    division = forms.ChoiceField(
+        choices=[('', 'Select Division')] + list(settings.DIVISION_CHOICES),
+        widget=forms.Select(
+            attrs={"class": "browser-default custom-select form-control"}
+        ),
+        label="Division (Nursery, Primary, or JHS)",
+        required=True,
+        help_text="Teachers can only access classes in their assigned division"
+    )
+
     address = forms.CharField(
         max_length=30,
         widget=forms.TextInput(
@@ -138,12 +149,14 @@ class StaffAddForm(UserCreationForm):
     def save(self, commit=True):
         user = super().save(commit=False)
         user.is_lecturer = True
+        user.is_teacher = True  # Set both for backward compatibility
         user.first_name = self.cleaned_data.get("first_name")
         user.last_name = self.cleaned_data.get("last_name")
         user.phone = self.cleaned_data.get("phone")
         user.address = self.cleaned_data.get("address")
         user.email = self.cleaned_data.get("email")
         user.department = self.cleaned_data.get("department")
+        user.division = self.cleaned_data.get("division")  # Save division
 
         # Generate credentials if username is missing (which implies new user via this form)
         password = None

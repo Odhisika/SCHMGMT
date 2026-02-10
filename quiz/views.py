@@ -45,6 +45,13 @@ class QuizCreateView(CreateView):
     def get_initial(self):
         initial = super().get_initial()
         course = get_object_or_404(Course, slug=self.kwargs["slug"])
+        
+        # Access check: Ensure teacher can create quizzes for this course
+        if not (self.request.user.is_superuser or self.request.user.is_school_admin):
+            if not self.request.user.can_access_level(course.level):
+                from django.core.exceptions import PermissionDenied
+                raise PermissionDenied("You cannot create quizzes for courses outside your division.")
+        
         initial["course"] = course
         return initial
 
@@ -54,7 +61,15 @@ class QuizCreateView(CreateView):
         return context
 
     def form_valid(self, form):
-        form.instance.course = get_object_or_404(Course, slug=self.kwargs["slug"])
+        course = get_object_or_404(Course, slug=self.kwargs["slug"])
+        
+        # Double-check division access before saving
+        if not (self.request.user.is_superuser or self.request.user.is_school_admin):
+            if not self.request.user.can_access_level(course.level):
+                messages.error(self.request, "You cannot create quizzes for courses outside your division.")
+                return redirect('home')
+        
+        form.instance.course = course
         with transaction.atomic():
             self.object = form.save()
             return redirect(
@@ -94,7 +109,32 @@ def quiz_delete(request, slug, pk):
 @login_required
 def quiz_list(request, slug):
     course = get_object_or_404(Course, slug=slug)
+    
+    # Access control: Check if user can access this course's quizzes
+    can_access = False
+    
+    if request.user.is_superuser or request.user.is_school_admin:
+        can_access = True
+    elif request.user.is_teacher or request.user.is_lecturer:
+        # Teachers can only access quizzes for courses in their division
+        if request.user.can_access_level(course.level):
+            can_access = True
+    elif request.user.is_student:
+        # Students can access quizzes for courses they are enrolled in
+        from result.models import TakenCourse
+        if TakenCourse.objects.filter(student__student=request.user, course=course).exists():
+            can_access = True
+    
+    if not can_access:
+        messages.error(request, "You do not have permission to view quizzes for this course.")
+        return redirect('home')
+    
     quizzes = Quiz.objects.filter(course=course).order_by("-timestamp")
+    
+    # Filter out draft quizzes for students
+    if request.user.is_student:
+        quizzes = quizzes.filter(draft=False)
+    
     return render(
         request, "quiz/quiz_list.html", {"quizzes": quizzes, "course": course}
     )

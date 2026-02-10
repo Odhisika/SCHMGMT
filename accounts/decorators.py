@@ -37,9 +37,9 @@ def lecturer_required(
     school admin, or superuser, redirects to the specified URL if necessary.
     """
 
-    # Define the test function: checks if the user is active and a lecturer, school admin, or superuser
+    # Define the test function: checks if the user is active and a lecturer, teacher, school admin, or superuser
     def test_func(user):
-        return user.is_active and (user.is_lecturer or user.is_school_admin or user.is_superuser)
+        return user.is_active and (user.is_lecturer or user.is_teacher or user.is_school_admin or user.is_superuser)
 
     # Define the wrapper function to handle the response
     def wrapper(request, *args, **kwargs):

@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% load crispy_forms_tags %}
+
+{% block title %}{{ title }} | {{ block.super }}{% endblock title %}
+
+{% block content %}
+<div class="container">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'lesson_note_list' %}">{% trans 'Lesson Notes' %}</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ title }}</li>
+        </ol>
+    </nav>
+
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">{{ title }}</h6>
+        </div>
+        <div class="card-body">
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        {{ form.course|as_crispy_field }}
+                    </div>
+                    <div class="col-md-3">
+                        {{ form.term|as_crispy_field }}
+                    </div>
+                    <div class="col-md-3">
+                        {{ form.week_number|as_crispy_field }}
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        {{ form.title|as_crispy_field }}
+                    </div>
+                    <div class="col-md-6">
+                        {{ form.topic|as_crispy_field }}
+                    </div>
+                </div>
+
+                <hr class="my-4">
+                <h5 class="text-muted mb-3">{% trans 'Lesson Content' %}</h5>
+
+                {{ form.objectives|as_crispy_field }}
+                {{ form.content|as_crispy_field }}
+                {{ form.methodology|as_crispy_field }}
+                
+                <div class="row">
+                    <div class="col-md-6">
+                         {{ form.assessment|as_crispy_field }}
+                    </div>
+                    <div class="col-md-6">
+                        {{ form.resources_needed|as_crispy_field }}
+                    </div>
+                </div>
+
+                {{ form.homework|as_crispy_field }}
+                
+                <div class="row mt-3">
+                    <div class="col-md-12">
+                        {{ form.attachment|as_crispy_field }}
+                        <small class="form-text text-muted">{% trans 'Upload supporting documents (PDF, DOCX) if needed.' %}</small>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> {% if action == 'Update' %}{% trans 'Update Lesson Note' %}{% else %}{% trans 'Save Draft' %}{% endif %}
+                    </button>
+                    <a href="{% url 'lesson_note_list' %}" class="btn btn-secondary">{% trans 'Cancel' %}</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock content %}

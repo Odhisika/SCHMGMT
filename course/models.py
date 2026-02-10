@@ -268,6 +268,176 @@ def log_uploadvideo_delete(sender, instance, **kwargs):
     )
 
 
+class LessonNote(models.Model):
+    """Lesson notes submitted by teachers for admin review"""
+    
+    STATUS_CHOICES = (
+        ('DRAFT', _('Draft')),
+        ('SUBMITTED', _('Submitted for Review')),
+        ('APPROVED', _('Approved')),
+        ('REJECTED', _('Needs Revision')),
+    )
+    
+    teacher = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='lesson_notes',
+        verbose_name=_('Teacher')
+    )
+    course = models.ForeignKey(
+        Course,
+        on_delete=models.CASCADE,
+        verbose_name=_('Course')
+    )
+    term = models.ForeignKey(
+        'core.Term',
+        on_delete=models.CASCADE,
+        verbose_name=_('Term')
+    )
+    week_number = models.PositiveIntegerField(
+        verbose_name=_('Week Number'),
+        help_text=_('Week number for this lesson (e.g., Week 1, Week 2)')
+    )
+    title = models.CharField(
+        max_length=200,
+        verbose_name=_('Lesson Title')
+    )
+    topic = models.CharField(
+        max_length=300,
+        verbose_name=_('Topic/Subject Matter')
+    )
+    objectives = models.TextField(
+        verbose_name=_('Learning Objectives'),
+        help_text=_('What students should learn/achieve by the end of the lesson')
+    )
+    content = models.TextField(
+        verbose_name=_('Lesson Content'),
+        help_text=_('Detailed lesson content and key points to cover')
+    )
+    methodology = models.TextField(
+        verbose_name=_('Teaching Methods'),
+        help_text=_('Teaching methods, activities, and instructional strategies')
+    )
+    assessment = models.TextField(
+        blank=True,
+        verbose_name=_('Assessment Methods'),
+        help_text=_('How student learning will be assessed')
+    )
+    resources_needed = models.TextField(
+        blank=True,
+        verbose_name=_('Resources/Materials'),
+        help_text=_('Materials, equipment, and resources needed')
+    )
+    homework = models.TextField(
+        blank=True,
+        verbose_name=_('Homework/Assignment'),
+        help_text=_('Homework or assignments for students')
+    )
+    
+    # File attachments
+    attachment = models.FileField(
+        upload_to='lesson_notes/%Y/%m/',
+        blank=True,
+        null=True,
+        verbose_name=_('Attachment'),
+        help_text=_('Optional: Attach supporting documents (PDF, DOCX, DOC)'),
+        validators=[
+            FileExtensionValidator(['pdf', 'docx', 'doc'])
+        ]
+    )
+    
+    # Workflow and approval
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='DRAFT',
+        verbose_name=_('Status')
+    )
+    submitted_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name=_('Submitted At')
+    )
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reviewed_lesson_notes',
+        verbose_name=_('Reviewed By')
+    )
+    reviewed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name=_('Reviewed At')
+    )
+    admin_comments = models.TextField(
+        blank=True,
+        verbose_name=_('Admin Comments'),
+        help_text=_('Feedback from admin/reviewer')
+    )
+    
+    # Timestamps
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name=_('Created At')
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name=_('Updated At')
+    )
+    
+    class Meta:
+        verbose_name = _('Lesson Note')
+        verbose_name_plural = _('Lesson Notes')
+        ordering = ['-created_at']
+        unique_together = ['course', 'term', 'week_number', 'teacher']
+    
+    def __str__(self):
+        return f"{self.course.code} - Week {self.week_number} - {self.title}"
+    
+    def can_edit(self):
+        """Check if lesson note can be edited (only drafts and rejected notes)"""
+        return self.status in ['DRAFT', 'REJECTED']
+    
+    def can_submit(self):
+        """Check if lesson note can be submitted"""
+        return self.status in ['DRAFT', 'REJECTED']
+    
+    def get_status_display_class(self):
+        """Return Bootstrap class for status badge"""
+        status_classes = {
+            'DRAFT': 'secondary',
+            'SUBMITTED': 'info',
+            'APPROVED': 'success',
+            'REJECTED': 'danger',
+        }
+        return status_classes.get(self.status, 'secondary')
+
+
+@receiver(post_save, sender=LessonNote)
+def log_lesson_note_save(sender, instance, created, **kwargs):
+    if created:
+        message = _(
+            f"Lesson note '{instance.title}' created by {instance.teacher.get_full_name} "
+            f"for {instance.course.title}."
+        )
+    else:
+        message = _(
+            f"Lesson note '{instance.title}' for {instance.course.title} has been updated."
+        )
+    ActivityLog.objects.create(message=message)
+
+
+@receiver(post_delete, sender=LessonNote)
+def log_lesson_note_delete(sender, instance, **kwargs):
+    ActivityLog.objects.create(
+        message=_(
+            f"Lesson note '{instance.title}' for {instance.course.title} has been deleted."
+        )
+    )
+
+
 class CourseOffer(models.Model):
     """NOTE: Only department head can offer semester courses"""
 

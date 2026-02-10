@@ -26,7 +26,7 @@
                 <i class="fas fa-pencil-alt"></i> {% trans 'Edit course' %}
             </a>
             {% endif %}
-            {% if request.user.is_superuser or request.user.is_school_admin or request.user.is_lecturer %}
+            {% if request.user.is_superuser or request.user.is_school_admin or request.user.is_lecturer or request.user.is_teacher %}
             <a class="btn btn-sm btn-primary" href="{% url 'upload_file_view' course.slug %}"><i class="fas fa-plus"></i>
                 {% trans 'Upload new file' %}
             </a>
@@ -61,7 +61,7 @@
                             <th>{% trans 'Video Title' %}</th>
                             <th>{% trans 'Uploaded Date' %}</th>
                             <th>{% trans 'Get Started' %}</th>
-                            {% if request.user.is_superuser or request.user.is_school_admin or request.user.is_lecturer %}
+                            {% if request.user.is_superuser or request.user.is_school_admin or request.user.is_lecturer or request.user.is_teacher %}
                             <th>{% trans 'Actions' %}</th>
                             {% endif %}
                         </tr>
@@ -84,7 +84,7 @@
                                 </div>
                             </th>
 
-                            {% if request.user.is_superuser or request.user.is_school_admin or request.user.is_lecturer %}
+                            {% if request.user.is_superuser or request.user.is_school_admin or request.user.is_lecturer or request.user.is_teacher %}
                             <td>
                                 <div class="update-delete">
                                     <a href="{% url 'upload_video_edit' slug=course.slug video_slug=video.slug %}"
@@ -106,7 +106,7 @@
                             <td>
                                 <span class="text-danger">
                                     {% trans 'No video Uploaded.' %}
-                                    {% if request.user.is_superuser or request.user.is_school_admin or request.user.is_lecturer %}
+                                    {% if request.user.is_superuser or request.user.is_school_admin or request.user.is_lecturer or request.user.is_teacher %}
                                     <a href="{% url 'upload_video' course.slug %}" class="text-primary">
                                         <i class="primary" style="font-size: 22px;">
                                             {% trans 'Upload now.' %}
@@ -138,7 +138,7 @@
                             <th>{% trans 'Uploaded Date' %}</th>
                             <th>{% trans 'Updated Date' %}</th>
                             <th>{% trans 'Downloads' %}</th>
-                            {% if request.user.is_superuser or request.user.is_school_admin or request.user.is_lecturer %}
+                            {% if request.user.is_superuser or request.user.is_school_admin or request.user.is_lecturer or request.user.is_teacher %}
                             <th>{% trans 'Actions' %}</th>
                             {% endif %}
                         </tr>
@@ -161,7 +161,7 @@
                                 </div>
                             </th>
 
-                            {% if request.user.is_superuser or request.user.is_school_admin or request.user.is_lecturer %}
+                            {% if request.user.is_superuser or request.user.is_school_admin or request.user.is_lecturer or request.user.is_teacher %}
                             <td>
                                 <div class="update-delete">
                                     <a href="{% url 'upload_file_edit' slug=course.slug file_id=file.pk %}"
@@ -183,7 +183,7 @@
                             <td>
                                 <span class="text-danger">
                                     {% trans 'No File Uploaded.' %}
-                                    {% if request.user.is_superuser or request.user.is_school_admin or request.user.is_lecturer %}
+                                    {% if request.user.is_superuser or request.user.is_school_admin or request.user.is_lecturer or request.user.is_teacher %}
                                     <a href="{% url 'upload_file_view' course.slug %}" class="text-primary">
                                         <i class="primary" style="font-size: 22px;">
                                             {% trans 'Upload now.' %}

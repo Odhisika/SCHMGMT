@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% block title %}{% trans 'Lesson Notes' %} | {{ block.super }}{% endblock title %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0 text-gray-800">{% trans 'My Lesson Notes' %}</h1>
+        <a href="{% url 'lesson_note_create' %}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> {% trans 'Create Lesson Note' %}
+        </a>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label">{% trans 'Status' %}</label>
+                    <select name="status" class="form-select">
+                        <option value="">{% trans 'All Statuses' %}</option>
+                        {% for code, label in status_choices %}
+                        <option value="{{ code }}" {% if selected_status == code %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">{% trans 'Term' %}</label>
+                    <select name="term" class="form-select">
+                        <option value="">{% trans 'All Terms' %}</option>
+                        {% for term in terms %}
+                        <option value="{{ term.id }}" {% if selected_term == term.id|stringformat:"s" %}selected{% endif %}>{{ term }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-secondary w-100">{% trans 'Filter' %}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card shadow mb-4">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped" width="100%" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th>{% trans 'Week' %}</th>
+                            <th>{% trans 'Course' %}</th>
+                            <th>{% trans 'Title' %}</th>
+                            <th>{% trans 'Term' %}</th>
+                            <th>{% trans 'Status' %}</th>
+                            <th>{% trans 'Last Updated' %}</th>
+                            <th>{% trans 'Actions' %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for note in lesson_notes %}
+                        <tr>
+                            <td>Week {{ note.week_number }}</td>
+                            <td>{{ note.course }}</td>
+                            <td>
+                                <a href="{% url 'lesson_note_detail' note.pk %}">{{ note.title }}</a>
+                            </td>
+                            <td>{{ note.term }}</td>
+                            <td>
+                                <span class="badge bg-{{ note.get_status_display_class }}">
+                                    {{ note.get_status_display }}
+                                </span>
+                            </td>
+                            <td>{{ note.updated_at|date:"M d, Y" }}</td>
+                            <td>
+                                <a href="{% url 'lesson_note_detail' note.pk %}" class="btn btn-sm btn-info" title="View">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                {% if note.can_edit %}
+                                <a href="{% url 'lesson_note_edit' note.pk %}" class="btn btn-sm btn-warning" title="Edit">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                {% endif %}
+                                {% if note.status == 'DRAFT' %}
+                                <a href="{% url 'lesson_note_delete' note.pk %}" class="btn btn-sm btn-danger" 
+                                   onclick="return confirm('Are you sure you want to delete this lesson note?');" title="Delete">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center">{% trans 'No lesson notes found.' %}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}

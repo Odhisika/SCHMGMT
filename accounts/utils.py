@@ -74,3 +74,75 @@ def send_new_account_email(user, password):
         "context": {"user": user, "password": password},
     }
     EmailThread(**email).start()
+
+
+# ########################################################
+# Division-based Access Control Utilities
+# ########################################################
+
+def get_division_for_level(level_code):
+    """
+    Returns the division that a given level belongs to
+    
+    Args:
+        level_code: The level code (e.g., 'Primary 1', 'JHS 1')
+    
+    Returns:
+        Division constant (DIVISION_NURSERY, DIVISION_PRIMARY, or DIVISION_JHS) or None
+    """
+    for division, levels in settings.DIVISION_LEVEL_MAPPING.items():
+        if level_code in levels:
+            return division
+    return None
+
+
+def get_levels_for_division(division):
+    """
+    Returns all levels in a given division
+    
+    Args:
+        division: Division constant (DIVISION_NURSERY, DIVISION_PRIMARY, or DIVISION_JHS)
+    
+    Returns:
+        List of level codes in that division
+    """
+    return settings.DIVISION_LEVEL_MAPPING.get(division, [])
+
+
+def check_teacher_division_access(teacher, level_code):
+    """
+    Validates if a teacher can access a given level based on their division
+    
+    Args:
+        teacher: User object (must be a teacher)
+        level_code: The level code to check access for
+    
+    Returns:
+        Boolean indicating if teacher can access the level
+    """
+    # Use the User model's built-in method
+    return teacher.can_access_level(level_code)
+
+
+def filter_levels_by_division(user):
+    """
+    Filter LEVEL_CHOICES based on user's division
+    
+    Args:
+        user: User object
+    
+    Returns:
+        Filtered list of (code, name) tuples for levels the user can access
+    """
+    # Admins see all levels
+    if user.is_superuser or user.is_school_admin:
+        return settings.LEVEL_CHOICES
+    
+    # Teachers see only levels in their division
+    if (user.is_teacher or user.is_lecturer) and user.division:
+        accessible_levels = user.get_division_levels()
+        return [(code, name) for code, name in settings.LEVEL_CHOICES if code in accessible_levels]
+    
+    # Default: return all levels
+    return settings.LEVEL_CHOICES
+

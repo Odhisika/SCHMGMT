@@ -96,6 +96,14 @@ class User(AbstractUser):
         help_text=_("The class/level this teacher is responsible for (if class teacher)")
     )
 
+    division = models.CharField(
+        max_length=25,
+        choices=settings.DIVISION_CHOICES,
+        blank=True,
+        null=True,
+        help_text=_("The school division this teacher belongs to (Nursery, Primary, or JHS)")
+    )
+
     objects = CustomUserManager()
 
     class Meta:
@@ -138,6 +146,28 @@ class User(AbstractUser):
     @property
     def can_manage_school(self):
         return self.is_superuser or self.is_school_admin
+    
+    def get_division_levels(self):
+        """Return all levels in this teacher's division"""
+        if not self.division:
+            return []
+        return settings.DIVISION_LEVEL_MAPPING.get(self.division, [])
+    
+    def can_access_level(self, level_code):
+        """Check if this teacher can access the given level"""
+        # Admins can access all levels
+        if self.is_superuser or self.is_school_admin:
+            return True
+        
+        # Teachers can only access levels in their division
+        if self.is_teacher or self.is_lecturer:
+            if not self.division:
+                # If no division is set, deny access by default
+                return False
+            return level_code in self.get_division_levels()
+        
+        # Other users have no level-based restrictions
+        return True
 
     def get_picture(self):
         try:

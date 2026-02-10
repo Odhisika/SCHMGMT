@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from . import lesson_note_views as ln_views
 
 
 urlpatterns = [
@@ -49,27 +50,35 @@ urlpatterns = [
         views.handle_file_delete,
         name="upload_file_delete",
     ),
-    # Video uploads urls
+    # ############# UPLOAD video views #####################################
     path(
-        "course/<slug>/video_tutorials/upload/",
-        views.handle_video_upload,
-        name="upload_video",
+        "course/<slug:slug>/upload/video/", views.handle_video_upload, name="upload_video"
     ),
     path(
-        "course/<slug>/video_tutorials/<video_slug>/detail/",
+        "course/<slug:slug>/upload/video/<slug:video_slug>/",
         views.handle_video_single,
         name="video_single",
     ),
     path(
-        "course/<slug>/video_tutorials/<video_slug>/edit/",
+        "course/<slug:slug>/upload/video/<slug:video_slug>/edit/",
         views.handle_video_edit,
-        name="upload_video_edit",
+        name="video_edit",
     ),
     path(
-        "course/<slug>/video_tutorials/<video_slug>/delete/",
+        "course/<slug:slug>/upload/video/<slug:video_slug>/delete/",
         views.handle_video_delete,
-        name="upload_video_delete",
+        name="video_delete",
     ),
+    # Lesson Note views
+    path("lesson-notes/", ln_views.lesson_note_list, name="lesson_note_list"),
+    path("lesson-notes/create/", ln_views.lesson_note_create, name="lesson_note_create"),
+    path("lesson-notes/<int:pk>/", ln_views.lesson_note_detail, name="lesson_note_detail"),
+    path("lesson-notes/<int:pk>/edit/", ln_views.lesson_note_edit, name="lesson_note_edit"),
+    path("lesson-notes/<int:pk>/submit/", ln_views.lesson_note_submit, name="lesson_note_submit"),
+    path("lesson-notes/<int:pk>/delete/", ln_views.lesson_note_delete, name="lesson_note_delete"),
+    # Admin lesson note views
+    path("admin/lesson-notes/", ln_views.lesson_note_admin_list, name="lesson_note_admin_list"),
+    path("admin/lesson-notes/<int:pk>/review/", ln_views.lesson_note_admin_review, name="lesson_note_admin_review"),
     # course registration
     path("course/registration/", views.course_registration, name="course_registration"),
     path("course/drop/", views.course_drop, name="course_drop"),

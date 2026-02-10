@@ -16,33 +16,46 @@ from .models import Attendance, AttendanceSession, AttendanceSummary, PRESENT, A
 @login_required
 @lecturer_required
 def attendance_dashboard(request):
-    """Attendance overview for teachers/admins"""
+    """Attendance overview for teachers/admins - filtered by division"""
     current_term = Term.objects.filter(is_current_term=True, school=request.school).first()
     today = date.today()
     
-    # Recent sessions
+    # Filter levels by teacher's division
+    if request.user.is_superuser or request.user.is_school_admin:
+        accessible_levels = settings.LEVEL_CHOICES
+    elif request.user.division:
+        division_levels = request.user.get_division_levels()
+        accessible_levels = [(code, name) for code, name in settings.LEVEL_CHOICES if code in division_levels]
+    else:
+        accessible_levels = []
+    
+    accessible_level_codes = [code for code, name in accessible_levels]
+    
+    # Recent sessions (filtered by accessible levels)
     recent_sessions = AttendanceSession.objects.filter(
-        school=request.school
+        school=request.school,
+        level__in=accessible_level_codes
     ).select_related('term', 'marked_by').order_by('-date')[:10]
     
-    # Today's sessions
+    # Today's sessions (filtered by accessible levels)
     today_sessions = AttendanceSession.objects.filter(
         school=request.school,
-        date=today
+        date=today,
+        level__in=accessible_level_codes
     ).select_related('term')
     
     # Get classes that need marking today
-    all_levels = settings.LEVEL_CHOICES
     marked_today = list(today_sessions.values_list('level', flat=True))
-    pending_levels = [code for code, name in all_levels if code not in marked_today]
+    pending_levels = [code for code, name in accessible_levels if code not in marked_today]
     
     context = {
         'title': _('Attendance Dashboard'),
         'current_term': current_term,
         'recent_sessions': recent_sessions,
         'today_sessions': today_sessions,
-        'pending_levels': [(code, dict(all_levels).get(code, code)) for code in pending_levels],
+        'pending_levels': [(code, dict(accessible_levels).get(code, code)) for code in pending_levels],
         'today': today,
+        'user_division': request.user.division if hasattr(request.user, 'division') else None,
     }
     return render(request, 'attendance/dashboard.html', context)
 

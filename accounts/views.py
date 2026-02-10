@@ -450,27 +450,23 @@ class ParentAdd(CreateView):
 @login_required
 @lecturer_required
 def class_list_view(request):
-    """Dashboard showing all classes (levels)"""
+    """Dashboard showing all classes (levels) - filtered by division"""
     
     if request.user.is_superuser or request.user.is_school_admin:
         # Admins see all classes
         levels = settings.LEVEL_CHOICES
+    elif request.user.division:
+        # Teachers see only classes in their assigned division
+        accessible_levels = request.user.get_division_levels()
+        levels = [(code, name) for code, name in settings.LEVEL_CHOICES if code in accessible_levels]
     else:
-        # Teachers see only classes where they have allocated courses
-        from course.models import CourseAllocation
-        
-        allocations = CourseAllocation.objects.filter(
-            teacher=request.user
-        ).prefetch_related('courses')
-        
-        # Extract unique levels from allocated courses
-        teacher_levels = set()
-        for allocation in allocations:
-            for course in allocation.courses.filter(school=request.school):
-                teacher_levels.add(course.level)
-        
-        # Filter LEVEL_CHOICES to only include teacher's levels
-        levels = [(code, name) for code, name in settings.LEVEL_CHOICES if code in teacher_levels]
+        # Teachers without division assigned see no classes
+        # (Admin needs to assign them a division first)
+        messages.warning(
+            request, 
+            "You have not been assigned to a division yet. Please contact your administrator."
+        )
+        levels = []
     
     # Calculate student counts per class efficiently
     students_counts = {}
@@ -483,6 +479,7 @@ def class_list_view(request):
         "levels": levels,
         "students_counts": students_counts,
         "is_teacher": not (request.user.is_superuser or request.user.is_school_admin),
+        "user_division": request.user.division if hasattr(request.user, 'division') else None,
     }
     return render(request, "accounts/class_list.html", context)
 
@@ -490,23 +487,28 @@ def class_list_view(request):
 @login_required
 @lecturer_required
 def class_detail_view(request, level_code):
-    """Workspace for a specific class level"""
-    from course.models import CourseAllocation
+    """Workspace for a specific class level - with division-based access control"""
     
     # Find level name from choices
     level_name = dict(settings.LEVEL_CHOICES).get(level_code, level_code)
 
-    # Access Control: Verify teacher has courses in this level
-    if not (request.user.is_superuser or request.user.is_school_admin):
-        has_access = CourseAllocation.objects.filter(
-            teacher=request.user,
-            courses__level=level_code,
-            courses__school=request.school
-        ).exists()
+    # Access Control: Verify teacher can access this level based on division
+    if not request.user.can_access_level(level_code):
+        from accounts.utils import get_division_for_level
+        level_division = get_division_for_level(level_code)
         
-        if not has_access:
-            messages.error(request, f"You don't have access to {level_name}.")
-            return redirect('class_list')
+        if not request.user.division:
+            messages.error(
+                request, 
+                "You have not been assigned to a division. Please contact your administrator."
+            )
+        else:
+            messages.error(
+                request, 
+                f"Access denied: {level_name} belongs to {level_division} division, "
+                f"but you are assigned to {request.user.division} division."
+            )
+        return redirect('class_list')
 
     students = Student.objects.filter(
         level=level_code, student__school=request.school

@@ -1,6 +1,7 @@
 from django import forms
 from accounts.models import User
-from .models import Program, Course, CourseAllocation, Upload, UploadVideo
+from core.models import Term
+from .models import Program, Course, CourseAllocation, Upload, UploadVideo, LessonNote
 
 
 class ProgramForm(forms.ModelForm):
@@ -139,3 +140,75 @@ class UploadFormVideo(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields["title"].widget.attrs.update({"class": "form-control"})
         self.fields["video"].widget.attrs.update({"class": "form-control"})
+
+
+# Lesson Note Form
+class LessonNoteForm(forms.ModelForm):
+    class Meta:
+        model = LessonNote
+        fields = [
+            'course', 'term', 'week_number', 'title', 'topic',
+            'objectives', 'content', 'methodology', 'assessment',
+            'resources_needed', 'homework', 'attachment'
+        ]
+        widgets = {
+            'objectives': forms.Textarea(attrs={'rows': 3}),
+            'content': forms.Textarea(attrs={'rows': 4}),
+            'methodology': forms.Textarea(attrs={'rows': 3}),
+            'assessment': forms.Textarea(attrs={'rows': 2}),
+            'resources_needed': forms.Textarea(attrs={'rows': 2}),
+            'homework': forms.Textarea(attrs={'rows': 2}),
+        }
+    
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+        
+        # Apply form-control class to all fields
+        for field_name, field in self.fields.items():
+            if field_name == 'attachment':
+                field.widget.attrs.update({'class': 'form-control-file'})
+            else:
+                field.widget.attrs.update({'class': 'form-control'})
+        
+        # Filter courses based on user's allocated courses and division
+        if user:
+            # Get courses allocated to this teacher
+            allocated_course_ids = CourseAllocation.objects.filter(
+                teacher=user
+            ).values_list('courses__id', flat=True)
+            
+            # Filter by division if not admin
+            if not (user.is_superuser or user.is_school_admin):
+                self.fields['course'].queryset = Course.objects.filter(
+                    id__in=allocated_course_ids,
+                    level__in=user.get_division_levels()
+                ).order_by('level', 'title')
+            else:
+                self.fields['course'].queryset = Course.objects.filter(
+                    id__in=allocated_course_ids
+                ).order_by('level', 'title')
+        
+        # Filter to current and future terms
+        self.fields['term'].queryset = Term.objects.all().order_by('-is_current_term', '-term')
+
+
+class LessonNoteAdminReviewForm(forms.ModelForm):
+    """Form for admin to review and approve/reject lesson notes"""
+    class Meta:
+        model = LessonNote
+        fields = ['status', 'admin_comments']
+        widgets = {
+            'admin_comments': forms.Textarea(attrs={'rows': 3}),
+        }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Only allow APPROVED or REJECTED status
+        self.fields['status'].choices = [
+            ('APPROVED', 'Approved'),
+            ('REJECTED', 'Needs Revision'),
+        ]
+        self.fields['status'].widget.attrs.update({'class': 'form-control'})
+        self.fields['admin_comments'].widget.attrs.update({'class': 'form-control'})
+        self.fields['admin_comments'].required = True
