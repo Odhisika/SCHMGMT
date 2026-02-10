@@ -18,6 +18,8 @@ urlpatterns = [
     path('record/', views.record_manual_payment, name='record_payment'),
     path('record/<int:student_id>/', views.record_manual_payment, name='record_payment_student'),
     path('verify/<int:payment_id>/', views.verify_payment, name='verify_payment'),
+    path('payment/<int:pk>/edit/', views.payment_edit, name='payment_edit'),
+    path('payment/<int:pk>/delete/', views.payment_delete, name='payment_delete'),
     path('history/<int:student_id>/', views.payment_history, name='payment_history'),
     
     # Student search API

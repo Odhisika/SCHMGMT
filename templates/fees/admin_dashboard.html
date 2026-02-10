@@ -141,33 +141,52 @@
             </div>
             <div class="card-body-clean">
                 {% if recent_payments %}
-                <div class="table-responsive">
-                    <table class="table-clean table-hover">
-                        <thead>
+                <div class="table-responsive table-shadow">
+                    <table class="table table-bordered table-striped table-hover mb-0">
+                        <thead class="bg-light">
                             <tr>
+                                <th>#</th>
                                 <th>{% trans 'Date' %}</th>
-                                <th>{% trans 'Student' %}</th>
+                                <th>{% trans 'Full Name' %}</th>
+                                <th>{% trans 'Level/Class' %}</th>
                                 <th>{% trans 'Amount' %}</th>
                                 <th>{% trans 'Status' %}</th>
+                                <th class="text-center">{% trans 'Actions' %}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for payment in recent_payments %}
                             <tr>
-                                <td>{{ payment.payment_date }}</td>
+                                <td>{{ forloop.counter }}</td>
+                                <td>{{ payment.payment_date|date:"M d, Y" }}</td>
                                 <td>
                                     <div style="font-weight: 500;">{{ payment.student.student.get_full_name }}</div>
-                                    <small style="color: #5f6368;">{{ payment.student.class_id }}</small>
                                 </td>
-                                <td>{{ settings.CURRENCY_SYMBOL }}{{ payment.amount }}</td>
+                                <td>{{ payment.student.level }}</td>
+                                <td><strong>{{ settings.CURRENCY_SYMBOL }}{{ payment.amount }}</strong></td>
                                 <td>
                                     {% if payment.status == 'VERIFIED' %}
                                     <span class="badge-clean badge-success">{% trans 'Verified' %}</span>
                                     {% elif payment.status == 'PENDING' %}
                                     <span class="badge-clean badge-warning">{% trans 'Pending' %}</span>
-                                    {% else %}
+                                    {% elif payment.status == 'FAILED' %}
                                     <span class="badge-clean badge-danger">{% trans 'Failed' %}</span>
+                                    {% else %}
+                                    <span class="badge-clean badge-secondary">{{ payment.get_status_display }}</span>
                                     {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    <div class="btn-group">
+                                        <a href="{% url 'fees:download_receipt' payment.id %}" class="btn btn-sm btn-outline-clean me-1" title="{% trans 'Download Receipt' %}">
+                                            <i class="fas fa-file-download text-primary"></i>
+                                        </a>
+                                        <a href="{% url 'fees:payment_edit' payment.pk %}" class="btn btn-sm btn-outline-clean me-1" title="{% trans 'Edit Payment' %}">
+                                            <i class="fas fa-edit text-warning"></i>
+                                        </a>
+                                        <a href="{% url 'fees:payment_delete' payment.pk %}" class="btn btn-sm btn-outline-clean" title="{% trans 'Delete Payment' %}">
+                                            <i class="fas fa-trash text-danger"></i>
+                                        </a>
+                                    </div>
                                 </td>
                             </tr>
                             {% endfor %}

@@ -21,6 +21,16 @@
         <div class="card">
             <p class="form-title">{% trans 'Course Allocation Form' %}</p>
             <div class="p-3">
+                <form method="GET" action="" class="mb-3">
+                    <label for="divisionSelect" class="form-label">{% trans 'Filter by Block/Division' %}</label>
+                    <select name="division" id="divisionSelect" class="form-select browser-default custom-select" onchange="this.form.submit()">
+                        <option value="">{% trans 'All Divisions' %}</option>
+                        {% for code, name in division_choices %}
+                        <option value="{{ code }}" {% if current_division == code %}selected{% endif %}>{{ name }}</option>
+                        {% endfor %}
+                    </select>
+                </form>
+
                 <form action="" method="POST">{% csrf_token %}
                       {{ form.teacher|as_crispy_field }}
                       {{ form.courses|as_crispy_field }}

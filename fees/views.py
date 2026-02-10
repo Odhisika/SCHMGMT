@@ -420,6 +420,51 @@ def verify_payment(request, payment_id):
 
 
 @login_required
+@admin_required
+def payment_edit(request, pk):
+    """Edit an existing payment record"""
+    from .forms import ManualPaymentForm
+    
+    payment = get_object_or_404(Payment, pk=pk, school=request.school)
+    student = payment.student
+    
+    if request.method == 'POST':
+        form = ManualPaymentForm(request.POST, instance=payment, school=request.school, initial_student=student)
+        if form.is_valid():
+            form.save()
+            messages.success(request, _("Payment record updated successfully!"))
+            return redirect('fees:dashboard')
+    else:
+        form = ManualPaymentForm(instance=payment, school=request.school, initial_student=student)
+    
+    context = {
+        'title': _('Edit Payment'),
+        'form': form,
+        'payment': payment,
+        'student': student,
+    }
+    return render(request, 'fees/payment_edit.html', context)
+
+
+@login_required
+@admin_required
+def payment_delete(request, pk):
+    """Delete a payment record"""
+    payment = get_object_or_404(Payment, pk=pk, school=request.school)
+    
+    if request.method == 'POST':
+        payment.delete()
+        messages.success(request, _("Payment record deleted successfully!"))
+        return redirect('fees:dashboard')
+    
+    context = {
+        'title': _('Delete Payment'),
+        'payment': payment,
+    }
+    return render(request, 'fees/payment_confirm_delete.html', context)
+
+
+@login_required
 def payment_history(request, student_id=None):
     """View payment history"""
     if request.user.is_student:

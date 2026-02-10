@@ -153,9 +153,7 @@
 			<li class="{% if request.path == ar %}active{% endif %}">
 				<a href="{% url 'ass_results' %}"><i class="fa fa-list-ol"></i> {% trans 'Assessment Results' %}</a>
 			</li>
-			<li class="{% if request.path == cr %}active{% endif %}">
-				<a href="{% url 'course_registration' %}"><i class="fas fa-plus"></i>{% trans 'Add' %} &amp; {% trans 'Drop Subject' %}</a>
-			</li>
+
 			{% endif %}
 			<br />
 			<p class="ms-3 text-secondary">&RightArrow; Others</p>
@@ -179,9 +177,80 @@
 
 {% block js %}
 <script>
-	document.getElementById("lang-select").addEventListener("change", function() {
-		console.log("Changed!")
-    	document.getElementById("lang-form").submit();  // Submit the form programmatically
+	const langSelect = document.getElementById("lang-select");
+	if (langSelect) {
+		langSelect.addEventListener("change", function() {
+			console.log("Changed!")
+			document.getElementById("lang-form").submit();  // Submit the form programmatically
+		});
+	}
+
+	// Sidebar Scroll and State Management
+	document.addEventListener("DOMContentLoaded", function() {
+		const sidebar = document.getElementById('side-nav');
+		const key = 'schmgmt_sidebar_pos';
+		const DEBUG = false; // Set to true for debugging
+
+		if (!sidebar) return;
+
+		function log(msg) {
+			if (DEBUG) console.log("[Sidebar]", msg);
+		}
+
+		// 1. Find or Set Active Item based on URL
+		function markActiveItem() {
+			let activeItem = sidebar.querySelector('.active');
+			if (!activeItem) {
+				const currentPath = window.location.pathname;
+				log("No server-side active item found. Checking Path: " + currentPath);
+				
+				const links = sidebar.querySelectorAll('a');
+				for (const link of links) {
+					const href = link.getAttribute('href');
+					// Check exact match or sub-path match
+					if (href === currentPath || (href !== '/' && currentPath.startsWith(href))) {
+						activeItem = link.parentElement;
+						activeItem.classList.add('active');
+						log("Found matching link: " + href);
+						break;
+					}
+				}
+			} else {
+				log("Server-side active item found.");
+			}
+			return activeItem;
+		}
+
+		// 2. Restore Scroll Position
+		function restoreSidebarState() {
+			const activeItem = markActiveItem();
+			const savedPos = sessionStorage.getItem(key);
+
+			if (savedPos && parseInt(savedPos) > 0) {
+				sidebar.scrollTop = parseInt(savedPos);
+				log("Restored scroll position: " + savedPos);
+			}
+			
+			// 3. Force Active Item into View
+			if (activeItem) {
+				log("Scrolling active item into view");
+				// Use timeout to ensure layout is done
+				setTimeout(() => {
+					activeItem.scrollIntoView({ block: 'center', behavior: 'auto' });
+				}, 100);
+			}
+		}
+
+		// Run logic
+		restoreSidebarState();
+		
+		// Run again after a delay to handle layout shifts (images, etc)
+		setTimeout(restoreSidebarState, 500);
+
+		// Save position on scroll
+		sidebar.addEventListener('scroll', function() {
+			sessionStorage.setItem(key, sidebar.scrollTop);
+		});
 	});
 </script>
 {% endblock js %}

@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% load i18n static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/clean-ui.css' %}">
+{% endblock %}
+
+{% block title %}{{ title }} | {% trans 'Payments' %}{% endblock %}
+
+{% block content %}
+<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'fees:dashboard' %}">{% trans 'Payments' %}</a></li>
+        <li class="breadcrumb-item active">{% trans 'Delete Payment' %}</li>
+    </ol>
+</nav>
+
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card-clean border-danger mt-4">
+            <div class="card-header-clean bg-danger bg-opacity-10">
+                <h3 class="text-danger"><i class="fas fa-exclamation-triangle me-2"></i> {% trans 'Confirm Deletion' %}</h3>
+            </div>
+            <div class="card-body-clean text-center">
+                <p class="mb-4">
+                    {% blocktrans with amount=payment.amount currency=settings.CURRENCY_SYMBOL date=payment.payment_date|date:"M d, Y" student=payment.student.student.get_full_name %}
+                    Are you sure you want to delete the payment of <strong>{{ currency }}{{ amount }}</strong> recorded on <strong>{{ date }}</strong> for <strong>{{ student }}</strong>?
+                    {% endblocktrans %}
+                </p>
+                
+                <div class="alert alert-warning-clean text-start mb-4">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    {% trans "This action cannot be undone. The payment record will be permanently removed from the system and financial reports." %}
+                </div>
+
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="d-flex justify-content-center gap-3">
+                        <a href="{% url 'fees:dashboard' %}" class="btn-secondary-clean">
+                            {% trans 'No, Cancel' %}
+                        </a>
+                        <button type="submit" class="btn btn-danger px-4" style="border-radius: 8px; font-weight: 600;">
+                            {% trans 'Yes, Delete Record' %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

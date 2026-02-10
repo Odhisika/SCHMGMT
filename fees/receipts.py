@@ -144,7 +144,7 @@ class PaymentReceiptGenerator:
         
         student = self.payment.student
         student_data = [
-            ['Name:', student.student.get_full_name()],
+            ['Name:', student.student.get_full_name],
             ['Student ID:', student.student.username],
             ['Class/Level:', student.level or 'N/A'],
         ]

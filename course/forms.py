@@ -50,19 +50,35 @@ class CourseAllocationForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         request = kwargs.pop("request", None)
+        division_filter = kwargs.pop("division_filter", None)
         super(CourseAllocationForm, self).__init__(*args, **kwargs)
+        
         if request:
             teachers = User.objects.filter(is_lecturer=True, school=request.school)
-            self.fields["teacher"].queryset = teachers
-            self.fields["courses"].queryset = Course.objects.filter(
-                school=request.school
-            ).order_by("program", "level")
+            courses = Course.objects.filter(school=request.school).order_by("program", "level")
+            
+            # Apply Division Filter if present
+            if division_filter:
+                from accounts.utils import get_levels_for_division
+                # Filter teachers by division
+                teachers = teachers.filter(division=division_filter)
+                
+                # Filter courses by levels in that division
+                division_levels = get_levels_for_division(division_filter)
+                courses = courses.filter(level__in=division_levels)
 
-            # Update teacher labels to show department
+            self.fields["teacher"].queryset = teachers
+            self.fields["courses"].queryset = courses
+
+            # Update teacher labels to show department and division
             teacher_choices = []
             for t in teachers:
-                dept_label = f" [{t.department.title}]" if t.department else ""
-                teacher_choices.append((t.id, f"{t.get_full_name}{dept_label}"))
+                info = []
+                if t.department: info.append(t.department.title)
+                if t.division: info.append(t.division)
+                info_str = f" [{', '.join(info)}]" if info else ""
+                
+                teacher_choices.append((t.id, f"{t.get_full_name}{info_str}"))
             self.fields["teacher"].choices = [("", "---------")] + teacher_choices
         else:
             self.fields["teacher"].queryset = User.objects.filter(is_lecturer=True)

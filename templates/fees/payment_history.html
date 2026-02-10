@@ -25,38 +25,62 @@
     </div>
     <div class="card-body-clean">
         {% if payments %}
-        <table class="table-clean">
-            <thead>
-                <tr>
-                    <th>{% trans 'Date' %}</th>
-                    <th>{% trans 'Fee Category' %}</th>
-                    <th>{% trans 'Amount' %}</th>
-                    <th>{% trans 'Method' %}</th>
-                    <th>{% trans 'Status' %}</th>
-                    <th>{% trans 'Recorded By' %}</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for p in payments %}
-                <tr>
-                    <td>{{ p.payment_date|default:p.created_at|date:"Y-m-d" }}</td>
-                    <td>{{ p.assignment.fee_structure.name|default:'General' }}</td>
-                    <td>{{ settings.CURRENCY_SYMBOL }}{{ p.amount }}</td>
-                    <td>{{ p.get_payment_method_display }}</td>
-                    <td>
-                        {% if p.status == 'VERIFIED' %}
-                        <span class="badge-clean badge-success">{{ p.get_status_display }}</span>
-                        {% elif p.status == 'PENDING' %}
-                        <span class="badge-clean badge-warning">{{ p.get_status_display }}</span>
-                        {% else %}
-                        <span class="badge-clean badge-danger">{{ p.get_status_display }}</span>
+        <div class="table-responsive table-shadow">
+            <table class="table table-bordered table-striped table-hover mb-0">
+                <thead class="bg-light">
+                    <tr>
+                        <th>#</th>
+                        <th>{% trans 'Date' %}</th>
+                        <th>{% trans 'Full Name' %}</th>
+                        <th>{% trans 'Level/Class' %}</th>
+                        <th>{% trans 'Fee Category' %}</th>
+                        <th>{% trans 'Amount' %}</th>
+                        <th>{% trans 'Method' %}</th>
+                        <th>{% trans 'Status' %}</th>
+                        {% if request.user.is_superuser or request.user.is_school_admin %}
+                        <th class="text-center">{% trans 'Actions' %}</th>
                         {% endif %}
-                    </td>
-                    <td>{{ p.recorded_by.get_full_name|default:'Online/Paystack' }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in payments %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td>{{ p.payment_date|default:p.created_at|date:"M d, Y" }}</td>
+                        <td>{{ p.student.student.get_full_name }}</td>
+                        <td>{{ p.student.level }}</td>
+                        <td>{{ p.assignment.fee_structure.name|default:'General' }}</td>
+                        <td><strong>{{ settings.CURRENCY_SYMBOL }}{{ p.amount }}</strong></td>
+                        <td>{{ p.get_payment_method_display }}</td>
+                        <td>
+                            {% if p.status == 'VERIFIED' %}
+                            <span class="badge-clean badge-success">{{ p.get_status_display }}</span>
+                            {% elif p.status == 'PENDING' %}
+                            <span class="badge-clean badge-warning">{{ p.get_status_display }}</span>
+                            {% else %}
+                            <span class="badge-clean badge-danger">{{ p.get_status_display }}</span>
+                            {% endif %}
+                        </td>
+                        {% if request.user.is_superuser or request.user.is_school_admin %}
+                        <td class="text-center">
+                            <div class="btn-group">
+                                <a href="{% url 'fees:download_receipt' p.id %}" class="btn btn-sm btn-outline-clean me-1" title="{% trans 'Download Receipt' %}">
+                                    <i class="fas fa-file-download text-primary"></i>
+                                </a>
+                                <a href="{% url 'fees:payment_edit' p.pk %}" class="btn btn-sm btn-outline-clean me-1" title="{% trans 'Edit Payment' %}">
+                                    <i class="fas fa-edit text-warning"></i>
+                                </a>
+                                <a href="{% url 'fees:payment_delete' p.pk %}" class="btn btn-sm btn-outline-clean" title="{% trans 'Delete Payment' %}">
+                                    <i class="fas fa-trash text-danger"></i>
+                                </a>
+                            </div>
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
         {% else %}
         <div class="empty-state">
             <div class="empty-state-icon"><i class="fas fa-receipt"></i></div>

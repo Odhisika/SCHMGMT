@@ -6,6 +6,7 @@ from accounts.decorators import admin_required
 from .models import Period, TimetableEntry
 from .forms import PeriodForm, TimetableEntryForm
 from core.models import Term
+from accounts.models import Student
 from django.conf import settings
 
 

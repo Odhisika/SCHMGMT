@@ -207,6 +207,12 @@ class CourseAllocationFormView(CreateView):
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs["request"] = self.request
+        
+        # Pass division filter to form if present
+        division = self.request.GET.get('division')
+        if division:
+            kwargs['division_filter'] = division
+            
         return kwargs
 
     def form_valid(self, form):
@@ -222,6 +228,8 @@ class CourseAllocationFormView(CreateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["title"] = "Assign Course"
+        context["division_choices"] = settings.DIVISION_CHOICES
+        context["current_division"] = self.request.GET.get('division', '')
         return context
 
 

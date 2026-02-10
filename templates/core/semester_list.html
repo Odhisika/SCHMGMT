@@ -39,17 +39,16 @@
             {% for semester in semesters %}
             <tr>
                 <td> {{ forloop.counter }}.</td>
-                <td>{{ semester.semester }}</td>
+                <td>{{ semester.term }}</td>
                 <th>
-                    {% if semester.is_current_semester == False %}
+                    {% if semester.is_current_term == False %}
                     <i class="fas fa-times-circle fa-1-5x danger"></i>
                     {% else %}
                     <i class="fas fa-check-circle fa-1-5x"></i>
-                    <i class="icon-times-circle"></i>
                     {% endif %}
                 </th>
-                <td>{{ semester.session }}</td>
-                <td>{{ semester.next_semester_begins }}</td>
+                <td>{{ semester.year }}</td>
+                <td>{{ semester.next_term_begins }}</td>
 
                 {% if request.user.is_superuser or request.user.is_school_admin %}
                 <td>

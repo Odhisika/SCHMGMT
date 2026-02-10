@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+{% load i18n static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/clean-ui.css' %}">
+{% endblock %}
+
+{% block title %}{{ title }} | {% trans 'Payments' %}{% endblock %}
+
+{% block content %}
+<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'fees:dashboard' %}">{% trans 'Payments' %}</a></li>
+        <li class="breadcrumb-item active">{% trans 'Edit Payment' %}</li>
+    </ol>
+</nav>
+
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card-clean">
+            <div class="card-header-clean d-flex justify-content-between align-items-center">
+                <h3><i class="fas fa-edit me-2 text-primary"></i> {% trans 'Edit Payment Record' %}</h3>
+                <span class="badge-clean badge-info">{{ payment.get_status_display }}</span>
+            </div>
+            <div class="card-body-clean">
+                <div class="alert alert-info-clean mb-4">
+                    <i class="fas fa-info-circle me-2"></i>
+                    {% blocktrans with student_name=student.student.get_full_name %}You are editing a payment for <strong>{{ student_name }}</strong>.{% endblocktrans %}
+                </div>
+
+                <form method="post" class="form-clean">
+                    {% csrf_token %}
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group mb-4">
+                                <label>{{ form.payment_date.label }}</label>
+                                {{ form.payment_date }}
+                                {% if form.payment_date.errors %}
+                                <div class="text-danger small mt-1">{{ form.payment_date.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group mb-4">
+                                <label>{{ form.amount.label }} ({{ settings.CURRENCY_SYMBOL }})</label>
+                                {{ form.amount }}
+                                {% if form.amount.errors %}
+                                <div class="text-danger small mt-1">{{ form.amount.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group mb-4">
+                                <label>{{ form.payment_method.label }}</label>
+                                {{ form.payment_method }}
+                                {% if form.payment_method.errors %}
+                                <div class="text-danger small mt-1">{{ form.payment_method.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group mb-4">
+                                <label>{{ form.receipt_number.label }}</label>
+                                {{ form.receipt_number }}
+                                {% if form.receipt_number.errors %}
+                                <div class="text-danger small mt-1">{{ form.receipt_number.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group mb-4">
+                        <label>{{ form.assignment.label }}</label>
+                        {{ form.assignment }}
+                        <small class="text-muted">{% trans "Link this payment to a specific fee assignment if applicable." %}</small>
+                        {% if form.assignment.errors %}
+                        <div class="text-danger small mt-1">{{ form.assignment.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group mb-4">
+                        <label>{{ form.notes.label }}</label>
+                        {{ form.notes }}
+                        {% if form.notes.errors %}
+                        <div class="text-danger small mt-1">{{ form.notes.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+                        <a href="{% url 'fees:dashboard' %}" class="btn-secondary-clean">
+                            <i class="fas fa-times me-1"></i> {% trans 'Cancel' %}
+                        </a>
+                        <button type="submit" class="btn-primary-clean">
+                            <i class="fas fa-save me-1"></i> {% trans 'Update Payment' %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

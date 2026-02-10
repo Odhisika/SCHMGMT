@@ -41,9 +41,9 @@
 {% endif %}
 
 <div class="stats-grid mb-30">
-    <div class="balance-card-gradient">
-        <p class="stat-label" style="color: rgba(255,255,255,0.9); text-align: left; margin: 0 0 10px 0;">{% trans 'Outstanding Balance' %}</p>
-        <p class="stat-value" style="color: white; text-align: left; font-weight: 700; font-size: 36px;">{{ settings.CURRENCY_SYMBOL }}{{ total_balance|floatformat:2 }}</p>
+    <div class="card-clean" style="padding: 24px;">
+        <p class="stat-label" style="text-align: left; margin: 0 0 10px 0;">{% trans 'Outstanding Balance' %}</p>
+        <p class="stat-value" style="text-align: left; font-weight: 700; font-size: 36px;">{{ settings.CURRENCY_SYMBOL }}{{ total_balance|floatformat:2 }}</p>
     </div>
 </div>
 
