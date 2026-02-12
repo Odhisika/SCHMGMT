@@ -53,22 +53,31 @@
                 <i class="fas fa-table"></i> {% trans 'View Timetables' %}
             </div>
             <div class="card-body">
-                {% if grouped_levels %}
-                    {% for division_name, levels in grouped_levels %}
-                    <h5 class="mt-3">{{ division_name }}</h5>
-                    <div class="row mb-3">
-                        {% for code, name in levels %}
+                <!-- Division Tabs -->
+                <ul class="nav nav-tabs mb-4">
+                    {% for div_code, div_name in divisions %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if current_division == div_code %}active{% endif %}" 
+                           href="?division={{ div_code }}">
+                            {{ div_name }}
+                        </a>
+                    </li>
+                    {% endfor %}
+                </ul>
+
+                {% if active_levels %}
+                    <div class="row">
+                        {% for code, name in active_levels %}
                         <div class="col-md-4 mb-2">
-                            <a href="{% url 'timetable:timetable_by_class' level=code %}" class="btn {% if division_name == 'Primary School' %}btn-outline-primary{% elif division_name == 'Junior High School' %}btn-outline-success{% else %}btn-outline-info{% endif %} w-100">
+                            <a href="{% url 'timetable:timetable_by_class' level=code %}" class="btn {% if current_division == 'Primary' %}btn-outline-primary{% elif current_division == 'JHS' %}btn-outline-success{% else %}btn-outline-info{% endif %} w-100">
                                 {{ name }}
                             </a>
                         </div>
                         {% endfor %}
                     </div>
-                    {% endfor %}
                 {% else %}
                     <div class="alert alert-info">
-                        <i class="fas fa-info-circle"></i> {% trans 'No classes available for your account type.' %}
+                        <i class="fas fa-info-circle"></i> {% trans 'No classes available for this section.' %}
                     </div>
                 {% endif %}
             </div>

@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% load crispy_forms_tags %}
+
+{% block title %}{{ title }} | {% trans 'Learning management system' %}{% endblock title %}
+
+{% block content %}
+<div class="container">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'home' %}">{% trans 'Home' %}</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'programs' %}">{% trans 'Academic Structure' %}</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'class_level_detail' level_code=level_code %}">{{ level_name }}</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{% trans 'Add Subject' %}</li>
+        </ol>
+    </nav>
+
+    <!-- Header -->
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-body p-4">
+                    <h3 class="card-title mb-1">{% trans 'Add Subject to' %} {{ level_name }}</h3>
+                    <p class="text-muted mb-4">{% trans 'Create a new subject for this class level' %}</p>
+
+                    <form method="post">
+                        {% csrf_token %}
+                        {{ form|crispy }}
+                        
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="selectAllClasses">
+                            <label class="form-check-label text-primary fw-bold" for="selectAllClasses">
+                                {% trans 'Select All Classes' %}
+                            </label>
+                        </div>
+                        
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>{% trans 'Note:' %}</strong> {% trans 'This subject will be added to' %} <strong>{{ level_name }}</strong>. 
+                            {% trans 'All students in this class will be automatically enrolled.' %}
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i>{% trans 'Save Subject' %}
+                            </button>
+                            <a href="{% url 'class_level_detail' level_code=level_code %}" class="btn btn-secondary">
+                                {% trans 'Cancel' %}
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const selectAllCheckbox = document.getElementById('selectAllClasses');
+        const replicationCheckboxes = document.querySelectorAll('input[name="replicate_to"]');
+        
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', function() {
+                const isChecked = this.checked;
+                replicationCheckboxes.forEach(checkbox => {
+                    checkbox.checked = isChecked;
+                });
+            });
+        }
+    });
+</script>
+{% endblock content %}

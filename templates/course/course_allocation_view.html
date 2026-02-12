@@ -22,7 +22,51 @@
 <br>
 
 {% include 'snippets/messages.html' %}
-{% include 'snippets/filter_form.html' %}
+
+<!-- Division Tabs -->
+<ul class="nav nav-pills mb-3" id="pills-tab" role="tablist">
+    {% for division_code, division_name in divisions %}
+    <li class="nav-item" role="presentation">
+        <a class="nav-link {% if current_division == division_code %}active{% endif %}" 
+           href="?division={{ division_code }}" role="tab">
+            {{ division_name }}
+        </a>
+    </li>
+    {% endfor %}
+</ul>
+
+<!-- Filter Toolbar -->
+<div class="card p-3 shadow-sm border-0 bg-light mb-4">
+    <form method="get" class="row g-2 align-items-center">
+        <!-- Preserve current division -->
+        <input type="hidden" name="division" value="{{ current_division }}">
+        
+        <!-- Original filters from django-filters -->
+        {% for field in filter.form %}
+        <div class="col-md-3">
+            {{ field }}
+        </div>
+        {% endfor %}
+        
+        <!-- New Level Filter -->
+        <div class="col-md-3">
+            <select name="level" class="form-select au-input" onchange="this.form.submit()">
+                <option value="">{% trans 'All Levels' %}</option>
+                {% for code, name in division_levels %}
+                <option value="{{ code }}" {% if selected_level == code %}selected{% endif %}>
+                    {{ name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="col-md-3">
+            <button class="btn btn-primary w-100" type="submit">
+                <i class="fas fa-filter"></i> {% trans 'Apply Filters' %}
+            </button>
+        </div>
+    </form>
+</div>
 
 <div class="table-responsive table-shadow p-0 mt-4">
     <table class="table table-light table-striped">

@@ -5,6 +5,7 @@ from django.core.paginator import Paginator
 from django.db.models import Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.decorators import method_decorator
+from django.utils.translation import gettext_lazy as _
 from django.views.generic import CreateView
 from django_filters.views import FilterView
 
@@ -45,7 +46,43 @@ class ProgramFilterView(FilterView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["title"] = "Programs"
+        context["title"] = "Academic Structure"
+        
+        # Import settings for level constants
+        from django.conf import settings
+        
+        # Get class levels grouped by division
+        context['nursery_levels'] = [
+            (settings.NURSERY_1, "Nursery 1"),
+            (settings.NURSERY_2, "Nursery 2"),
+            (settings.KG_1, "KG 1"),
+            (settings.KG_2, "KG 2"),
+        ]
+        
+        context['primary_levels'] = [
+            (settings.PRIMARY_1, "Primary 1"),
+            (settings.PRIMARY_2, "Primary 2"),
+            (settings.PRIMARY_3, "Primary 3"),
+            (settings.PRIMARY_4, "Primary 4"),
+            (settings.PRIMARY_5, "Primary 5"),
+            (settings.PRIMARY_6, "Primary 6"),
+        ]
+        
+        context['jhs_levels'] = [
+            (settings.JHS_1, "JHS 1"),
+            (settings.JHS_2, "JHS 2"),
+            (settings.JHS_3, "JHS 3"),
+        ]
+        
+        # Count subjects for each level
+        from course.models import Course
+        level_subject_counts = {}
+        for level_code, level_name in context['nursery_levels'] + context['primary_levels'] + context['jhs_levels']:
+            count = Course.objects.filter(level=level_code, school=self.request.school).count()
+            level_subject_counts[level_code] = count
+        
+        context['level_subject_counts'] = level_subject_counts
+        
         return context
 
 
@@ -239,11 +276,44 @@ class CourseAllocationFilterView(FilterView):
     template_name = "course/course_allocation_view.html"
 
     def get_queryset(self):
-        return CourseAllocation.objects.filter(teacher__school=self.request.school)
+        qs = CourseAllocation.objects.filter(teacher__school=self.request.school)
+        
+        # Division filtering
+        current_division = self.request.GET.get('division', settings.DIVISION_NURSERY)
+        division_levels = settings.DIVISION_LEVEL_MAPPING.get(current_division, [])
+        
+        # Filter by teacher division (primary)
+        qs = qs.filter(teacher__division=current_division)
+        
+        # Further filter by level if selected
+        selected_level = self.request.GET.get('level')
+        if selected_level:
+            qs = qs.filter(courses__level=selected_level).distinct()
+            
+        return qs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["title"] = "Course Allocations"
+        current_division = self.request.GET.get('division', settings.DIVISION_NURSERY)
+        selected_level = self.request.GET.get('level')
+        
+        division_levels = settings.DIVISION_LEVEL_MAPPING.get(current_division, [])
+        division_level_choices = []
+        for code, name in settings.LEVEL_CHOICES:
+            if code in division_levels:
+                division_level_choices.append((code, name))
+                
+        context.update({
+            "title": _("Course Allocations"),
+            "current_division": current_division,
+            "selected_level": selected_level,
+            "division_levels": division_level_choices,
+            "divisions": [
+                (settings.DIVISION_NURSERY, _("Nursery/Pre-School")),
+                (settings.DIVISION_PRIMARY, _("Primary School")),
+                (settings.DIVISION_JHS, _("Junior High School")),
+            ]
+        })
         return context
 
 

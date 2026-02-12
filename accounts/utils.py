@@ -67,11 +67,19 @@ def send_new_account_email(user, password):
         template_name = "accounts/email/new_student_account_confirmation.html"
     else:
         template_name = "accounts/email/new_lecturer_account_confirmation.html"
+    
+    school = user.school
+    school_name = school.name if school else "Scolaa"
+
     email = {
-        "subject": "Your SkyLearn account confirmation and credentials",
+        "subject": f"Your {school_name} account confirmation and credentials",
         "recipient_list": [user.email],
         "template_name": template_name,
-        "context": {"user": user, "password": password},
+        "context": {
+            "user": user, 
+            "password": password,
+            "school": school
+        },
     }
     EmailThread(**email).start()
 

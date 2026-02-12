@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+{% load i18n %}
 <html>
   <head>
     <title>Account Confirmation</title>
@@ -252,9 +253,9 @@
     <div class="container">
       <div class="card">
         <div class="header">
-          <h2 class="text-muted lh-1">LuckyTech Innovation Ground</h2>
+          <h2 class="text-muted lh-1">{{ school.name }}</h2>
           <p class="small text-muted fw-400 lh-1 m-0">
-            Your learning management system
+            {% trans 'Your educational management portal' %}
           </p>
         </div>
         <div class="card-body">
@@ -263,10 +264,10 @@
           <p>
             A new lecturer account with ID of <b>{{ user.username }}</b> has been
             created for you. <br />
-            You're receiving this e-mail because the SkyLearn admin has given your
-            e-mail address to register an account on skylearn.com. <br />
+            You're receiving this e-mail because the {{ school.name }} admin has given your
+            e-mail address to register an account. <br />
           </p>
-          <h5>Login credentials for your SkyLearn account:</h5>
+          <h5>Login credentials for your account:</h5>
           <ul>
             <li>ID: {{ user.username }}</li>
             <li>Your password: {{ password }}</li>
@@ -287,14 +288,15 @@
           </p>
         </div>
         <div class="footer">
-          <p>Sincerely, skylearn team!</p>
+          <p>Sincerely, {{ school.name }} team!</p>
           <p>
-            For any inquiries or assistance, please contact our support team:
+            For any inquiries or assistance, please contact our support team.
           </p>
-          <p>Email: <a href="mailto:support@skylearn.com">support@skylearn.com</a></p>
-          <p>Phone: <a href="tel:251900000000">+(251) 90-000-0000</a></p>
+          {% if school.email %}
+          <p>Email: <a href="mailto:{{ school.email }}">{{ school.email }}</a></p>
+          {% endif %}
           <p>
-            &copy; 2023 <a href="skylearn.com">skylearn.com</a> | All rights reserved.
+            &copy; {% now "Y" %} {{ school.name }} | All rights reserved.
           </p>
         </div>
       </div>

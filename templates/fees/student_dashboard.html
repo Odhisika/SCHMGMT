@@ -59,6 +59,7 @@
                     <th>{% trans 'Amount' %}</th>
                     <th>{% trans 'Paid' %}</th>
                     <th>{% trans 'Balance' %}</th>
+                    <th>{% trans 'Bank Details' %}</th>
                     <th>{% trans 'Actions' %}</th>
                 </tr>
             </thead>
@@ -75,6 +76,12 @@
                         {% else %}
                         <span class="badge-success">{% trans 'Paid' %}</span>
                         {% endif %}
+                    </td>
+                    <td>
+                        <button type="button" class="btn-info-clean btn-sm" data-bs-toggle="modal" data-bs-target="#bankDetailsModal" style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; padding: 10px 15px; background-color: #00bcd4; color: white; border: none; border-radius: 6px;">
+                            <i class="fas fa-university"></i> 
+                            <span>{% trans 'View Details' %}</span>
+                        </button>
                     </td>
                     <td>
                         {% if assignment.balance > 0 %}
@@ -144,6 +151,92 @@
             <p class="empty-state-text">{% trans 'No payment history yet' %}</p>
         </div>
         {% endif %}
+    </div>
+</div>
+
+<!-- Bank Account Details Modal -->
+<div class="modal fade" id="bankDetailsModal" tabindex="-1" aria-labelledby="bankDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content" style="border-radius: 12px; border: none; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
+            <div class="modal-header" style="border-bottom: 1px solid #f1f3f4; padding: 20px 24px;">
+                <h5 class="modal-title" id="bankDetailsModalLabel" style="font-weight: 600; color: #202124;">
+                    <i class="fas fa-university text-primary me-2"></i> {% trans 'School Bank Account Details' %}
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" style="padding: 24px;">
+                <div class="alert alert-info" style="background-color: #e8f0fe; border: none; border-radius: 8px; color: #1967d2; font-size: 14px;">
+                    <i class="fas fa-info-circle me-2"></i> {% trans 'Please use your payment reference' %} <strong>{{ payment_reference }}</strong> {% trans 'for all transfers to ensure your payment is accurately tracked.' %}
+                </div>
+
+                <div class="row mt-4">
+                    {% if bank_accounts %}
+                        {% for account in bank_accounts %}
+                        <div class="col-md-6 mb-4">
+                            <div class="card h-100" style="border: 1px solid #e0e0e0; border-radius: 10px; transition: transform 0.2s;">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <span class="badge {% if account.account_type == 'BANK' %}bg-primary{% else %}bg-success{% endif %}" style="padding: 6px 12px; border-radius: 20px;">
+                                            {{ account.get_account_type_display }}
+                                        </span>
+                                        {% if account.is_default %}
+                                        <span class="text-primary" style="font-size: 12px; font-weight: 600;">
+                                            <i class="fas fa-check-circle"></i> {% trans 'Preferred' %}
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    {% if account.account_type == 'BANK' %}
+                                    <h6 class="card-title fw-bold">{{ account.bank_name }}</h6>
+                                    <div class="mb-2">
+                                        <small class="text-muted d-block">{% trans 'Account Name' %}</small>
+                                        <span class="fw-medium">{{ account.account_name }}</span>
+                                    </div>
+                                    <div class="mb-2">
+                                        <small class="text-muted d-block">{% trans 'Account Number' %}</small>
+                                        <span class="fw-bold" style="font-size: 1.1rem; letter-spacing: 0.5px;">{{ account.account_number }}</span>
+                                    </div>
+                                    {% if account.branch %}
+                                    <div class="mb-2">
+                                        <small class="text-muted d-block">{% trans 'Branch' %}</small>
+                                        <span>{{ account.branch }}</span>
+                                    </div>
+                                    {% endif %}
+                                    {% else %}
+                                    <h6 class="card-title fw-bold">{{ account.get_mobile_money_network_display }}</h6>
+                                    <div class="mb-2">
+                                        <small class="text-muted d-block">{% trans 'Recipient Name' %}</small>
+                                        <span class="fw-medium">{{ account.account_name }}</span>
+                                    </div>
+                                    <div class="mb-2">
+                                        <small class="text-muted d-block">{% trans 'Mobile Number' %}</small>
+                                        <span class="fw-bold" style="font-size: 1.1rem; letter-spacing: 0.5px;">{{ account.mobile_money_number }}</span>
+                                    </div>
+                                    {% endif %}
+
+                                    {% if account.notes %}
+                                    <hr style="border-top: 1px dashed #e0e0e0;">
+                                    <div class="mt-2">
+                                        <small class="text-muted d-block mb-1">{% trans 'Instructions' %}</small>
+                                        <p class="mb-0" style="font-size: 13px; line-height: 1.4;">{{ account.notes }}</p>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="col-12 text-center py-4">
+                            <i class="fas fa-university text-muted mb-3" style="font-size: 48px; opacity: 0.3;"></i>
+                            <p class="text-muted">{% trans 'No bank account details available at the moment. Please contact the school administration.' %}</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid #f1f3f4; padding: 16px 24px;">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" style="border-radius: 6px;">{% trans 'Close' %}</button>
+            </div>
+        </div>
     </div>
 </div>
 

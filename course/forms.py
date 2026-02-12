@@ -16,18 +16,27 @@ class ProgramForm(forms.ModelForm):
 
 
 class CourseAddForm(forms.ModelForm):
+    replicate_to = forms.MultipleChoiceField(
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        label="Also add to these classes"
+    )
+
     class Meta:
         model = Course
-        fields = "__all__"
+        fields = ["title", "code", "summary", "level", "is_core_subject", "is_elective"]
+        # Exclude program, school, term as they will be handled automatically
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        from django.conf import settings
+        self.fields['replicate_to'].choices = settings.LEVEL_CHOICES
+        
         self.fields["title"].widget.attrs.update({"class": "form-control"})
         self.fields["code"].widget.attrs.update({"class": "form-control"})
-        self.fields["summary"].widget.attrs.update({"class": "form-control"})
-        self.fields["program"].widget.attrs.update({"class": "form-control"})
+        self.fields["summary"].widget.attrs.update({"class": "form-control", "rows": 3})
         self.fields["level"].widget.attrs.update({"class": "form-control"})
-        self.fields["term"].widget.attrs.update({"class": "form-control"})
+        # self.fields["term"].widget.attrs.update({"class": "form-control"}) # Handled automatically
 
 
 class CourseAllocationForm(forms.ModelForm):
@@ -41,7 +50,7 @@ class CourseAllocationForm(forms.ModelForm):
     teacher = forms.ModelChoiceField(
         queryset=User.objects.none(),
         widget=forms.Select(attrs={"class": "browser-default custom-select"}),
-        label="Lecturer",
+        label="Teacher",
     )
 
     class Meta:
@@ -56,6 +65,14 @@ class CourseAllocationForm(forms.ModelForm):
         if request:
             teachers = User.objects.filter(is_lecturer=True, school=request.school)
             courses = Course.objects.filter(school=request.school).order_by("program", "level")
+            
+            # Filter out courses that already have a teacher assigned
+            # We want 1:1 teacher-course mapping per level
+            allocated_course_ids = CourseAllocation.objects.filter(
+                teacher__school=request.school
+            ).values_list('courses__id', flat=True)
+            
+            courses = courses.exclude(id__in=allocated_course_ids)
             
             # Apply Division Filter if present
             if division_filter:
@@ -94,7 +111,7 @@ class EditCourseAllocationForm(forms.ModelForm):
     teacher = forms.ModelChoiceField(
         queryset=User.objects.none(),
         widget=forms.Select(attrs={"class": "browser-default custom-select"}),
-        label="Lecturer",
+        label="Teacher",
     )
 
     class Meta:
@@ -110,6 +127,15 @@ class EditCourseAllocationForm(forms.ModelForm):
             courses_qs = Course.objects.filter(school=request.school).order_by(
                 "program", "level"
             )
+
+            # Filter out courses allocated to OTHER teachers
+            # We want 1:1 teacher-course mapping per level
+            allocated_to_others = CourseAllocation.objects.filter(
+                teacher__school=request.school
+            ).exclude(teacher=self.instance.teacher)
+            
+            other_allocated_ids = allocated_to_others.values_list('courses__id', flat=True)
+            courses_qs = courses_qs.exclude(id__in=other_allocated_ids)
 
             # If we are editing, filter courses by the teacher's department
             if self.instance and self.instance.teacher.department:

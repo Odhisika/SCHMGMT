@@ -17,13 +17,20 @@ class Period(models.Model):
     school = models.ForeignKey('school.School', on_delete=models.CASCADE)
     name = models.CharField(max_length=50, help_text=_("e.g., Period 1, Break, Assembly"))
     period_type = models.CharField(max_length=20, choices=PERIOD_TYPES, default='LESSON')
+    division = models.CharField(
+        max_length=25,
+        choices=settings.DIVISION_CHOICES,
+        blank=True,
+        null=True,
+        help_text=_("Academic division this period applies to")
+    )
     start_time = models.TimeField()
     end_time = models.TimeField()
     order = models.IntegerField(help_text=_("Display order in the day"))
     
     class Meta:
-        ordering = ['school', 'order']
-        unique_together = ['school', 'order']
+        ordering = ['school', 'division', 'order']
+        unique_together = ['school', 'division', 'order']
         verbose_name = _("Period")
         verbose_name_plural = _("Periods")
     
@@ -90,6 +97,12 @@ class TimetableEntry(models.Model):
     
     def clean(self):
         """Validate no teacher conflicts"""
+        # Ensure school is set before validation
+        if not hasattr(self, 'school') or not self.school_id:
+            # If school is not set, we skip this validation because it will be set in the view
+            # Standard validation will catch it if it remains null on save
+            return
+
         if self.teacher and self.subject and self.period.period_type == 'LESSON':
             conflicts = TimetableEntry.objects.filter(
                 school=self.school,

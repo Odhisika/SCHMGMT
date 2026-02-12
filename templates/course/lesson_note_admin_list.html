@@ -9,11 +9,35 @@
         <h1 class="h3 mb-0 text-gray-800">{% trans 'Lesson Note Review' %}</h1>
     </div>
 
+    <!-- Division Tabs -->
+    <ul class="nav nav-tabs mb-4">
+        {% for div_code, div_name in divisions %}
+        <li class="nav-item">
+            <a class="nav-link {% if current_division == div_code %}active{% endif %}" 
+               href="?division={{ div_code }}&status={{ selected_status }}">
+                {{ div_name }}
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+
     <!-- Filters -->
     <div class="card mb-4">
         <div class="card-body">
             <form method="get" class="row g-3 align-items-end">
-                <div class="col-md-3">
+                <input type="hidden" name="division" value="{{ current_division }}">
+                
+                <div class="col-md-2">
+                    <label class="form-label">{% trans 'Level' %}</label>
+                    <select name="level" class="form-select">
+                        <option value="">{% trans 'All Levels' %}</option>
+                        {% for lvl_code, lvl_name in current_division_levels %}
+                        <option value="{{ lvl_code }}" {% if selected_level == lvl_code %}selected{% endif %}>{{ lvl_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-2">
                     <label class="form-label">{% trans 'Status' %}</label>
                     <select name="status" class="form-select">
                         <option value="SUBMITTED" {% if selected_status == 'SUBMITTED' %}selected{% endif %}>{% trans 'Pending Review' %}</option>

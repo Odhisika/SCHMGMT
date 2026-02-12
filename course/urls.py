@@ -1,6 +1,7 @@
 from django.urls import path
 from . import views
 from . import lesson_note_views as ln_views
+from . import class_level_views as cl_views
 
 
 urlpatterns = [
@@ -10,6 +11,9 @@ urlpatterns = [
     path("add/", views.program_add, name="add_program"),
     path("<int:pk>/edit/", views.program_edit, name="edit_program"),
     path("<int:pk>/delete/", views.program_delete, name="program_delete"),
+    # Class Level Management
+    path("level/<str:level_code>/", cl_views.class_level_detail, name="class_level_detail"),
+    path("level/<str:level_code>/add-subject/", cl_views.add_subject_to_level, name="add_subject_to_level"),
     # Course urls
     path("course/<slug>/detail/", views.course_single, name="course_detail"),
     path("<int:pk>/course/add/", views.course_add, name="course_add"),

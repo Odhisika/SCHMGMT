@@ -28,63 +28,45 @@
 {% include 'snippets/messages.html' %}
 {% include 'snippets/filter_form.html' %}
 
-<div class="table-responsive table-shadow table-light table-striped m-0 mt-4">
-    <table class="table">
-        <thead>
-            <tr>
-                <th>#</th>
-                <th>{% trans 'ID No.' %} </th>
-                <th> {% trans 'Full Name' %} </th>
-                <th> {% trans 'Email' %} </th>
-                <th> {% trans 'Program' %} </th>
-                {% if request.user.is_superuser or request.user.is_school_admin %}
-                <th> {% trans 'Action' %} </th>
-                {% endif %}
-            </tr>
-        </thead>
-        <tbody>
+<div class="card-clean mb-4">
+    <div class="card-header-clean">
+        <h3>{% trans 'All Students' %}</h3>
+    </div>
+    <div class="card-body-clean">
+        {% if filter.qs %}
+        <div class="row">
             {% for student in filter.qs %}
-            <tr>
-                <td> {{ forloop.counter }}.</td>
-                <td>{{ student.student.username }} </td>
-                <td><a href="{% url 'profile_single' student.student.id %}">{{ student.student.get_full_name }}</a></td>
-                <td>{{ student.student.email }} </td>
-                <td>{{ student.program }}</td>
-
-                {% if request.user.is_superuser or request.user.is_school_admin %}
-                <td>
-                    <div class="dropdown">
-                        <button class="btn btn-sm" type="button" data-bs-toggle="dropdown" data-bs-boundary="window" data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false">
-                            <i class="fa fa-ellipsis-vertical"></i>
-                        </button>
-                        <ul class="dropdown-menu">
-                          <li><a class="dropdown-item" href="{% url 'student_edit' student.student.pk %}"><i class="unstyled me-2 fas fa-edit"></i>{% trans 'Update' %}</a></li>
-                          <li><a class="dropdown-item" target="_blank" href="{% url 'profile_single' student.student.id %}?download_pdf=1"><i class="unstyled me-2 fas fa-download"></i>{% trans 'Download PDF' %}</a></li>
-                          <li><a class="dropdown-item text-danger" href="{% url 'student_delete' student.pk %}"><i class="unstyled me-2 fas fa-trash-alt"></i>{% trans 'Delete' %}</a></li>
-                        </ul>
-                      </div>
-                </td>
-                {% endif %}
-                
-                {% empty %}
-                <tr>
-                  <td colspan="6">
-                  <span class="text-danger">
-                    {% trans 'No Student.' %}
-                    {% if request.user.is_superuser or request.user.is_school_admin %}
-                    <a href="{% url 'add_student' %}">
-                    <i class="primary" style="font-size: 22px;">
-                        {% trans 'Add Student Now.' %}
-                    </i>
-                    {% endif %}
-                    </a>
-                  </span>
-                </td>
-                </tr>
-
-            </tr>
+            <div class="col-6 col-md-3 mb-3">
+                <a href="{% url 'profile_single' student.student.id %}" style="text-decoration: none;">
+                    <div class="card-clean p-3 text-center h-100 d-flex flex-column align-items-center justify-content-center shadow-sm" style="margin-bottom: 0; min-height: 100px; transition: transform 0.2s; border: 1px solid #f1f3f4;">
+                        {% if student.student.picture %}
+                        <img src="{{ student.student.picture.url }}" class="rounded-circle mb-2" width="40" height="40" alt="" style="object-fit: cover; border: 2px solid #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        {% else %}
+                        <div class="rounded-circle mb-2 bg-light d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; border: 2px solid #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                            <i class="fas fa-user text-muted"></i>
+                        </div>
+                        {% endif %}
+                        <h6 class="m-0 text-dark fw-bold">{{ student.student.get_full_name }}</h6>
+                        <small class="text-muted d-block mt-1">{{ student.program|truncatechars:20 }}</small>
+                        <small class="badge bg-light text-muted mt-2">{{ student.student.username }}</small>
+                    </div>
+                </a>
+            </div>
             {% endfor %}
-        </tbody>
-    </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon"><i class="fas fa-user-graduate"></i></div>
+            <p class="empty-state-text">
+                {% trans 'No students found.' %}
+                {% if request.user.is_superuser or request.user.is_school_admin %}
+                <a href="{% url 'add_student' %}" class="btn-outline-clean mt-2 d-inline-block">
+                    {% trans 'Add Student Now' %}
+                </a>
+                {% endif %}
+            </p>
+        </div>
+        {% endif %}
+    </div>
 </div>
 {% endblock content %}

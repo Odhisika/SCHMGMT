@@ -27,9 +27,9 @@ def period_list(request):
 @login_required
 @admin_required
 def period_add(request):
-    """Add a new period"""
+    """View to add a new period to the school timetable"""
     if request.method == 'POST':
-        form = PeriodForm(request.POST)
+        form = PeriodForm(request.POST, school=request.school)
         if form.is_valid():
             period = form.save(commit=False)
             period.school = request.school
@@ -38,7 +38,7 @@ def period_add(request):
             return redirect('timetable:period_list')
         messages.error(request, _('Please correct the errors below.'))
     else:
-        form = PeriodForm()
+        form = PeriodForm(school=request.school)
     
     context = {
         'title': _('Add Period'),
@@ -50,18 +50,18 @@ def period_add(request):
 @login_required
 @admin_required
 def period_edit(request, pk):
-    """Edit an existing period"""
+    """View to edit an existing period"""
     period = get_object_or_404(Period, pk=pk, school=request.school)
     
     if request.method == 'POST':
-        form = PeriodForm(request.POST, instance=period)
+        form = PeriodForm(request.POST, instance=period, school=request.school)
         if form.is_valid():
             form.save()
             messages.success(request, _('Period updated successfully!'))
             return redirect('timetable:period_list')
         messages.error(request, _('Please correct the errors below.'))
     else:
-        form = PeriodForm(instance=period)
+        form = PeriodForm(instance=period, school=request.school)
     
     context = {
         'title': _('Edit Period'),
@@ -93,7 +93,8 @@ def period_delete(request, pk):
 
 @login_required
 def timetable_dashboard(request):
-    """Main timetable dashboard - with role-based filtering"""
+    """Main timetable dashboard - with division-based tabs"""
+    current_division = request.GET.get('division', settings.DIVISION_NURSERY)
     current_term = Term.objects.filter(is_current_term=True, school=request.school).first()
     
     # Determine accessible levels
@@ -101,45 +102,56 @@ def timetable_dashboard(request):
         levels = settings.LEVEL_CHOICES
     elif request.user.is_student:
         # Students see only their own level
-        student = Student.objects.get(student=request.user)
-        # Find the display name for the student's level
-        level_name = dict(settings.LEVEL_CHOICES).get(student.level, student.level)
-        levels = [(student.level, level_name)]
+        try:
+            student = Student.objects.get(student=request.user)
+            level_name = dict(settings.LEVEL_CHOICES).get(student.level, student.level)
+            levels = [(student.level, level_name)]
+        except Student.DoesNotExist:
+            levels = []
     elif request.user.is_teacher or request.user.is_lecturer:
         # Teachers see only levels in their division
         from accounts.utils import filter_levels_by_division
         levels = filter_levels_by_division(request.user)
+        
+        # Override current_division if teacher is restricted
+        if request.user.division:
+            current_division = request.user.division
     else:
         levels = []
 
     # Organize levels by division/section for display
-    # We can try to group them: Nursery, Primary, JHS
-    # Or just pass the list and let template iterate. 
-    # Given the template was hardcoded, passing a structured dict might be better.
-    
     from accounts.utils import get_division_for_level
     
-    grouped_levels = {}
+    # Filter the list of levels for the current tab
+    active_levels = []
+    available_divisions = set()
+    
     for code, name in levels:
-        division = get_division_for_level(code)
-        if not division:
-            division = "Other"
-        
-        if division not in grouped_levels:
-            grouped_levels[division] = []
-        grouped_levels[division].append((code, name))
-        
-    # Sort order for divisions
-    division_order = [settings.DIVISION_NURSERY, settings.DIVISION_PRIMARY, settings.DIVISION_JHS, "Other"]
-    sorted_grouped_levels = []
-    for div in division_order:
-        if div in grouped_levels:
-            sorted_grouped_levels.append((dict(settings.DIVISION_CHOICES).get(div, div), grouped_levels[div]))
+        div = get_division_for_level(code)
+        if div:
+            available_divisions.add(div)
+            if div == current_division:
+                active_levels.append((code, name))
+
+    # Prep division tabs
+    division_choices = [
+        (settings.DIVISION_NURSERY, _("Nursery/Pre-School")),
+        (settings.DIVISION_PRIMARY, _("Primary School")),
+        (settings.DIVISION_JHS, _("Junior High School")),
+    ]
+    
+    # Filter valid divisions (those that have levels for this user)
+    valid_divisions = []
+    for code, label in division_choices:
+        if code in available_divisions:
+            valid_divisions.append((code, label))
 
     context = {
         'title': _('Timetable Dashboard'),
         'current_term': current_term,
-        'grouped_levels': sorted_grouped_levels,
+        'current_division': current_division,
+        'active_levels': active_levels,
+        'divisions': valid_divisions,
     }
     return render(request, 'timetable/dashboard.html', context)
 
@@ -175,14 +187,22 @@ def timetable_by_class(request, level):
         messages.error(request, _("You do not have permission to view this timetable."))
         return redirect('timetable:timetable_dashboard')
     
-    # Get all periods for this school (lesson periods only for the grid)
+    # Get the division for this level to filter periods
+    from accounts.utils import get_division_for_level
+    level_division = get_division_for_level(level)
+    
+    # Get all periods for this school and division (lesson periods only for the grid)
     lesson_periods = Period.objects.filter(
         school=request.school,
-        period_type='LESSON'
+        period_type='LESSON',
+        division=level_division
     ).order_by('order')
     
     # Get all periods including breaks for reference
-    all_periods = Period.objects.filter(school=request.school).order_by('order')
+    all_periods = Period.objects.filter(
+        school=request.school,
+        division=level_division
+    ).order_by('order')
     
     # Get timetable entries for this class
     entries = TimetableEntry.objects.filter(

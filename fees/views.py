@@ -116,6 +116,12 @@ def student_payment_dashboard(request):
     except:
         pass
     
+    # Get active bank accounts for display
+    bank_accounts = SchoolBankAccount.objects.filter(
+        school=request.school,
+        is_active=True
+    ).order_by('-is_default')
+    
     context = {
         'title': _('My Payments'),
         'student': student,
@@ -124,6 +130,7 @@ def student_payment_dashboard(request):
         'total_balance': total_balance,
         'current_term': current_term,
         'payment_reference': payment_reference,
+        'bank_accounts': bank_accounts,
     }
     return render(request, 'fees/student_dashboard.html', context)
 

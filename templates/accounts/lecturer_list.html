@@ -23,67 +23,49 @@
 {% include 'snippets/messages.html' %}
 {% include 'snippets/filter_form.html' %}
 
-<div class="table-responsive table-shadow table-light table-striped m-0 mt-4">
-    <table class="table">
-        <thead>
-            <tr>
-                <th>#</th>
-                <th> {% trans 'ID No.' %}' </th>
-                <th> {% trans 'Full Name' %} </th>
-                <th> {% trans 'Email' %} </th>
-                <th> {% trans 'Mob No.' %} </th>
-                <th> {% trans 'Address/city' %} </th>
-                <th> {% trans 'Last login' %}  </th>
-                {% if request.user.is_superuser or request.user.is_school_admin %}
-                <th> {% trans 'Action' %} </th>
-                {% endif %}
-            </tr>
-        </thead>
-        <tbody>
-            {% for lecturer in filter.qs %}
-            <tr>
-                <td> {{ forloop.counter }}.</td>
-                <td>{{ lecturer.username }}</td>
-                <td><a href="{% url 'profile_single' lecturer.id %}">{{ lecturer.get_full_name }}</a></td>
-                <td>{{ lecturer.email }}</td>
-                <td>{{ lecturer.phone }}</td>
-                <td>{{ lecturer.address }}</td>
-                <td>{{ lecturer.last_login }}</td>
-                {% if request.user.is_superuser or request.user.is_school_admin %}
-                <td> 
-                    <div class="dropdown">
-                        <button class="btn btn-sm" type="button" data-bs-toggle="dropdown" data-bs-boundary="window" data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false">
-                            <i class="fa fa-ellipsis-vertical"></i>
-                        </button>
-                        <ul class="dropdown-menu">
-                          <li><a class="dropdown-item" href="{% url 'staff_edit' pk=lecturer.pk %}"><i class="unstyled me-2 fas fa-edit"></i>{% trans 'Update' %}</a></li>
-                          <li><a class="dropdown-item"  target="_blank" href="{% url 'profile_single' lecturer.id %}?download_pdf=1"><i class="unstyled me-2 fas fa-download"></i>{% trans 'Download PDF' %}</a></li>
-                          <li><a class="dropdown-item text-danger" href="{% url 'lecturer_delete' pk=lecturer.pk %}"><i class="unstyled me-2 fas fa-trash-alt"></i> {% trans 'Delete' %}</a></li>
-                        </ul>
-                    </div>
-                </td>
-                {% endif %}
-                
-                {% empty %}
-                <tr>
-                  <td colspan="8">
-                  <span class="text-danger">
-                    {% trans 'No Teacher(s).' %}
-                    {% if request.user.is_superuser or request.user.is_school_admin %}
-                    <a href="{% url 'add_lecturer' %}">
-                    <i class="primary" style="font-size: 22px;">
-                        {% trans 'Add Teacher Now.' %}
-                    </i>
-                    {% endif %}
-                    </a>
-                  </span>
-                </td>
-                </tr>
+<ul class="nav nav-tabs mt-4" id="teacherTab" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="nursery-tab" data-bs-toggle="tab" data-bs-target="#nursery" type="button" role="tab" aria-controls="nursery" aria-selected="true">
+        <i class="fas fa-baby me-2"></i>{% trans 'Nursery/Pre-School' %}
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="primary-tab" data-bs-toggle="tab" data-bs-target="#primary" type="button" role="tab" aria-controls="primary" aria-selected="false">
+        <i class="fas fa-child me-2"></i>{% trans 'Primary School' %}
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="jhs-tab" data-bs-toggle="tab" data-bs-target="#jhs" type="button" role="tab" aria-controls="jhs" aria-selected="false">
+        <i class="fas fa-user-graduate me-2"></i>{% trans 'JHS' %}
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="unassigned-tab" data-bs-toggle="tab" data-bs-target="#unassigned" type="button" role="tab" aria-controls="unassigned" aria-selected="false">
+        <i class="fas fa-users me-2"></i>{% trans 'Others' %}
+      </button>
+    </li>
+</ul>
 
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+<div class="tab-content" id="teacherTabContent">
+    <!-- Nursery Tab -->
+    <div class="tab-pane fade show active" id="nursery" role="tabpanel" aria-labelledby="nursery-tab">
+        {% include 'accounts/snippets/teacher_table.html' with lecturers=nursery_teachers %}
+    </div>
+
+    <!-- Primary Tab -->
+    <div class="tab-pane fade" id="primary" role="tabpanel" aria-labelledby="primary-tab">
+        {% include 'accounts/snippets/teacher_table.html' with lecturers=primary_teachers %}
+    </div>
+
+    <!-- JHS Tab -->
+    <div class="tab-pane fade" id="jhs" role="tabpanel" aria-labelledby="jhs-tab">
+        {% include 'accounts/snippets/teacher_table.html' with lecturers=jhs_teachers %}
+    </div>
+
+    <!-- Others Tab -->
+    <div class="tab-pane fade" id="unassigned" role="tabpanel" aria-labelledby="unassigned-tab">
+        {% include 'accounts/snippets/teacher_table.html' with lecturers=other_teachers %}
+    </div>
 </div>
 {% endblock content %}
 

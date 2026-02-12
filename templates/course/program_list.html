@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load i18n %}
+{% load custom_filters %}
 {% block title %}{{ title }} | {% trans 'Learning management system' %}{% endblock title %}
 
 {% block content %}
@@ -23,66 +24,101 @@
 {% include 'snippets/messages.html' %}
 {% include 'snippets/filter_form.html' %}
 
-<div class="table-responsive table-shadow table-light table-striped m-0 mt-4">
-    <div class="table-shadow">
-        <table class="table table-light">
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th>{% trans 'Program Name' %}</th>
-                    <th>{% trans 'Summary' %}</th>
-                    {% if request.user.is_superuser or request.user.is_school_admin %}
-                    <th>{% trans 'Action' %}</th>
-                    {% endif %}
-                </tr>
-            </thead>
-            <tbody>
-                {% for program in filter.qs %}
-                <tr>
-                    <td>{{ forloop.counter }}.</td>
-                    <td>
-                        <a class="a-list" href="{{ program.get_absolute_url }}">
-                            {{ program.title}}
-                        </a>
-                    </td>
-                    <td>{{ program.summary }} </td>
-                    {% if request.user.is_superuser or request.user.is_school_admin %}
-                    <td>
-                        <div class="dropdown">
-                            <button class="btn btn-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="fa fa-ellipsis-vertical"></i>
-                            </button>
-                            <ul class="dropdown-menu">
-                              <li><a class="dropdown-item" href="{% url 'edit_program' pk=program.pk %}"><i class="unstyled me-2 fas fa-edit"></i>{% trans 'Update' %}</a></li>
-                              <li><a class="dropdown-item text-danger" href="{% url 'program_delete' pk=program.pk %}"><i class="unstyled me-2 fas fa-trash-alt"></i>{% trans 'Delete' %}</a></li>
-                            </ul>
+<!-- Division Tabs -->
+<ul class="nav nav-tabs mt-4" id="divisionTab" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="nursery-tab" data-bs-toggle="tab" data-bs-target="#nursery" type="button" role="tab" aria-controls="nursery" aria-selected="true">
+        <i class="fas fa-baby me-2"></i>{% trans 'Nursery/Pre-School' %}
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="primary-tab" data-bs-toggle="tab" data-bs-target="#primary" type="button" role="tab" aria-controls="primary" aria-selected="false">
+        <i class="fas fa-child me-2"></i>{% trans 'Primary School' %}
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="jhs-tab" data-bs-toggle="tab" data-bs-target="#jhs" type="button" role="tab" aria-controls="jhs" aria-selected="false">
+        <i class="fas fa-user-graduate me-2"></i>{% trans 'JHS' %}
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="other-tab" data-bs-toggle="tab" data-bs-target="#other" type="button" role="tab" aria-controls="other" aria-selected="false">
+        <i class="fas fa-book me-2"></i>{% trans 'Others' %}
+      </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="divisionTabContent">
+    <!-- Nursery Tab -->
+    <div class="tab-pane fade show active" id="nursery" role="tabpanel" aria-labelledby="nursery-tab">
+        <div class="row mt-4">
+            {% for level_code, level_name in nursery_levels %}
+            <div class="col-md-3 col-sm-6 mb-3">
+                <a href="{% url 'class_level_detail' level_code=level_code %}" style="text-decoration: none;">
+                    <div class="card text-center h-100 shadow-sm" style="border: 1px solid #e0e0e0; transition: all 0.2s;">
+                        <div class="card-body d-flex flex-column align-items-center justify-content-center py-4">
+                            <i class="fas fa-baby fa-2x mb-3 text-primary"></i>
+                            <h5 class="card-title mb-2">{{ level_name }}</h5>
+                            <p class="text-muted small mb-0">
+                                {{ level_subject_counts|get_item:level_code|default:0 }} {% trans 'Subjects' %}
+                            </p>
                         </div>
-                    </td>
-                    {% endif %}
-                </tr>
-                {% empty %}
-                <tr>
-                  <td></td>
-                  <td></td>
-                  <td>
-                  <span class="text-danger">
-                    {% trans 'No program.' %}
-                    {% if request.user.is_superuser or request.user.is_school_admin %}
-                    <a href="{% url 'add_program' %}">
-                    <i class="primary" style="font-size: 22px;">
-                        {% trans 'Add program now.' %}
-                    </i>
-                    {% endif %}
-                    </a>
-                  </span>
-                </td>
-                <td></td>
-                <td></td>
-                <td></td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                    </div>
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Primary Tab -->
+    <div class="tab-pane fade" id="primary" role="tabpanel" aria-labelledby="primary-tab">
+        <div class="row mt-4">
+            {% for level_code, level_name in primary_levels %}
+            <div class="col-md-3 col-sm-6 mb-3">
+                <a href="{% url 'class_level_detail' level_code=level_code %}" style="text-decoration: none;">
+                    <div class="card text-center h-100 shadow-sm" style="border: 1px solid #e0e0e0; transition: all 0.2s;">
+                        <div class="card-body d-flex flex-column align-items-center justify-content-center py-4">
+                            <i class="fas fa-book fa-2x mb-3 text-success"></i>
+                            <h5 class="card-title mb-2">{{ level_name }}</h5>
+                            <p class="text-muted small mb-0">
+                                {{ level_subject_counts|get_item:level_code|default:0 }} {% trans 'Subjects' %}
+                            </p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- JHS Tab -->
+    <div class="tab-pane fade" id="jhs" role="tabpanel" aria-labelledby="jhs-tab">
+        <div class="row mt-4">
+            {% for level_code, level_name in jhs_levels %}
+            <div class="col-md-3 col-sm-6 mb-3">
+                <a href="{% url 'class_level_detail' level_code=level_code %}" style="text-decoration: none;">
+                    <div class="card text-center h-100 shadow-sm" style="border: 1px solid #e0e0e0; transition: all 0.2s;">
+                        <div class="card-body d-flex flex-column align-items-center justify-content-center py-4">
+                            <i class="fas fa-graduation-cap fa-2x mb-3 text-info"></i>
+                            <h5 class="card-title mb-2">{{ level_name }}</h5>
+                            <p class="text-muted small mb-0">
+                                {{ level_subject_counts|get_item:level_code|default:0 }} {% trans 'Subjects' %}
+                            </p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Others Tab (for programs not tied to specific levels) -->
+    <div class="tab-pane fade" id="other" role="tabpanel" aria-labelledby="other-tab">
+        <div class="alert alert-info mt-4">
+            <i class="fas fa-info-circle me-2"></i>
+            {% trans 'Other programs and departments that are not tied to specific class levels.' %}
+        </div>
+        {% include 'course/snippets/program_table.html' with programs=filter.qs division='Other' %}
     </div>
 </div>
 {% endblock content %}

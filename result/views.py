@@ -977,12 +977,50 @@ def report_cards(request):
     """
     List all students and their report card status for the school admin.
     """
-    students = Student.objects.filter(student__school=request.school).annotate(result_count=Count('result'))
+    from accounts.utils import get_division_for_level
+    
+    # Get current division and level from request
+    DIVISION_NURSERY = settings.DIVISION_NURSERY
+    current_division = request.GET.get('division', DIVISION_NURSERY)
+    selected_level = request.GET.get('level')
+    
+    # Base queryset
+    students = Student.objects.filter(student__school=request.school)
+    
+    # Division filtering
+    division_levels = settings.DIVISION_LEVEL_MAPPING.get(current_division, [])
+    if division_levels:
+        students = students.filter(level__in=division_levels)
+    
+    # Level filtering
+    if selected_level:
+        students = students.filter(level=selected_level)
+    
+    students = students.annotate(result_count=Count('result')).order_by('level', 'student__username')
+    
     current_term = Semester.objects.filter(is_current_term=True, school=request.school).first()
     
+    # Prepare context for tabs and filters
+    divisions = [
+        (settings.DIVISION_NURSERY, _("Nursery/Pre-School")),
+        (settings.DIVISION_PRIMARY, _("Primary School")),
+        (settings.DIVISION_JHS, _("Junior High School")),
+    ]
+    
+    # Filter valid levels for the dropdown based on current division
+    # settings.LEVEL_CHOICES contains all levels. We filter them.
+    division_level_choices = []
+    for code, name in settings.LEVEL_CHOICES:
+        if code in division_levels:
+            division_level_choices.append((code, name))
+
     context = {
         "students": students,
         "current_term": current_term,
         "title": "Report Cards Management",
+        "current_division": current_division,
+        "divisions": divisions,
+        "selected_level": selected_level,
+        "division_levels": division_level_choices,
     }
     return render(request, "result/report_cards_list.html", context)

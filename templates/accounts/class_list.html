@@ -11,53 +11,41 @@
     </ol>
 </nav>
 
-<div class="card">
-    <div class="card-header bg-white">
-        <h3 class="card-title text-primary"><i class="fas fa-layer-group"></i> {% trans 'Class Management Dashboard' %}</h3>
+<div class="card-clean mb-4">
+    <div class="card-header-clean">
+        <h3>{% trans 'All Classes' %}</h3>
     </div>
-    <div class="card-body">
+    <div class="card-body-clean">
         {% if is_teacher %}
-        <div class="alert alert-info mb-4">
+        <div class="alert-info-clean mb-4" style="font-size: 14px;">
             <i class="fas fa-info-circle"></i> {% trans 'You are viewing only the classes where you have assigned subjects.' %}
         </div>
         {% endif %}
 
         {% if levels %}
-        <div class="row g-4">
+        <div class="row">
             {% for level_code, level_name in levels %}
-            <div class="col">
-                <div class="card h-100 shadow border-0" style="border-radius: 8px;">
-                    <div class="card-body p-4 text-center">
-                        <h3 class="card-title fw-bold text-dark mb-1">{{ level_name }}</h3>
-                        <div class="mb-3">
-                            <span class="display-4 fw-bold text-primary">{{ students_counts|get_item:level_code|default:0 }}</span>
-                            <span class="text-muted d-block small text-uppercase fw-bold">Students</span>
-                        </div>
-                        <p class="card-text text-muted mb-4 small">
-                            {% trans 'Manage students, view results, and handle promotions for' %} {{ level_name }}.
-                        </p> 
-                        <a href="{% url 'class_detail' level_code %}" class="btn btn-primary w-100 py-2">
-                            {% trans 'Open Class Workspace' %}
-                        </a>
+            <div class="col-6 col-md-3 mb-3">
+                <a href="{% url 'class_detail' level_code %}" style="text-decoration: none;">
+                    <div class="card-clean p-3 text-center h-100 d-flex align-items-center justify-content-center shadow-sm" style="margin-bottom: 0; min-height: 80px; transition: transform 0.2s; border: 1px solid #f1f3f4;">
+                        <h5 class="m-0" style="color: #202124; font-weight: 600;">{{ level_name }}</h5>
                     </div>
-                </div>
+                </a>
             </div>
             {% endfor %}
         </div>
         {% else %}
-        <div class=\"text-center py-5\">
-            <i class=\"fas fa-calendar-times fa-4x text-muted mb-3\"></i>
-            <h4>{% trans 'No Classes Assigned' %}</h4>
-            <p class=\"text-muted\">
+        <div class="empty-state">
+            <div class="empty-state-icon"><i class="fas fa-layer-group"></i></div>
+            <p class="empty-state-text">
                 {% if is_teacher %}
-                {% trans 'You currently have no course allocations. Please contact your administrator to get subjects assigned.' %}
+                {% trans 'You currently have no course allocations.' %}
                 {% else %}
-                {% trans 'No classes are currently set up in the system.' %}
+                {% trans 'No classes are currently set up.' %}
                 {% endif %}
             </p>
         </div>
         {% endif %}
-
     </div>
 </div>
 {% endblock content %}

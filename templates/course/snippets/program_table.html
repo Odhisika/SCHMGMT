@@ -1,0 +1,62 @@
+{% load i18n %}
+\u003cdiv class=\"table-responsive table-shadow p-0 mt-3\"\u003e
+    \u003ctable class=\"table table-light table-striped m-0\"\u003e
+        \u003cthead\u003e
+            \u003ctr\u003e
+                \u003cth\u003e#\u003c/th\u003e
+                \u003cth\u003e{% trans 'Block/Department Name' %}\u003c/th\u003e
+                \u003cth\u003e{% trans 'Type' %}\u003c/th\u003e
+                \u003cth\u003e{% trans 'Summary' %}\u003c/th\u003e
+                {% if request.user.is_superuser or request.user.is_school_admin %}
+                \u003cth\u003e{% trans 'Action' %}\u003c/th\u003e
+                {% endif %}
+            \u003c/tr\u003e
+        \u003c/thead\u003e
+        \u003ctbody\u003e
+            {% for program in programs %}
+            \u003ctr\u003e
+                \u003ctd\u003e{{ forloop.counter }}.\u003c/td\u003e
+                \u003ctd\u003e
+                    \u003ca class=\"a-list\" href=\"{{ program.get_absolute_url }}\"\u003e
+                        {{ program.title}}
+                    \u003c/a\u003e
+                \u003c/td\u003e
+                \u003ctd\u003e
+                    {% if program.is_academic_block %}
+                    \u003cspan class=\"badge bg-primary\"\u003e{% trans 'Academic Block' %}\u003c/span\u003e
+                    {% else %}
+                    \u003cspan class=\"badge bg-secondary\"\u003e{% trans 'Department' %}\u003c/span\u003e
+                    {% endif %}
+                \u003c/td\u003e
+                \u003ctd\u003e{{ program.summary }}\u003c/td\u003e
+                {% if request.user.is_superuser or request.user.is_school_admin %}
+                \u003ctd\u003e
+                    \u003cdiv class=\"dropdown\"\u003e
+                        \u003cbutton class=\"btn btn-sm\" type=\"button\" data-bs-toggle=\"dropdown\" data-bs-boundary=\"window\" data-bs-popper-config='{"strategy":"fixed"}' aria-expanded=\"false\"\u003e
+                            \u003ci class=\"fa fa-ellipsis-vertical\"\u003e\u003c/i\u003e
+                        \u003c/button\u003e
+                        \u003cul class=\"dropdown-menu\"\u003e
+                          \u003cli\u003e\u003ca class=\"dropdown-item\" href=\"{% url 'edit_program' pk=program.pk %}\"\u003e\u003ci class=\"unstyled me-2 fas fa-edit\"\u003e\u003c/i\u003e{% trans 'Update' %}\u003c/a\u003e\u003c/li\u003e
+                          \u003cli\u003e\u003ca class=\"dropdown-item text-danger\" href=\"{% url 'program_delete' pk=program.pk %}\"\u003e\u003ci class=\"unstyled me-2 fas fa-trash-alt\"\u003e\u003c/i\u003e{% trans 'Delete' %}\u003c/a\u003e\u003c/li\u003e
+                        \u003c/ul\u003e
+                    \u003c/div\u003e
+                \u003c/td\u003e
+                {% endif %}
+            \u003c/tr\u003e
+            {% empty %}
+            \u003ctr\u003e
+              \u003ctd colspan=\"{% if request.user.is_superuser or request.user.is_school_admin %}5{% else %}4{% endif %}\"\u003e
+              \u003cspan class=\"text-muted\"\u003e
+                {% trans 'No programs found in' %} {{ division }} {% trans 'division.' %}
+                {% if request.user.is_superuser or request.user.is_school_admin %}
+                \u003ca href=\"{% url 'add_program' %}\"\u003e
+                    {% trans 'Add program now.' %}
+                \u003c/a\u003e
+                {% endif %}
+              \u003c/span\u003e
+            \u003c/td\u003e
+            \u003c/tr\u003e
+            {% endfor %}
+        \u003c/tbody\u003e
+    \u003c/table\u003e
+\u003c/div\u003e

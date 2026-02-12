@@ -1,6 +1,20 @@
 {% extends 'base.html' %}
 {% load i18n %}
 {% load crispy_forms_tags %}
+
+{% block js %}
+<script>
+    function filterPeriodsByLevel(level) {
+        // Implement AJAX or simpler filtering logic
+        // Since we are server-side filtering on load, a reload might be simplest for now
+        // OR fetch compatible periods/subjects
+        
+        const url = new URL(window.location.href);
+        url.searchParams.set('level', level);
+        window.location.href = url.toString();
+    }
+</script>
+{% endblock js %}
 {% block title %}{{ title }} | {% trans 'Learning management system' %}{% endblock title %}
 
 {% block content %}

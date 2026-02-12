@@ -27,6 +27,21 @@ class Program(models.Model):
     title = models.CharField(max_length=150)
     summary = models.TextField(blank=True)
     school = models.ForeignKey("school.School", on_delete=models.CASCADE, null=True, blank=True)
+    
+    # Link program to a division (Nursery, Primary, JHS)
+    division = models.CharField(
+        max_length=25,
+        choices=settings.DIVISION_CHOICES,
+        blank=True,
+        null=True,
+        help_text=_("Academic division this program belongs to")
+    )
+    
+    # Indicate if this is a core academic block or a subject department
+    is_academic_block = models.BooleanField(
+        default=True,
+        help_text=_("True for main academic divisions (Nursery, Primary, JHS), False for subject departments")
+    )
 
     objects = ProgramManager()
 
@@ -118,6 +133,69 @@ def log_course_save(sender, instance, created, **kwargs):
 @receiver(post_delete, sender=Course)
 def log_course_delete(sender, instance, **kwargs):
     ActivityLog.objects.create(message=_(f"The course '{instance}' has been deleted."))
+
+
+class SubjectTemplate(models.Model):
+    """Pre-defined subject templates for each level to standardize curriculum"""
+    title = models.CharField(max_length=200, help_text=_("Subject name, e.g., English Language, Mathematics"))
+    code_prefix = models.CharField(max_length=50, help_text=_("Subject code prefix, e.g., ENG, MATH, SCI"))
+    level = models.CharField(max_length=25, choices=settings.LEVEL_CHOICES, help_text=_("Grade level for this subject"))
+    division = models.CharField(max_length=25, choices=settings.DIVISION_CHOICES, help_text=_("Academic division"))
+    is_core_subject = models.BooleanField(
+        default=True, 
+        help_text=_("Core subjects are mandatory for all students")
+    )
+    is_elective = models.BooleanField(
+        default=False,
+        help_text=_("Elective subjects are optional")
+    )
+    description = models.TextField(
+        blank=True,
+        help_text=_("Brief description of the subject content and objectives")
+    )
+    school = models.ForeignKey(
+        "school.School", 
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        help_text=_("School this template belongs to")
+    )
+    
+    class Meta:
+        unique_together = ['code_prefix', 'level', 'school']
+        ordering = ['division', 'level', 'title']
+        verbose_name = _("Subject Template")
+        verbose_name_plural = _("Subject Templates")
+    
+    def __str__(self):
+        return f"{self.title} ({self.level})"
+    
+    def create_course(self, program, term):
+        """Create a Course instance from this template"""
+        code = f"{self.code_prefix}{self.level[:3].upper()}"
+        course = Course.objects.create(
+            title=self.title,
+            code=code,
+            program=program,
+            level=self.level,
+            term=term,
+            is_core_subject=self.is_core_subject,
+            is_elective=self.is_elective,
+            summary=self.description,
+            school=self.school
+        )
+        return course
+
+
+@receiver(post_save, sender=SubjectTemplate)
+def log_subject_template_save(sender, instance, created, **kwargs):
+    verb = "created" if created else "updated"
+    ActivityLog.objects.create(message=_(f"Subject template '{instance}' has been {verb}."))
+
+
+@receiver(post_delete, sender=SubjectTemplate)
+def log_subject_template_delete(sender, instance, **kwargs):
+    ActivityLog.objects.create(message=_(f"Subject template '{instance}' has been deleted."))
 
 
 class CourseAllocation(models.Model):

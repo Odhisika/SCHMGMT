@@ -271,6 +271,17 @@ class LecturerFilterView(FilterView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["title"] = "Lecturers"
+        
+        # We use the filtered queryset from django-filters
+        qs = self.get_queryset()
+        # Apply the filter from the filterset
+        filtered_qs = self.filterset_class(self.request.GET, queryset=qs).qs
+        
+        context["nursery_teachers"] = filtered_qs.filter(division=settings.DIVISION_NURSERY)
+        context["primary_teachers"] = filtered_qs.filter(division=settings.DIVISION_PRIMARY)
+        context["jhs_teachers"] = filtered_qs.filter(division=settings.DIVISION_JHS)
+        context["other_teachers"] = filtered_qs.filter(division__isnull=True)
+        
         return context
 
 
