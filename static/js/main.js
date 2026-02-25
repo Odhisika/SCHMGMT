@@ -6,6 +6,10 @@ function toggleSidebar() {
   document.getElementById("main").classList.toggle("toggle-active");
   document.getElementById("top-navbar").classList.toggle("toggle-active");
   document.querySelector(".manage-wrap").classList.toggle("toggle-active");
+  const toggleBtn = document.getElementById("sidebar-toggle");
+  if (toggleBtn) {
+    toggleBtn.classList.toggle("toggle-active");
+  }
 }
 
 // #################################

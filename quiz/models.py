@@ -80,6 +80,21 @@ class Quiz(models.Model):
         verbose_name=_("Single Attempt"),
         help_text=_("If yes, only one attempt by a user will be permitted."),
     )
+    max_attempts = models.PositiveSmallIntegerField(
+        default=1,
+        verbose_name=_("Max Attempts"),
+        help_text=_(
+            "Maximum number of attempts a student can make. "
+            "When more than 1, the highest score is recorded for reports."
+        ),
+        choices=[
+            (1, _("1 attempt (default)")),
+            (2, _("2 attempts")),
+            (3, _("3 attempts")),
+            (4, _("4 attempts")),
+            (5, _("5 attempts")),
+        ],
+    )
     pass_mark = models.SmallIntegerField(
         default=50,
         verbose_name=_("Pass Mark"),
@@ -93,6 +108,42 @@ class Quiz(models.Model):
             "If yes, the quiz is not displayed in the quiz list and can only be taken by users who can edit quizzes."
         ),
     )
+    
+    # Scheduling and availability
+    available_from = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name=_("Available From"),
+        help_text=_("Quiz becomes available to students at this date/time")
+    )
+    available_until = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name=_("Available Until"),
+        help_text=_("Quiz is no longer available after this date/time")
+    )
+    
+    # Time limits
+    time_limit_minutes = models.IntegerField(
+        null=True,
+        blank=True,
+        verbose_name=_("Time Limit (minutes)"),
+        help_text=_("Time limit in minutes for completing the quiz. Leave blank for unlimited time.")
+    )
+    
+    # Answer display options
+    allow_review_after_submission = models.BooleanField(
+        default=True,
+        verbose_name=_("Allow Review After Submission"),
+        help_text=_("Students can review their answers after submitting")
+    )
+    show_correct_answers_after = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name=_("Show Correct Answers After"),
+        help_text=_("Correct answers will be visible after this date/time")
+    )
+    
     timestamp = models.DateTimeField(auto_now=True)
 
     objects = QuizManager()
@@ -107,11 +158,22 @@ class Quiz(models.Model):
     def save(self, *args, **kwargs):
         if self.single_attempt:
             self.exam_paper = True
+            self.max_attempts = 1
 
         if not (0 <= self.pass_mark <= 100):
             raise ValidationError(_("Pass mark must be between 0 and 100."))
 
         super().save(*args, **kwargs)
+
+    def allows_multiple_attempts(self):
+        return not self.single_attempt and self.max_attempts > 1
+
+    def get_best_score_for_user(self, user):
+        """Return the best scoring completed sitting for this user."""
+        sittings = Sitting.objects.filter(
+            user=user, quiz=self, complete=True
+        ).order_by('-current_score')
+        return sittings.first()
 
     def get_questions(self):
         return self.question_set.all().select_subclasses()
@@ -122,6 +184,38 @@ class Quiz(models.Model):
 
     def get_absolute_url(self):
         return reverse("quiz_index", kwargs={"slug": self.course.slug})
+    
+    def is_available(self, for_user=None):
+        """Check if quiz is currently available"""
+        current_time = now()
+        
+        # Check if not yet available
+        if self.available_from and current_time < self.available_from:
+            return False
+        
+        # Check if expired
+        if self.available_until and current_time > self.available_until:
+            return False
+        
+        return True
+    
+    def is_expired(self):
+        """Check if quiz has expired"""
+        if self.available_until:
+            return now() > self.available_until
+        return False
+    
+    def time_until_available(self):
+        """Get time until quiz becomes available"""
+        if self.available_from and now() < self.available_from:
+            return self.available_from - now()
+        return None
+    
+    def time_until_expires(self):
+        """Get time until quiz expires"""
+        if self.available_until and now() < self.available_until:
+            return self.available_until - now()
+        return None
 
 
 @receiver(pre_save, sender=Quiz)
@@ -202,6 +296,17 @@ class SittingManager(models.Manager):
 
         questions = ",".join(map(str, question_ids)) + ","
 
+        # Determine which attempt number this is
+        prior_attempts = self.filter(
+            user=user, quiz=quiz, course=course, complete=True
+        ).count()
+        attempt_number = prior_attempts + 1
+
+        # Initialize time_remaining_seconds if quiz is timed
+        initial_time_remaining = None
+        if quiz.time_limit_minutes:
+            initial_time_remaining = quiz.time_limit_minutes * 60
+
         new_sitting = self.create(
             user=user,
             quiz=quiz,
@@ -212,15 +317,20 @@ class SittingManager(models.Manager):
             current_score=0,
             complete=False,
             user_answers="{}",
+            attempt_number=attempt_number,
+            time_remaining_seconds=initial_time_remaining,
         )
         return new_sitting
 
     def user_sitting(self, user, quiz, course):
-        if (
-            quiz.single_attempt
-            and self.filter(user=user, quiz=quiz, course=course, complete=True).exists()
-        ):
+        completed_count = self.filter(
+            user=user, quiz=quiz, course=course, complete=True
+        ).count()
+
+        # Single attempt or max attempts reached
+        if quiz.single_attempt or completed_count >= quiz.max_attempts:
             return False
+
         try:
             sitting = self.get(user=user, quiz=quiz, course=course, complete=False)
         except Sitting.DoesNotExist:
@@ -263,6 +373,28 @@ class Sitting(models.Model):
     )
     start = models.DateTimeField(auto_now_add=True, verbose_name=_("Start"))
     end = models.DateTimeField(null=True, blank=True, verbose_name=_("End"))
+    attempt_number = models.PositiveSmallIntegerField(
+        default=1,
+        verbose_name=_("Attempt Number"),
+        help_text=_("Which attempt number this sitting represents")
+    )
+    
+    # Time tracking for timed quizzes
+    time_started = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name=_("Time Started")
+    )
+    time_remaining_seconds = models.IntegerField(
+        null=True,
+        blank=True,
+        verbose_name=_("Time Remaining (seconds)"),
+        help_text=_("Remaining time in seconds for timed quizzes")
+    )
+    auto_submit_on_timeout = models.BooleanField(
+        default=True,
+        verbose_name=_("Auto Submit on Timeout"),
+        help_text=_("Automatically submit when time expires")
+    )
 
     objects = SittingManager()
 
@@ -270,17 +402,53 @@ class Sitting(models.Model):
         permissions = (("view_sittings", _("Can see completed exams.")),)
 
     def get_first_question(self):
+        """Get the first unanswered question"""
         if not self.question_list:
             return False
         first_question_id = int(self.question_list.split(",", 1)[0])
         return Question.objects.get_subclass(id=first_question_id)
 
     def remove_first_question(self):
+        """Remove first question from the list (after answering)"""
         if not self.question_list:
             return
         _, remaining_questions = self.question_list.split(",", 1)
         self.question_list = remaining_questions
         self.save()
+    
+    def get_question_by_position(self, position):
+        """Get question at specific position (0-indexed)"""
+        question_ids = self._question_ids()
+        if 0 <= position < len(question_ids):
+            return Question.objects.get_subclass(id=question_ids[position])
+        return None
+    
+    def get_current_position(self):
+        """Get current question position (0-indexed)"""
+        answered = self.get_answered_questions()
+        return len(answered)
+    
+    def get_next_question(self):
+        """Get next question in sequence"""
+        current_pos = self.get_current_position()
+        return self.get_question_by_position(current_pos)
+    
+    def has_next_question(self):
+        """Check if there are more questions"""
+        return bool(self.question_list)
+    
+    def get_answered_questions(self):
+        """Get list of question IDs that have been answered"""
+        import json
+        try:
+            answers = json.loads(self.user_answers)
+            return [int(qid) for qid in answers.keys()]
+        except (ValueError, json.JSONDecodeError):
+            return []
+    
+    def get_total_questions(self):
+        """Get total number of questions in quiz"""
+        return len(self._question_ids())
 
     def add_to_score(self, points):
         self.current_score += int(points)
@@ -305,6 +473,36 @@ class Sitting(models.Model):
         self.complete = True
         self.end = now()
         self.save()
+    
+    def is_time_expired(self):
+        """Check if the quiz time limit has been exceeded"""
+        if not self.quiz.time_limit_minutes:
+            return False
+        
+        if self.complete:
+            return False
+        
+        time_elapsed = self.get_time_elapsed()
+        time_limit_seconds = self.quiz.time_limit_minutes * 60
+        
+        return time_elapsed >= time_limit_seconds
+    
+    def get_time_elapsed(self):
+        """Get time elapsed in seconds since quiz started"""
+        if self.complete and self.end:
+            return (self.end - self.time_started).total_seconds()
+        return (now() - self.time_started).total_seconds()
+    
+    def get_time_remaining(self):
+        """Get remaining time in seconds for timed quizzes"""
+        if not self.quiz.time_limit_minutes:
+            return None
+        
+        time_limit_seconds = self.quiz.time_limit_minutes * 60
+        time_elapsed = self.get_time_elapsed()
+        remaining = time_limit_seconds - time_elapsed
+        
+        return max(0, int(remaining))
 
     def add_incorrect_question(self, question):
         incorrect_ids = self.get_incorrect_questions
@@ -481,3 +679,187 @@ class EssayQuestion(Question):
 
     def answer_choice_to_string(self, guess):
         return str(guess)
+
+
+class TrueFalseQuestion(Question):
+    """True or False question type"""
+    correct_answer = models.BooleanField(
+        help_text=_("Is the correct answer True or False?"),
+        verbose_name=_("Correct Answer")
+    )
+
+    class Meta:
+        verbose_name = _("True/False Question")
+        verbose_name_plural = _("True/False Questions")
+
+    def check_if_correct(self, guess):
+        try:
+            return bool(int(guess)) == self.correct_answer
+        except (ValueError, TypeError):
+            return False
+
+    def get_choices(self):
+        return [(1, _("True")), (0, _("False"))]
+
+    def get_choices_list(self):
+        return self.get_choices()
+
+    def answer_choice_to_string(self, guess):
+        try:
+            return _("True") if int(guess) == 1 else _("False")
+        except (ValueError, TypeError):
+            return ""
+
+
+class FillInTheBlankQuestion(Question):
+    """Fill in the blank question type"""
+    correct_answer = models.CharField(
+        max_length=200,
+        help_text=_("The correct answer text"),
+        verbose_name=_("Correct Answer")
+    )
+    case_sensitive = models.BooleanField(
+        default=False,
+        help_text=_("Should the answer be case-sensitive?"),
+        verbose_name=_("Case Sensitive")
+    )
+
+    class Meta:
+        verbose_name = _("Fill in the Blank Question")
+        verbose_name_plural = _("Fill in the Blank Questions")
+
+    def check_if_correct(self, guess):
+        if not guess:
+            return False
+        if self.case_sensitive:
+            return str(guess).strip() == self.correct_answer.strip()
+        else:
+            return str(guess).strip().lower() == self.correct_answer.strip().lower()
+
+    def get_answers(self):
+        return self.correct_answer
+
+    def get_answers_list(self):
+        return [self.correct_answer]
+
+    def answer_choice_to_string(self, guess):
+        return str(guess) if guess else ""
+
+
+class Assignment(models.Model):
+    """Assignment/Homework model for file-based assignments"""
+    quiz = models.ForeignKey(
+        Quiz,
+        on_delete=models.CASCADE,
+        verbose_name=_("Quiz"),
+        related_name="assignments"
+    )
+    title = models.CharField(
+        max_length=200,
+        verbose_name=_("Title"),
+        help_text=_("Assignment title")
+    )
+    description = models.TextField(
+        verbose_name=_("Description"),
+        help_text=_("Assignment instructions and requirements")
+    )
+    file = models.FileField(
+        upload_to='assignments/%Y/%m/%d/',
+        blank=True,
+        null=True,
+        verbose_name=_("Assignment File"),
+        help_text=_("Optional: Upload assignment document (PDF, DOCX, etc.)")
+    )
+    due_date = models.DateTimeField(
+        verbose_name=_("Due Date"),
+        help_text=_("Submission deadline")
+    )
+    max_score = models.IntegerField(
+        default=100,
+        verbose_name=_("Maximum Score"),
+        help_text=_("Maximum points for this assignment")
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = _("Assignment")
+        verbose_name_plural = _("Assignments")
+        ordering = ['-due_date']
+
+    def __str__(self):
+        return f"{self.title} - {self.quiz.course.code}"
+
+    def is_overdue(self):
+        return now() > self.due_date
+
+
+class AssignmentSubmission(models.Model):
+    """Student submissions for assignments"""
+    assignment = models.ForeignKey(
+        Assignment,
+        on_delete=models.CASCADE,
+        verbose_name=_("Assignment"),
+        related_name="submissions"
+    )
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        verbose_name=_("Student"),
+        related_name="assignment_submissions"
+    )
+    submitted_file = models.FileField(
+        upload_to='assignment_submissions/%Y/%m/%d/',
+        verbose_name=_("Submitted File"),
+        help_text=_("Upload your assignment file")
+    )
+    submission_text = models.TextField(
+        blank=True,
+        verbose_name=_("Submission Text"),
+        help_text=_("Optional: Add notes or explanation")
+    )
+    submission_date = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name=_("Submission Date")
+    )
+    grade = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name=_("Grade"),
+        help_text=_("Score awarded by teacher")
+    )
+    feedback = models.TextField(
+        blank=True,
+        verbose_name=_("Teacher Feedback"),
+        help_text=_("Comments from the teacher")
+    )
+    graded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="graded_assignments",
+        verbose_name=_("Graded By")
+    )
+    graded_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name=_("Graded At")
+    )
+
+    class Meta:
+        verbose_name = _("Assignment Submission")
+        verbose_name_plural = _("Assignment Submissions")
+        unique_together = ['assignment', 'student']
+        ordering = ['-submission_date']
+
+    def __str__(self):
+        return f"{self.student.get_full_name} - {self.assignment.title}"
+
+    def is_late(self):
+        return self.submission_date > self.assignment.due_date
+
+    def is_graded(self):
+        return self.grade is not None

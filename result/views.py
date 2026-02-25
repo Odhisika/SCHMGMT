@@ -62,17 +62,38 @@ def create_promotion(request):
     is_third_term = current_term and current_term.term == settings.THIRD_TERM
 
     pass_mark = 50.0  # Pass mark percentage
-
-    context = {
-        "title": "Promote Students",
-        "current_term": current_term,
-        "is_third_term": is_third_term,
-        "levels": settings.LEVEL_CHOICES,
-        "pass_mark": pass_mark,
-    }
+    
+    # Division filtering logic
+    DEFAULT_DIV = settings.DIVISION_NURSERY
+    current_division = request.GET.get('division', DEFAULT_DIV)
+    division_levels_list = settings.DIVISION_LEVEL_MAPPING.get(current_division, [])
+    
+    # Filter level choices for the dropdown
+    division_level_choices = []
+    for code, name in settings.LEVEL_CHOICES:
+        if code in division_levels_list:
+            division_level_choices.append((code, name))
 
     selected_level = request.GET.get("level") or request.POST.get("level")
-    context["selected_level"] = selected_level
+    
+    # Ensure selected level belongs to current division if coming from tabs
+    if selected_level and selected_level not in division_levels_list:
+        selected_level = None
+
+    context = {
+        "title": _("Promote Students"),
+        "current_term": current_term,
+        "is_third_term": is_third_term,
+        "levels": division_level_choices, # Filtered levels
+        "pass_mark": pass_mark,
+        "current_division": current_division,
+        "divisions": [
+            (settings.DIVISION_NURSERY, _("Nursery/Pre-School")),
+            (settings.DIVISION_PRIMARY, _("Primary School")),
+            (settings.DIVISION_JHS, _("Junior High School")),
+        ],
+        "selected_level": selected_level,
+    }
 
     if selected_level:
         students = Student.objects.filter(
@@ -141,9 +162,10 @@ def create_promotion(request):
                 request,
                 f"Successfully promoted {promote_count} students from {selected_level}.",
             )
-            return HttpResponseRedirect(reverse_lazy("create_promotion"))
+            return HttpResponseRedirect(reverse_lazy("create_promotion") + f"?division={current_division}")
 
         context["promotion_list"] = promotion_list
+        context["students"] = students # Adding students to context to trigger list view
 
     return render(request, "result/create_promotion.html", context)
 
@@ -1024,3 +1046,124 @@ def report_cards(request):
         "division_levels": division_level_choices,
     }
     return render(request, "result/report_cards_list.html", context)
+
+
+# ============================================================================
+# Teacher Score Entry System
+# ============================================================================
+
+@login_required
+@lecturer_required
+def manage_scores_dashboard(request):
+    """
+    Dashboard for teachers to select class and subject for score entry.
+    Strictly filters based on teacher's course allocations.
+    """
+    # Get subjects taught by teacher (strictly allocated)
+    if request.user.is_superuser or request.user.is_school_admin:
+        # Admins see all courses in their school if they navigate here
+        subjects = Course.objects.filter(school=request.school).distinct()
+        allocated_levels = [l[0] for l in settings.LEVEL_CHOICES]
+    else:
+        # Filter strictly by teacher allocation
+        from course.models import CourseAllocation
+        # Get courses directly from the allocation
+        subjects = Course.objects.filter(allocated_course__teacher=request.user).distinct()
+        # Get levels only from the subjects they teach
+        allocated_levels = list(subjects.values_list('level', flat=True).distinct())
+
+    # Map levels to settings choices for labels
+    levels = [l for l in settings.LEVEL_CHOICES if l[0] in allocated_levels]
+
+    context = {
+        "levels": levels,
+        "subjects": subjects,
+        "title": "Manage Scores",
+    }
+    return render(request, "result/manage_scores.html", context)
+
+
+@login_required
+@lecturer_required
+def enter_scores(request, level):
+    """
+    Score entry interface for a specific class.
+    Accepts subject_id via GET parameter.
+    Verifies that the teacher is authorized to enter scores for this subject.
+    """
+    subject_id = request.GET.get('subject')
+    if not subject_id:
+        messages.error(request, "Please select a subject.")
+        return HttpResponseRedirect(reverse_lazy('manage_scores'))
+        
+    course = get_object_or_404(Course, pk=subject_id)
+    
+    # Authorization Check: Ensure teacher is allocated to this course
+    if not (request.user.is_superuser or request.user.is_school_admin):
+        # Check if this course is in teacher's allocations
+        from course.models import CourseAllocation
+        if not course.allocated_course.filter(teacher=request.user).exists():
+            messages.error(request, f"You are not authorized to enter scores for {course.title}.")
+            return HttpResponseRedirect(reverse_lazy('manage_scores'))
+    
+    # Get students enrolled in this course at this level
+    taken_courses = TakenCourse.objects.filter(
+        course=course,
+        student__level=level,
+        school=request.school
+    ).select_related('student', 'student__student').order_by('student__student__last_name')
+    
+    current_term = Semester.objects.filter(is_current_term=True, school=request.school).first()
+    
+    context = {
+        "course": course,
+        "level": level,
+        "taken_courses": taken_courses,
+        "current_term": current_term,
+        "title": f"Enter Scores - {course.title} ({level})",
+    }
+    return render(request, "result/enter_scores.html", context)
+
+
+@login_required
+@lecturer_required
+def save_scores(request):
+    """
+    AJAX handler to save scores in bulk.
+    """
+    from django.http import JsonResponse
+    import json
+    
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            scores = data.get('scores', [])
+            
+            updated_count = 0
+            errors = []
+            
+            for item in scores:
+                tc_id = item.get('id')
+                try:
+                    tc = TakenCourse.objects.get(pk=tc_id, school=request.school)
+                    
+                    # Update fields (handling empty strings as 0)
+                    tc.midsem_score = float(item.get('midsem') or 0)
+                    tc.quiz_score = float(item.get('quiz') or 0)
+                    tc.assignment_score = float(item.get('assignment') or 0)
+                    tc.exam_score = float(item.get('exam') or 0)
+                    
+                    tc.save()
+                    updated_count += 1
+                except Exception as e:
+                    errors.append(f"Error updating record {tc_id}: {str(e)}")
+            
+            if errors:
+                 return JsonResponse({'status': 'warning', 'message': f'Saved {updated_count} records with some errors.', 'errors': errors})
+            
+            return JsonResponse({'status': 'success', 'message': f'Successfully saved {updated_count} student records.'})
+            
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+            
+    return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)

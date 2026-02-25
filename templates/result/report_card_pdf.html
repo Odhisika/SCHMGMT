@@ -99,8 +99,17 @@
 </head>
 <body>
     <div class="header">
+        {% if request.school.logo %}
+        <div style="text-align: center; margin-bottom: 15px;">
+            <img src="{{ request.school.logo.path }}" alt="School Logo" style="max-height: 80px; max-width: 150px;">
+        </div>
+        {% endif %}
         <div class="school-name">{{ request.school.name|upper }}</div>
-        <div>{{ request.school.address }} | {{ request.school.phone }}</div>
+        <div>
+            {% if request.school.address %}{{ request.school.address }}{% endif %}
+            {% if request.school.address and request.school.phone %} | {% endif %}
+            {% if request.school.phone %}{{ request.school.phone }}{% endif %}
+        </div>
         <div class="report-title">{% trans 'TERMINAL REPORT CARD' %}</div>
     </div>
 

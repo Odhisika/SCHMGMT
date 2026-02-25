@@ -1,8 +1,6 @@
 {% extends "base.html" %}
 {% load i18n %}
-
 {% load quiz_tags %}
-
 
 {% block title %} {{ quiz.title}} | {% trans 'Learning management system' %} {% endblock %}
 {% block description %} {% trans "Quiz Results for" %} {{ quiz.title }} {% endblock %}
@@ -16,171 +14,151 @@
 		<li class="breadcrumb-item"><a href="{% url 'program_detail' course.program.id %}">{{ course.program }}</a></li>
 		<li class="breadcrumb-item"><a href="{{ course.get_absolute_url }}">{{ course }}</a></li>
 		<li class="breadcrumb-item"><a href="{% url 'quiz_index' course.slug %}">{% trans 'Quizzes' %}</a></li>
-		<li class="breadcrumb-item"><a href="{% url 'quiz_take' course.id quiz.slug %}">{{ quiz.title|title }}</a></li>
 		<li class="breadcrumb-item active" aria-current="page">{% trans 'Result' %}</li>
 	</ol>
 </nav>
 
-<div id="progress-card">
-  <div class="col-md-6 mx-auto">
-    <h5 class="lead">{% trans 'Calculating your result...' %}</h5>
-    <div class="progress">
-      <div class="progress-bar progress-bar-striped" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
-    </div>
-  </div>
-</div>
+<div class="container">
+	<!-- Results Summary Card -->
+	<div class="row justify-content-center mt-4">
+		<div class="col-lg-8">
+			<div class="card shadow-sm">
+				<div class="card-header bg-primary text-white text-center py-3">
+					<h4 class="mb-0">{% trans "Quiz Completed!" %}</h4>
+				</div>
+				<div class="card-body text-center p-5">
+					<h5 class="mb-4">{{ quiz.title }}</h5>
+					
+					<!-- Score Display -->
+					<div class="row mb-4">
+						<div class="col-md-4">
+							<div class="border rounded p-3">
+								<h6 class="text-muted small">{% trans "Your Score" %}</h6>
+								<h2 class="mb-0 {% if percent >= quiz.pass_mark %}text-success{% else %}text-danger{% endif %}">
+									{{ percent }}%
+								</h2>
+							</div>
+						</div>
+						<div class="col-md-4">
+							<div class="border rounded p-3">
+								<h6 class="text-muted small">{% trans "Correct Answers" %}</h6>
+								<h2 class="mb-0">{{ score }}/{{ max_score }}</h2>
+							</div>
+						</div>
+						<div class="col-md-4">
+							<div class="border rounded p-3">
+								<h6 class="text-muted small">{% trans "Status" %}</h6>
+								<h2 class="mb-0">
+									{% if percent >= quiz.pass_mark %}
+										<i class="fas fa-check-circle text-success"></i>
+									{% else %}
+										<i class="fas fa-times-circle text-danger"></i>
+									{% endif %}
+								</h2>
+							</div>
+						</div>
+					</div>
 
-<div class="container" id="progress-main">
-  {% if previous.answers %}
-    <div class="card bg-white p-3">
-        <p class="muted"><small>{% trans "The previous question" %}:</small></p>
-        <p>{{ previous.previous_question }}</p>
-        <p class="mb-0">Your answer was
-        <strong>
-            {{ previous.previous_outcome|yesno:"correct,incorrect" }}
-        </strong>
-        </p>
+					<!-- Pass/Fail Message -->
+					{% if quiz.pass_mark %}
+					<div class="alert {% if percent >= quiz.pass_mark %}alert-success{% else %}alert-warning{% endif %} mb-4">
+						<h5 class="alert-heading">
+							{% if percent >= quiz.pass_mark %}
+								<i class="fas fa-trophy me-2"></i>{% trans "Congratulations! You passed!" %}
+							{% else %}
+								<i class="fas fa-info-circle me-2"></i>{% trans "Keep practicing!" %}
+							{% endif %}
+						</h5>
+						<p class="mb-0">
+							{% if percent >= quiz.pass_mark %}
+								{% blocktrans with pass_mark=quiz.pass_mark %}You scored above the pass mark of {{ pass_mark }}%{% endblocktrans %}
+							{% else %}
+								{% blocktrans with pass_mark=quiz.pass_mark %}You need {{ pass_mark }}% to pass. Review the questions and try again.{% endblocktrans %}
+							{% endif %}
+						</p>
+					</div>
+					{% endif %}
 
-        {% load i18n %}
-        {% if previous.answers %}
-          <table class="table table-striped table-bordered">
-            <tbody>
-              {% for answer in previous.answers %}
-                {% if answer.correct %}
-                  <tr class="success">
-                    <td>{{ answer }}</td>
-                  <td class="text-success"><strong>{% trans "This is the correct answer" %}</strong></td>
-                  </tr>
-                {% else %}
-                  <tr>
-                    <td>{{ answer }}</td>
-                    <td>
-                    {% if previous.question_type.MCQuestion %}
-                      {% if answer.id|add:"0" == previous.previous_answer|add:"0" %}
-                        {% trans "This was your answer." %}
-                      {% endif %}
-                    {% endif %}
-                    </td>
-                  {% endif %}
-                  </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+					<!-- Action Buttons -->
+					<div class="d-grid gap-2 d-md-flex justify-content-md-center">
+						<a href="{% url 'quiz_index' course.slug %}" class="btn btn-primary">
+							<i class="fas fa-list me-1"></i>{% trans "Back to Quizzes" %}
+						</a>
+						<a href="{% url 'quiz_progress' %}" class="btn btn-outline-primary">
+							<i class="fas fa-chart-line me-1"></i>{% trans "View Progress" %}
+						</a>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
 
-          {% if user_was_incorrect %}
-            <div class="text-danger">
-              <strong>{% trans "You answered the above question incorrectly" %}</strong>
-            </div>
-          {% endif %}
+	<!-- Question Review (if answers_at_end is True) -->
+	{% if questions %}
+	<div class="row justify-content-center mt-4">
+		<div class="col-lg-10">
+			<div class="card">
+				<div class="card-header">
+					<h5 class="mb-0">{% trans "Question Review" %}</h5>
+				</div>
+				<div class="card-body">
+					{% for question in questions %}
+					<div class="question-review mb-4 {% if not forloop.last %}pb-4 border-bottom{% endif %}">
+						<div class="d-flex justify-content-between align-items-start mb-3">
+							<h6 class="mb-0">
+								<span class="badge bg-secondary me-2">Q{{ forloop.counter }}</span>
+								{{ question.content }}
+							</h6>
+							{% if question.id in incorrect_questions %}
+							<span class="badge bg-danger">{% trans "Incorrect" %}</span>
+							{% else %}
+							<span class="badge bg-success">{% trans "Correct" %}</span>
+							{% endif %}
+						</div>
 
-        {% endif %}
+						{% if question.figure %}
+						<div class="mb-3">
+							<img src="{{ question.figure.url }}" alt="{{ question.content }}" class="img-fluid rounded" style="max-width: 400px;"/>
+						</div>
+						{% endif %}
 
-        <p><strong>{% trans "Explanation" %}:</strong></p>
-        <p class="p-2" style="background-color: #fcf8e3;">
-          {% if previous.previous_question.explanation %}
-            {{ previous.previous_question.explanation }}
-          {% else %}
-            {% trans "No explanation set to this question." %}
-          {% endif %}
-        </p>
-        <hr>
-    </div>
+						<!-- Show correct answer -->
+						{% correct_answer_for_all question %}
 
-  {% endif %}
+						<!-- Show user's answer -->
+						{% if question.user_answer %}
+						<p class="mt-2">
+							<strong>{% trans "Your answer" %}:</strong>
+							<span class="{% if question.id not in incorrect_questions %}text-success{% else %}text-danger{% endif %}">
+								{{ question|answer_choice_to_string:question.user_answer }}
+							</span>
+						</p>
+						{% endif %}
 
-  {% if max_score %}
-
-  <div class="card bg-white p-3">
-    <div class="header-title-xl text-center">{% trans "Quiz result" %}</div>
-    <div class="title-line"></div>
-	<p class="text-center">
-	  <small class="muted">{% trans "Quiz title" %}: </small>
-	  <strong>{{ quiz.title }}</strong></p>
-
-	<p class="lead text-center">
-	  {% trans "You answered" %} {{ score }} {% trans "questions correctly out of" %} {{ max_score }}, {% trans "giving you" %} {{ percent }}{% trans "% correct" %}
-    </p>
-
-    <div class="score-wrapper mx-auto">
-      <div class="score-wrapper-text">{{ percent }}%</div>
-      <div class="score-wrapper-bar {% if percent >= 60 %} bg-success {% elif percent >= 50 %} bg-warning {% else %} bg-danger {% endif %}" 
-        style="height: {{ percent }}%;" ></div>
-    </div><br>
-
-	{% if quiz.pass_mark %}
-  <div class="card p-1" style="border: 1px solid #fd7e14;">
-    <p class="lead bg-light p-3 text-orange"><span class="fa-1x">&CircleDot;</span> {{ sitting.result_message }}</p>
-    {% endif %}
-    <ul>
-      <li>{% trans "Review the questions below and try the quiz again in the future"%}.</li>
-      <li>
-        {% trans "The result of this quiz will be stored in your progress section" %} 
-        <a class="text-primary" href="{% url 'quiz_progress' %}">Here</a> 
-        {% trans "so you can review and monitor your progression" %}.
-      </li>
-    </ul>
-
-  </div>
-
-  {% endif %}
-
-  <hr>
-
-  {% if possible %}
-
-  <p class="lead">
-	{% trans "Your session score is" %} {{ session }} {% trans "out of a possible" %} {{ possible }}
-  </p>
-
-  <hr>
-
-  {% endif %}
-
-  {% if questions %}
-  <div class="card bg-light p-2">
-    <h2>Overview</h2>
-    {% for question in questions %}
-
-      <p class="lead">
-		    {{ forloop.counter }}, {{ question.content }}
-	    </p>
-
-	  <p><strong>{% trans "Explanation" %}:</strong></p>
-    {% if question.explanation %}
-    <p class="p-2 alert alert-info">
-      {{ question.explanation|safe }}
-    </p>
-    {% else %}
-    <p class="p-2 alert alert-warning">
-      {% trans "No explanation set for this question." %}
-    </p>
-    {% endif %}
-    
-    {% correct_answer_for_all question %}
-    
-    {% if question.user_answer %}
-    <p><span class="bg-secondary px-3 py-1 text-light">{% trans "Your answer" %}: {{ question|answer_choice_to_string:question.user_answer }}</span></p>
-    {% endif %}
-
-    <hr>
-
-  {% endfor %}
-  </div>
-
-  {% endif %}
-
+						<!-- Explanation -->
+						{% if question.explanation %}
+						<div class="alert alert-info mt-3 mb-0">
+							<strong><i class="fas fa-lightbulb me-1"></i>{% trans "Explanation" %}:</strong>
+							{{ question.explanation|safe }}
+						</div>
+						{% endif %}
+					</div>
+					{% endfor %}
+				</div>
+			</div>
+		</div>
+	</div>
+	{% endif %}
 </div>
 
 {% endblock %}
 
 {% block js %}
 <script>
-    // loader
-    // document.getElementById('progress-main').style.display = 'none';
-    var timer = setInterval(function(){
-        document.getElementById('progress-card').style.display = 'none';
-        document.getElementById('progress-main').style.display = 'block';
-        clearInterval(timer)
-    }, 8000);           
+	// Confetti animation for passing scores
+	{% if percent >= quiz.pass_mark %}
+	// Simple confetti effect (optional - requires external library or custom implementation)
+	console.log('🎉 Congratulations! You passed!');
+	{% endif %}
 </script>
 {% endblock js %}

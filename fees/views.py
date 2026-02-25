@@ -30,37 +30,56 @@ def admin_payment_dashboard(request):
     """Admin payment overview"""
     current_term = Term.objects.filter(is_current_term=True, school=request.school).first()
     
-    # Recent payments
-    recent_payments = Payment.objects.filter(
-        school=request.school
-    ).select_related('student', 'assignment').order_by('-created_at')[:20]
+    # Get current division and level from request
+    current_division = request.GET.get('division', 'all')
+    selected_level = request.GET.get('level')
     
-    # Pending payments
-    pending_payments = Payment.objects.filter(
-        school=request.school,
-        status='PENDING'
-    ).select_related('student').order_by('-created_at')
-    
-    # Statistics
-    total_collected = Payment.objects.filter(
-        school=request.school,
-        status='VERIFIED'
-    ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0.00')
-    
-    total_pending = Payment.objects.filter(
-        school=request.school,
-        status='PENDING'
-    ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0.00')
+    # Division levels for filtering
+    if current_division == 'all':
+        division_levels = [] # No specific division levels to restrict to
+        current_division_display = _("All Divisions")
+    else:
+        division_levels = settings.DIVISION_LEVEL_MAPPING.get(current_division, [])
+        current_division_display = dict([
+            (settings.DIVISION_NURSERY, _("Nursery/Pre-School")),
+            (settings.DIVISION_PRIMARY, _("Primary School")),
+            (settings.DIVISION_JHS, _("Junior High School")),
+        ]).get(current_division, current_division)
 
-    # Fee Structure Breakdown
-    # This aligns with the "flexible" requirement - showing cards for each fee type
+    # Base querysets
+    payments_qs = Payment.objects.filter(school=request.school)
+    assignments_qs = StudentFeeAssignment.objects.filter(student__student__school=request.school)
+    
+    # Apply filtering
+    if current_division != 'all' and division_levels:
+        payments_qs = payments_qs.filter(student__level__in=division_levels)
+        assignments_qs = assignments_qs.filter(student__level__in=division_levels)
+        
+    if selected_level:
+        payments_qs = payments_qs.filter(student__level=selected_level)
+        assignments_qs = assignments_qs.filter(student__level=selected_level)
+
+    # Recent payments (filtered)
+    recent_payments = payments_qs.select_related('student', 'assignment').order_by('-created_at')[:20]
+    
+    # Pending payments (filtered)
+    pending_payments = payments_qs.filter(status='PENDING').select_related('student').order_by('-created_at')
+    
+    # Statistics (filtered)
+    total_collected = payments_qs.filter(status='VERIFIED').aggregate(Sum('amount'))['amount__sum'] or Decimal('0.00')
+    total_pending = payments_qs.filter(status='PENDING').aggregate(Sum('amount'))['amount__sum'] or Decimal('0.00')
+    
+    # Calculate collection rate percentage
+    total_expected = assignments_qs.aggregate(Sum('fee_structure__amount'))['fee_structure__amount__sum'] or Decimal('1.00')
+    collection_rate = round((total_collected / total_expected) * 100, 1) if total_expected > 0 else 0
+
+    # Fee Structure Breakdown (filtered by division/level if relevant, or just active ones)
     fee_structures = FeeStructure.objects.filter(school=request.school, is_active=True)
     fee_breakdown = []
     
     for structure in fee_structures:
-        # Calculate collected amount for this specific fee structure
-        # Payments linked to assignments of this structure
-        collected = Payment.objects.filter(
+        # Calculate collected amount for this specific fee structure within filter
+        collected = payments_qs.filter(
             assignment__fee_structure=structure,
             status='VERIFIED'
         ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0.00')
@@ -68,7 +87,7 @@ def admin_payment_dashboard(request):
         fee_breakdown.append({
             'name': structure.name,
             'amount': collected,
-            'icon': 'fa-money-bill-alt' # Default icon for now
+            'icon': 'fa-money-bill-alt'
         })
     
     # Get active bank accounts
@@ -77,15 +96,32 @@ def admin_payment_dashboard(request):
         is_active=True
     ).order_by('-is_default')
     
+    # Prepare division level choices
+    division_level_choices = []
+    for code, name in settings.LEVEL_CHOICES:
+        if code in division_levels:
+            division_level_choices.append((code, name))
+
     context = {
         'title': _('Payment Management'),
         'recent_payments': recent_payments,
         'pending_payments': pending_payments,
         'total_collected': total_collected,
         'total_pending': total_pending,
+        'collection_rate': collection_rate,
         'fee_breakdown': fee_breakdown,
         'current_term': current_term,
         'bank_accounts': bank_accounts,
+        'current_division': current_division,
+        'current_division_name': current_division_display,
+        'selected_level': selected_level,
+        'division_levels': division_level_choices,
+        'divisions': [
+            ('all', _("All Divisions")),
+            (settings.DIVISION_NURSERY, _("Nursery/Pre-School")),
+            (settings.DIVISION_PRIMARY, _("Primary School")),
+            (settings.DIVISION_JHS, _("Junior High School")),
+        ],
     }
     return render(request, 'fees/admin_dashboard.html', context)
 
@@ -662,6 +698,85 @@ def bank_account_toggle(request, pk):
     
     return redirect('fees:bank_account_list')
 
+@login_required
+@admin_required
+def defaulters_list(request):
+    """View to see students with outstanding fees and those who have fully paid"""
+    current_term = Term.objects.filter(is_current_term=True, school=request.school).first()
+    
+    current_division = request.GET.get('division', 'all')
+    selected_level = request.GET.get('level')
+    status_filter = request.GET.get('status') # 'paid', 'owing', 'partial'
+    
+    if current_division == 'all':
+        division_levels = []
+    else:
+        division_levels = settings.DIVISION_LEVEL_MAPPING.get(current_division, [])
+    
+    # Base student queryset
+    students_qs = Student.objects.filter(student__school=request.school)
+    
+    if current_division != 'all' and division_levels:
+        students_qs = students_qs.filter(level__in=division_levels)
+    
+    if selected_level:
+        students_qs = students_qs.filter(level=selected_level)
+
+    student_data = []
+    for student in students_qs.order_by('level', 'student__last_name'):
+        # Get assignments for this term
+        assignments = StudentFeeAssignment.objects.filter(student=student, term=current_term)
+        
+        total_fees = assignments.aggregate(Sum('amount'))['amount__sum'] or Decimal('0.00')
+        total_paid = Decimal('0.00')
+        
+        for assignment in assignments:
+            total_paid += assignment.amount_paid
+            
+        balance = total_fees - total_paid
+        
+        status = 'PAID'
+        if balance > 0:
+            if total_paid > 0:
+                status = 'PARTIAL'
+            else:
+                status = 'OWING'
+        
+        # Apply status filter if present
+        if status_filter:
+            if status_filter.upper() != status:
+                continue
+
+        student_data.append({
+            'student': student,
+            'total_fees': total_fees,
+            'total_paid': total_paid,
+            'balance': balance,
+            'status': status,
+        })
+
+    # Prepare context
+    division_level_choices = []
+    for code, name in settings.LEVEL_CHOICES:
+        if code in division_levels:
+            division_level_choices.append((code, name))
+            
+    context = {
+        'title': _('Fee Defaulters & Payments'),
+        'student_data': student_data,
+        'current_term': current_term,
+        'current_division': current_division,
+        'selected_level': selected_level,
+        'status_filter': status_filter,
+        'division_levels': division_level_choices,
+        'divisions': [
+            ('all', _("All Divisions")),
+            (settings.DIVISION_NURSERY, _("Nursery/Pre-School")),
+            (settings.DIVISION_PRIMARY, _("Primary School")),
+            (settings.DIVISION_JHS, _("Junior High School")),
+        ],
+    }
+    return render(request, 'fees/defaulters_list.html', context)
 
 @login_required
 @admin_required

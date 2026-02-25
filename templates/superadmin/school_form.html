@@ -12,11 +12,15 @@
     </ol>
 </nav>
 
-<div class="title-1">
-    <i class="fas fa-school"></i> 
-    {% if is_edit %}{% trans 'Edit School' %}{% else %}{% trans 'Create New School' %}{% endif %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+    <h1 class="title-1 mb-0">
+        <i class="fas fa-school"></i> 
+        {% if is_edit %}{% trans 'Edit School' %}{% else %}{% trans 'Create New School' %}{% endif %}
+    </h1>
+    <a href="{% url 'superadmin:school_list' %}" class="btn btn-secondary">
+        <i class="fas fa-arrow-left"></i> {% trans 'Back to List' %}
+    </a>
 </div>
-<br>
 
 {% include 'snippets/messages.html' %}
 

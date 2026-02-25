@@ -29,119 +29,165 @@
     </div>
 
     {% if courses %}
-    <!-- Subjects Grid -->
-    <div class="row">
-        {% for course in courses %}
-        <div class="col-md-4 col-lg-3 mb-4">
-            <div class="card h-100 shadow-sm">
-                <div class="card-body">
-                    <h5 class="card-title">{{ course.title }}</h5>
-                    <p class="text-muted small mb-2">{{ course.code }}</p>
-                    
-                    {% if course.is_core_subject %}
-                    <span class="badge bg-primary mb-2">{% trans 'Core' %}</span>
-                    {% endif %}
-                    {% if course.is_elective %}
-                    <span class="badge bg-secondary mb-2">{% trans 'Elective' %}</span>
-                    {% endif %}
-
-                    <!-- Assigned Teachers -->
-                    {% if course.id in course_teachers %}
-                    <div class="mt-2">
-                        <small class="text-muted d-block mb-1">{% trans 'Teachers:' %}</small>
-                        {% for teacher in course_teachers|get_item:course.id %}
-                        <div class="d-flex align-items-center mb-1">
-                            <i class="fas fa-user-circle text-muted me-2"></i>
-                            <small>{{ teacher.get_full_name }}</small>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% else %}
-                    <div class="mt-2">
-                        <small class="text-warning">
-                            <i class="fas fa-exclamation-triangle me-1"></i>
-                            {% trans 'No teacher assigned' %}
-                        </small>
-                    </div>
-                    {% endif %}
-                </div>
-
-                <!-- Action Buttons -->
-                {% if request.user.is_superuser or request.user.is_school_admin %}
-                <div class="card-footer bg-white border-top-0">
-                    <div class="btn-group w-100" role="group">
-                        <a href="{% url 'edit_course' slug=course.slug %}" class="btn btn-sm btn-outline-primary">
-                            <i class="fas fa-edit"></i>
-                        </a>
-                        {% if course.id not in course_teachers %}
-                        <button type="button" class="btn btn-sm btn-outline-success" 
-                                data-bs-toggle="modal" 
-                                data-bs-target="#assignTeacherModal{{ course.id }}">
-                            <i class="fas fa-user-plus"></i> {% trans 'Assign Teacher' %}
-                        </button>
-                        {% endif %}
-                        <a href="{% url 'delete_course' slug=course.slug %}" class="btn btn-sm btn-outline-danger">
-                            <i class="fas fa-trash"></i>
-                        </a>
-                    </div>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-
-        <!-- Teacher Assignment Modal -->
-        {% if request.user.is_superuser or request.user.is_school_admin %}
-        <div class="modal fade" id="assignTeacherModal{{ course.id }}" tabindex="-1">
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">{% trans 'Assign Teacher to' %} {{  course.title }}</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <form method="post" action="{% url 'course_allocation' %}">
-                        {% csrf_token %}
-                        <input type="hidden" name="courses" value="{{ course.id }}">
-                        <div class="modal-body">
-                            <div class="mb-3">
-                                <label class="form-label">{% trans 'Select Teacher' %} ({{ division_name }})</label>
-                                <select name="teacher" class="form-select" required>
-                                    <option value="">{% trans '-- Select Teacher --' %}</option>
-                                    {% for teacher in division_teachers %}
-                                    <option value="{{ teacher.id }}">
-                                        {{ teacher.get_full_name }}
-                                        {% if teacher.assigned_level %}
-                                        ({% trans 'Class Teacher:' %} {{ teacher.assigned_level }})
-                                        {% endif %}
-                                    </option>
+    <!-- Subjects Table -->
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-light">
+                        <tr>
+                            <th class="ps-4">#</th>
+                            <th>{% trans 'Subject Name' %}</th>
+                            <th>{% trans 'Code' %}</th>
+                            <th>{% trans 'Category' %}</th>
+                            <th>{% trans 'Assigned Teachers' %}</th>
+                            <th class="text-center">{% trans 'Actions' %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for course in courses %}
+                        <tr>
+                            <td class="ps-4 text-muted">{{ forloop.counter }}</td>
+                            <td>
+                                <div class="fw-bold text-dark">{{ course.title }}</div>
+                            </td>
+                            <td><span class="badge bg-light text-muted fw-normal">{{ course.code }}</span></td>
+                            <td>
+                                {% if course.is_core_subject %}
+                                <span class="badge bg-primary-soft text-primary border border-primary-subtle">{% trans 'Core' %}</span>
+                                {% endif %}
+                                {% if course.is_elective %}
+                                <span class="badge bg-secondary-soft text-secondary border border-secondary-subtle">{% trans 'Elective' %}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if course.id in course_teachers %}
+                                    {% for teacher in course_teachers|get_item:course.id %}
+                                    <div class="d-inline-flex align-items-center me-2 mb-1">
+                                        <i class="fas fa-user-circle text-muted me-1"></i>
+                                        <small class="text-dark">{{ teacher.get_full_name }}</small>
+                                    </div>
                                     {% endfor %}
-                                </select>
-                                <small class="text-muted">
-                                    {% trans 'Only teachers in' %} {{ division_name }} {% trans 'are shown' %}
-                                </small>
-                            </div>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% trans 'Cancel' %}</button>
-                            <button type="submit" class="btn btn-primary">{% trans 'Assign Teacher' %}</button>
-                        </div>
-                    </form>
-                </div>
+                                {% else %}
+                                    <small class="text-warning">
+                                        <i class="fas fa-exclamation-triangle me-1"></i>
+                                        {% trans 'No teacher assigned' %}
+                                    </small>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <div class="btn-group">
+                                    <a href="{% url 'edit_course' slug=course.slug %}" class="btn btn-sm btn-outline-clean me-1" title="{% trans 'Edit Subject' %}">
+                                        <i class="fas fa-edit text-warning"></i>
+                                    </a>
+                                    {% if request.user.is_superuser or request.user.is_school_admin %}
+                                        {% if course.id not in course_teachers %}
+                                        <button type="button" class="btn btn-sm btn-outline-clean me-1" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#assignTeacherModal{{ course.id }}"
+                                                title="{% trans 'Assign Teacher' %}">
+                                            <i class="fas fa-user-plus text-success"></i>
+                                        </button>
+                                        {% endif %}
+                                        <button type="button" class="btn btn-sm btn-outline-clean" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#deleteSubjectModal{{ course.id }}"
+                                                title="{% trans 'Delete' %}">
+                                            <i class="fas fa-trash text-danger"></i>
+                                        </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
-        {% endif %}
-        {% endfor %}
     </div>
+
+    <!-- Modals (Assignment and Deletion) -->
+    {% if request.user.is_superuser or request.user.is_school_admin %}
+        {% for course in courses %}
+            <!-- Teacher Assignment Modal -->
+            {% if course.id not in course_teachers %}
+            <div class="modal fade" id="assignTeacherModal{{ course.id }}" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">{% trans 'Assign Teacher to' %} {{  course.title }}</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <form method="post" action="{% url 'course_allocation' %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="courses" value="{{ course.id }}">
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label">{% trans 'Select Teacher' %} ({{ division_name }})</label>
+                                    <select name="teacher" class="form-select" required>
+                                        <option value="">{% trans '-- Select Teacher --' %}</option>
+                                        {% for teacher in division_teachers %}
+                                        <option value="{{ teacher.id }}">
+                                            {{ teacher.get_full_name }}
+                                            {% if teacher.assigned_level %}
+                                            ({% trans 'Class Teacher:' %} {{ teacher.assigned_level }})
+                                            {% endif %}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                    <small class="text-muted">
+                                        {% trans 'Only teachers in' %} {{ division_name }} {% trans 'are shown' %}
+                                    </small>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% trans 'Cancel' %}</button>
+                                <button type="submit" class="btn btn-primary">{% trans 'Assign Teacher' %}</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Delete Confirmation Modal -->
+            <div class="modal fade" id="deleteSubjectModal{{ course.id }}" tabindex="-1">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content border-0 shadow">
+                        <div class="modal-header bg-danger text-white border-0">
+                            <h5 class="modal-title"><i class="fas fa-exclamation-triangle me-2"></i>{% trans 'Confirm Deletion' %}</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body text-center py-4">
+                            <h4 class="mb-3">{% trans 'Are you sure?' %}</h4>
+                            <p class="text-muted mb-0">{% trans 'You are about to delete' %} <strong>{{ course.title }}</strong>.</p>
+                            <p class="text-danger small">{% trans 'This action cannot be undone and will remove all student scores for this subject.' %}</p>
+                        </div>
+                        <div class="modal-footer border-0 justify-content-center pb-4">
+                            <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal">{% trans 'No, Cancel' %}</button>
+                            <a href="{% url 'delete_course' slug=course.slug %}" class="btn btn-danger px-4">
+                                {% trans 'Yes, Delete Subject' %}
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    {% endif %}
+
     {% else %}
     <!-- Empty State -->
-    <div class="text-center py-5">
-        <i class="fas fa-book-open fa-4x text-muted mb-3"></i>
-        <h4>{% trans 'No subjects yet for' %} {{ level_name }}</h4>
-        <p class="text-muted">{% trans 'Add subjects to this class level to get started' %}</p>
-        {% if request.user.is_superuser or request.user.is_school_admin %}
-        <a href="{% url 'add_subject_to_level' level_code=level_code %}" class="btn btn-primary mt-2">
-            <i class="fas fa-plus me-2"></i>{% trans 'Add First Subject' %}
-        </a>
-        {% endif %}
+    <div class="card shadow-sm border-0">
+        <div class="card-body text-center py-5">
+            <i class="fas fa-book-open fa-4x text-muted mb-3"></i>
+            <h4>{% trans 'No subjects yet for' %} {{ level_name }}</h4>
+            <p class="text-muted">{% trans 'Add subjects to this class level to get started' %}</p>
+            {% if request.user.is_superuser or request.user.is_school_admin %}
+            <a href="{% url 'add_subject_to_level' level_code=level_code %}" class="btn btn-primary mt-2">
+                <i class="fas fa-plus me-2"></i>{% trans 'Add First Subject' %}
+            </a>
+            {% endif %}
+        </div>
     </div>
     {% endif %}
 </div>

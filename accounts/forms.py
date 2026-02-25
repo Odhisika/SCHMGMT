@@ -1,4 +1,5 @@
 from django import forms
+from django.utils.translation import gettext_lazy as _
 from django.db import transaction
 from django.contrib.auth.forms import (
     UserCreationForm,
@@ -347,11 +348,24 @@ class StudentAddForm(UserCreationForm):
 class ProfileUpdateForm(UserChangeForm):
     def __init__(self, *args, **kwargs):
         self.school = kwargs.pop("school", None)
+        self.is_admin = kwargs.pop("is_admin", False)
         super(ProfileUpdateForm, self).__init__(*args, **kwargs)
+        
         if self.school:
             self.fields["department"].queryset = Program.objects.filter(
                 school=self.school
             )
+
+        # Restrict fields for non-admin users
+        if not self.is_admin:
+            restricted_fields = [
+                "first_name", "last_name", "gender", "email", 
+                "phone", "address", "department"
+            ]
+            for field_name in restricted_fields:
+                if field_name in self.fields:
+                    self.fields[field_name].disabled = True
+                    self.fields[field_name].help_text = _("This field can only be updated by an administrator.")
 
     email = forms.EmailField(
         widget=forms.TextInput(

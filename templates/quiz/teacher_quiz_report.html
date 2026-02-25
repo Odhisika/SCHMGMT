@@ -1,0 +1,138 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans 'Quiz Score Report' %}{% endblock %}
+
+{% block content %}
+
+<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
+        <li class="breadcrumb-item active">{% trans 'Quiz Report' %}</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-0">{% trans 'Quiz Score Report' %}</h2>
+        <p class="text-muted small mb-0">{% trans 'Best scores per student across all assigned subjects' %}</p>
+    </div>
+    <span class="badge bg-primary fs-6">{{ total_courses }} {% trans 'course(s)' %}</span>
+</div>
+
+{% include 'snippets/messages.html' %}
+
+{% if report %}
+{% for course_item in report %}
+<div class="mb-5">
+    <div class="bg-light p-3 rounded mb-3 border-start border-4 border-primary">
+        <h4 class="mb-0">{{ course_item.course.title }}</h4>
+        <div class="d-flex gap-2 mt-1">
+            <span class="badge bg-secondary">{% trans 'Level' %}: {{ course_item.course.level }}</span>
+            <span class="badge bg-outline-secondary text-muted border small">{{ course_item.quizzes|length }} {% trans 'Quizzes' %}</span>
+        </div>
+    </div>
+
+    {% for item in course_item.quizzes %}
+    <div class="card border-0 shadow-sm mb-4 ms-md-4">
+        <div class="card-header bg-white border-bottom py-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="mb-0">{{ item.quiz.title|title }}</h5>
+                    <small class="text-muted">
+                        <span class="badge bg-{% if item.quiz.category == 'exam' %}danger{% elif item.quiz.category == 'assignment' %}warning text-dark{% else %}info text-dark{% endif %} rounded-pill">
+                            {{ item.quiz.category|title|default:'Quiz' }}
+                        </span>
+                        &bull; {{ item.quiz.get_questions.count }} {% trans 'Qs' %}
+                        &bull; {% trans 'Pass' %}: {{ item.quiz.pass_mark }}%
+                        &bull; {{ item.quiz.max_attempts }} {% trans 'attempt(s)' %}
+                    </small>
+                </div>
+                <div class="text-end">
+                    <div class="small text-muted">{% trans 'Students Passed' %}</div>
+                    <strong class="text-success">{{ item.passed }}/{{ item.total }}</strong>
+                </div>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table align-middle mb-0 table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 50px;">#</th>
+                        <th>{% trans 'Student' %}</th>
+                        <th>{% trans 'Best Score' %}</th>
+                        <th>{% trans 'Percentage' %}</th>
+                        <th>{% trans 'Attempts' %}</th>
+                        <th>{% trans 'Result' %}</th>
+                        <th>{% trans 'Date' %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in item.student_rows %}
+                    <tr>
+                        <td class="text-muted small">{{ forloop.counter }}</td>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                {% if row.student.profile_image %}
+                                <img src="{{ row.student.profile_image.url }}" class="rounded-circle" width="28" height="28" style="object-fit:cover;" alt="">
+                                {% else %}
+                                <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center text-white" style="width:28px;height:28px;font-size:11px;">
+                                    {{ row.student.first_name|slice:":1" }}{{ row.student.last_name|slice:":1" }}
+                                </div>
+                                {% endif %}
+                                <div>
+                                    <span class="fw-medium small">{{ row.student.get_full_name|default:row.student.username }}</span>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <strong>{{ row.best_sitting.get_current_score }}</strong>
+                            <span class="text-muted small">/ {{ row.best_sitting.get_max_score }}</span>
+                        </td>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="progress" style="width: 60px; height: 5px;">
+                                    <div class="progress-bar {% if row.best_sitting.check_if_passed %}bg-success{% else %}bg-danger{% endif %}"
+                                         style="width:{{ row.best_sitting.get_percent_correct }}%"></div>
+                                </div>
+                                <span class="small {% if row.best_sitting.check_if_passed %}text-success{% else %}text-danger{% endif %} fw-semibold">
+                                    {{ row.best_sitting.get_percent_correct }}%
+                                </span>
+                            </div>
+                        </td>
+                        <td>
+                            {% if row.attempts > 1 %}
+                            <span class="badge bg-light text-dark border">{{ row.attempts }}x</span>
+                            {% else %}
+                            <span class="text-muted small">1</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if row.best_sitting.check_if_passed %}
+                            <span class="badge bg-success"><i class="fas fa-check-circle me-1"></i>{% trans 'Pass' %}</span>
+                            {% else %}
+                            <span class="badge bg-danger"><i class="fas fa-times-circle me-1"></i>{% trans 'Fail' %}</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-muted small">
+                            {% if row.best_sitting.end %}{{ row.best_sitting.end|date:"N j, Y" }}{% else %}—{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endfor %}
+
+{% else %}
+<div class="text-center py-5 text-muted">
+    <i class="fas fa-chart-bar fa-3x mb-3 d-block opacity-25"></i>
+    <h5>{% trans 'No quiz results available yet.' %}</h5>
+    <p class="small">{% trans 'Results will appear here once students have completed quizzes in your subjects.' %}</p>
+</div>
+{% endif %}
+
+{% endblock %}

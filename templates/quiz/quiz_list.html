@@ -1,8 +1,8 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% block title %}{{ title }} | Learning management system{% endblock title %}
-{% load i18n %}
 {% load static %}
+
+{% block title %}{% trans 'Quizzes' %} | {{ course }}{% endblock %}
 
 {% block content %}
 
@@ -14,88 +14,276 @@
         {% else %}
         <li class="breadcrumb-item"><a href="{% url 'programs' %}">{% trans 'Programs' %}</a></li>
         {% endif %}
-        <li class="breadcrumb-item"><a href="{% url 'program_detail' pk=1 %}">{{ course.program }}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'program_detail' pk=course.program.id %}">{{ course.program }}</a></li>
         <li class="breadcrumb-item"><a href="{{ course.get_absolute_url }}">{{ course }}</a></li>
         <li class="breadcrumb-item active" aria-current="page">{% trans 'Quizzes' %}</li>
     </ol>
 </nav>
 
-{% if request.user.is_superuser or request.user.is_lecturer %}
-<div class="manage-wrap">
-    <a class="btn btn-primary" href="{% url 'quiz_create' course.slug %}"><i class="fas fa-plus"></i>{% trans 'Add Quiz' %}</a>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">{% trans 'Quizzes' %} <span class="text-muted fs-5">[{{ course|truncatechars:25 }}]</span></h2>
+    <div class="d-flex gap-2">
+        {% if request.user.is_student %}
+        <a href="{% url 'quiz_history' slug=course.slug %}" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-history me-1"></i>{% trans 'My Attempts' %}
+        </a>
+        {% endif %}
+        {% if request.user.is_superuser or request.user.is_lecturer %}
+        <a href="{% url 'teacher_quiz_report' %}" class="btn btn-outline-info btn-sm">
+            <i class="fas fa-chart-bar me-1"></i>{% trans 'Full Report' %}
+        </a>
+        <a class="btn btn-primary btn-sm" href="{% url 'quiz_create' course.slug %}">
+            <i class="fas fa-plus me-1"></i>{% trans 'Add Quiz' %}
+        </a>
+        {% endif %}
+    </div>
 </div>
-{% endif %}
-
-<div class="title-1">{% trans 'Quizzes' %} [{{ course|truncatechars:25 }}]</div>
-<br>
-<br>
 
 {% include 'snippets/messages.html' %}
 
-<div class="container">
+<div class="row g-4">
+    {% for item in quiz_list %}
+    <div class="col-md-6 col-xl-4">
+        <div class="card border-0 shadow-sm h-100 quiz-card">
 
-    <div class="row">
-        {% for quiz in quizzes %}
-        <div class="col-md-4 mb-2">
-            <div class="card p-2 quiz-wrapper">
-                <div class="d-flex justify-content-between align-items-center text-success mb-4">
-                    <em class="text-left">{{ quiz.category|title }} {% trans 'Quiz' %}</em>
-                    <div class="text-right text-light bg-danger px-2 small rounded">
-                        {{ quiz.get_questions.count }} {% trans 'Questions' %}
+            <!-- Status Strip -->
+            <div class="quiz-status-strip
+                {% if item.status == 'draft' %}bg-secondary
+                {% elif item.status == 'upcoming' %}bg-info
+                {% elif item.status == 'active' %}bg-success
+                {% else %}bg-danger{% endif %}">
+            </div>
+
+            <div class="card-body d-flex flex-column pt-3">
+                <!-- Header -->
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <span class="badge
+                        {% if item.quiz.category == 'exam' %}bg-danger
+                        {% elif item.quiz.category == 'assignment' %}bg-warning text-dark
+                        {% else %}bg-info text-dark{% endif %} rounded-pill">
+                        {{ item.quiz.category|title|default:'Quiz' }}
+                    </span>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-light text-dark border">
+                            {{ item.quiz.get_questions.count }} {% trans 'Qs' %}
+                        </span>
+                        <!-- Status badge -->
+                        <span class="badge
+                            {% if item.status == 'draft' %}bg-secondary
+                            {% elif item.status == 'upcoming' %}bg-info text-dark
+                            {% elif item.status == 'active' %}bg-success
+                            {% else %}bg-danger{% endif %}">
+                            {% if item.status == 'draft' %}{% trans 'Draft' %}
+                            {% elif item.status == 'upcoming' %}{% trans 'Upcoming' %}
+                            {% elif item.status == 'active' %}{% trans 'Live' %}
+                            {% else %}{% trans 'Closed' %}{% endif %}
+                        </span>
+                        {% if request.user.is_superuser or request.user.is_lecturer %}
+                        <!-- Quick actions -->
+                        <div class="dropstart">
+                            <button class="btn btn-sm btn-light p-1 px-2" type="button" data-bs-toggle="dropdown">
+                                <i class="fas fa-ellipsis-v"></i>
+                            </button>
+                            <ul class="dropdown-menu shadow border-0">
+                                <li>
+                                    <a class="dropdown-item" href="{% url 'quiz_update' slug=course.slug pk=item.quiz.id %}">
+                                        <i class="fas fa-pencil-alt me-2 text-warning"></i>{% trans 'Edit Quiz' %}
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="{% url 'quiz_results' slug=course.slug pk=item.quiz.id %}">
+                                        <i class="fas fa-chart-bar me-2 text-success"></i>{% trans 'View Results' %}
+                                    </a>
+                                </li>
+                                <li>
+                                    <button class="dropdown-item toggle-draft-btn"
+                                            data-quiz-id="{{ item.quiz.id }}"
+                                            data-draft="{{ item.quiz.draft|yesno:'true,false' }}">
+                                        <i class="fas fa-{% if item.quiz.draft %}eye{% else %}eye-slash{% endif %} me-2 text-info"></i>
+                                        {% if item.quiz.draft %}{% trans 'Publish' %}{% else %}{% trans 'Set to Draft' %}{% endif %}
+                                    </button>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <button type="button" class="dropdown-item text-danger"
+                                            data-bs-toggle="modal" data-bs-target="#deleteModal{{ item.quiz.id }}">
+                                        <i class="fas fa-trash me-2"></i>{% trans 'Delete' %}
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
 
-                <h6>{{ quiz.title|title }}</h6>
+                <h5 class="card-title fw-semibold mb-1">{{ item.quiz.title|title }}</h5>
 
-                {% if quiz.description %}
-                <p class="text-muted small">{{ quiz.description }}</p>
-                {% else %}
-                <p class="text-muted small">No description set.</p>
+                {% if item.quiz.description %}
+                <p class="text-muted small mb-3">{{ item.quiz.description|truncatechars:80 }}</p>
                 {% endif %}
 
-                {% if quiz.single_attempt %}
-                <p class="p-2 bg-light-warning small">{% trans "You will only get one attempt at this quiz" %}.</p>
+                <!-- Info Pills -->
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    {% if item.quiz.time_limit_minutes %}
+                    <span class="badge bg-light text-dark border small">
+                        <i class="fas fa-stopwatch me-1 text-danger"></i>
+                        {% if item.quiz.time_limit_minutes >= 60 %}
+                            {{ item.quiz.time_limit_minutes|divisibleby:"60"|yesno:"" }}
+                            {% widthratio item.quiz.time_limit_minutes 60 1 %}h
+                            {% with remainder=item.quiz.time_limit_minutes|add:"-60" %}
+                            {% if remainder > 0 %}{{ remainder }}m{% endif %}
+                            {% endwith %}
+                        {% else %}
+                            {{ item.quiz.time_limit_minutes }}{% trans 'min' %}
+                        {% endif %}
+                    </span>
+                    {% endif %}
+                    {% if item.quiz.single_attempt %}
+                    <span class="badge bg-light text-dark border small">
+                        <i class="fas fa-ban me-1 text-warning"></i>{% trans '1 Attempt' %}
+                    </span>
+                    {% endif %}
+                    {% if item.quiz.pass_mark %}
+                    <span class="badge bg-light text-dark border small">
+                        <i class="fas fa-check-circle me-1 text-success"></i>{{ item.quiz.pass_mark }}%{% trans ' to pass' %}
+                    </span>
+                    {% endif %}
+                    {% if item.best_sitting %}
+                    <span class="badge bg-primary-subtle text-primary border small">
+                        <i class="fas fa-trophy me-1"></i>{% trans 'Best' %}: {{ item.best_sitting.get_current_score }}/{{ item.best_sitting.get_max_score }}
+                    </span>
+                    {% endif %}
+                    {% if request.user.is_student and item.attempts_left > 0 and item.quiz.max_attempts > 1 %}
+                    <span class="badge bg-info-subtle text-info border small">
+                        <i class="fas fa-redo me-1"></i>{{ item.attempts_left }} {% trans 'more left' %}
+                    </span>
+                    {% endif %}
+                </div>
+
+                <!-- Availability Alerts -->
+                {% if item.status == 'upcoming' and item.time_until_available %}
+                <div class="alert alert-info py-2 small mb-3">
+                    <i class="fas fa-clock me-1"></i>
+                    {% trans 'Opens in' %}: <strong id="countdown-{{ item.quiz.id }}"
+                        data-seconds="{{ item.time_until_available.total_seconds|floatformat:0 }}">
+                        {{ item.time_until_available }}
+                    </strong>
+                </div>
+                {% elif item.status == 'active' and item.time_until_expires %}
+                <div class="alert alert-warning py-2 small mb-3">
+                    <i class="fas fa-hourglass-half me-1"></i>
+                    {% trans 'Closes in' %}: <strong>{{ item.time_until_expires }}</strong>
+                </div>
+                {% elif item.status == 'closed' %}
+                <div class="alert alert-danger py-2 small mb-3">
+                    <i class="fas fa-lock me-1"></i>{% trans 'This quiz has closed.' %}
+                </div>
                 {% endif %}
 
-                <div class="d-flex align-items-center">
-                    <a class="btn btn-block btn-secondary w-100" href="{% url 'quiz_take' pk=course.pk slug=quiz.slug %}">{% trans "Start quiz" %} &raquo;</a>
+                <!-- Student: completed indicator -->
+                {% if item.has_completed %}
+                <div class="alert alert-success py-2 small mb-3">
+                    <i class="fas fa-check-double me-1"></i>{% trans 'You have completed this quiz.' %}
+                </div>
+                {% endif %}
 
-                    {% if request.user.is_superuser or request.user.is_lecturer %}
-                        <div class="dropup">
-                            <button class="btn btn-sm p-0 ms-2" type="button" data-bs-toggle="dropdown"><i class="fas fa-ellipsis-v m-0"></i></button>
-                            <div class="dropdown-menu" aria-labelledby="dropdown01">
-                                <div class="dropdown-item">
-                                    <a href="{% url 'quiz_update' slug=course.slug pk=quiz.id %}" class="update"><i class="unstyled me-2 fas fa-pencil-alt"></i>{% trans 'Edit' %}</a>
-                                </div>
-                                <div class="dropdown-item">
-                                    <a href="{% url 'quiz_delete' slug=course.slug pk=quiz.id %}" class="delete"><i class="unstyled me-2 fas fa-trash-alt"></i>{% trans 'Delete' %}</a>
-                                </div>
-                            </div>
-                        </div>
+                <!-- CTA Buttons -->
+                <div class="mt-auto">
+                    {% if item.status == 'active' and not item.has_completed %}
+                        <a class="btn btn-success w-100" href="{% url 'quiz_take' pk=course.pk slug=item.quiz.slug %}">
+                            <i class="fas fa-play me-1"></i>{% trans 'Start Quiz' %}
+                        </a>
+                    {% elif item.status == 'active' and item.has_completed %}
+                        <a class="btn btn-outline-primary w-100" href="{% url 'quiz_review' pk=course.pk slug=item.quiz.slug %}">
+                            <i class="fas fa-eye me-1"></i>{% trans 'View Result' %}
+                        </a>
+                    {% elif item.status == 'closed' %}
+                        <a class="btn btn-outline-secondary w-100" href="{% url 'quiz_review' pk=course.pk slug=item.quiz.slug %}">
+                            <i class="fas fa-book-open me-1"></i>{% trans 'Review Questions' %}
+                        </a>
+                    {% elif item.status == 'upcoming' %}
+                        <button class="btn btn-light w-100" disabled>
+                            <i class="fas fa-lock me-1"></i>{% trans 'Not Yet Available' %}
+                        </button>
+                    {% elif item.status == 'draft' %}
+                        {% if request.user.is_superuser or request.user.is_lecturer %}
+                        <a class="btn btn-outline-secondary w-100" href="{% url 'quiz_take' pk=course.pk slug=item.quiz.slug %}">
+                            <i class="fas fa-vial me-1"></i>{% trans 'Preview (Draft)' %}
+                        </a>
+                        {% endif %}
                     {% endif %}
                 </div>
             </div>
         </div>
-
-        {% empty %}
-        <h4 class="text-center mt-5 py-5 text-muted">
-            <i class="fa-regular fa-folder-open me-2"></i> Course quizzes will appear here.
-        </h4>
-        {% endfor %}
     </div>
 
+    <!-- Delete Modal -->
+    {% if request.user.is_superuser or request.user.is_lecturer %}
+    <div class="modal fade" id="deleteModal{{ item.quiz.id }}" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header bg-danger text-white border-0">
+                    <h5 class="modal-title"><i class="fas fa-exclamation-triangle me-2"></i>{% trans 'Delete Quiz?' %}</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center py-4">
+                    <p class="mb-1">{% trans 'You are about to delete' %} <strong>{{ item.quiz.title }}</strong>.</p>
+                    <p class="text-danger small mb-0">{% trans 'All student results for this quiz will be permanently removed.' %}</p>
+                </div>
+                <div class="modal-footer border-0 justify-content-center pb-4">
+                    <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal">{% trans 'Cancel' %}</button>
+                    <a href="{% url 'quiz_delete' slug=course.slug pk=item.quiz.id %}" class="btn btn-danger px-4">
+                        {% trans 'Yes, Delete' %}
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% empty %}
+    <div class="col-12">
+        <div class="text-center py-5 text-muted">
+            <i class="fa-regular fa-folder-open fa-3x mb-3 d-block"></i>
+            <h5>{% trans 'No quizzes yet.' %}</h5>
+            {% if request.user.is_superuser or request.user.is_lecturer %}
+            <a href="{% url 'quiz_create' course.slug %}" class="btn btn-primary mt-2">{% trans 'Create First Quiz' %}</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
 </div>
+
+{% endblock %}
+
+{% block css %}
+<style>
+.quiz-card { overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; }
+.quiz-card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.1) !important; }
+.quiz-status-strip { height: 5px; }
+</style>
 {% endblock %}
 
 {% block js %}
 <script>
-    // #####################################
-    // loader
-    // document.getElementById('progress-main').style.display = 'none';
-    var timer = setInterval(function(){
-        document.getElementById('progress-card').style.display = 'none';
-        document.getElementById('progress-main').style.display = 'block';
-        clearInterval(timer)
-    }, 4000);           
+// Toggle draft via AJAX
+document.querySelectorAll('.toggle-draft-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const quizId = this.dataset.quizId;
+        fetch(`/quiz/${quizId}/toggle-draft/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) { console.error(data.error); return; }
+            // Simple reload to refresh UI state
+            window.location.reload();
+        });
+    });
+});
 </script>
 {% endblock js %}

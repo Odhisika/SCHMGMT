@@ -10,7 +10,11 @@
 				</div>
 			</div>
 			<a href="/" class="d-block mb-2">
-				<img src="{% static 'img/logo.jpeg' %}" class="sidebar-logo" alt="SkyLearn">
+				{% if current_school and current_school.logo %}
+					<img src="{{ current_school.logo.url }}" class="sidebar-logo" alt="{{ current_school.name }}">
+				{% else %}
+					<img src="{% static 'img/logo.jpeg' %}" class="sidebar-logo" alt="SkyLearn">
+				{% endif %}
 			</a>
 			<div class="user-role-badge">
 				<span class="role-text">{{ request.user.get_user_role }}</span>
@@ -20,7 +24,7 @@
 		{% url 'lecturer_list' as lec %}
 		{% url 'student_list' as stu %} {% url 'course_allocation_view' as cav %}
 		{% url 'programs' as pro %} {% url 'semester_list' as sem %} {% url 'timetable:timetable_dashboard' as ttable %}
-		{% url 'add_score' as ascore %} {% url 'grade_results' as vr %}{% url 'ass_results' as ar %}
+		{% url 'manage_scores' as ascore %} {% url 'grade_results' as vr %}{% url 'ass_results' as ar %}
 		{% url 'course_registration' as cr %} {% url 'edit_profile' as ep %} {% url 'change_password' as cp %}
 		{% url 'quiz_progress' as qpr %} {% url 'quiz_marking' as qce %} {% url 'user_course_list' as ucl %}
 		{% url 'admin_panel' as admin_p %}
@@ -41,11 +45,11 @@
 			</li>
 
 			{% if request.user.is_superuser %}
-			<li class="{% if request.path == admin_p %}active{% endif %}">
-				<a href="{% url 'admin_panel' %}"><i class="fas fa-user-tie"></i>{% trans 'Admin Panel' %}</a>
+			<li class="{% if '/superadmin/' == request.path %}active{% endif %}">
+				<a href="{% url 'superadmin:dashboard' %}"><i class="fas fa-user-shield"></i>{% trans 'Super Admin Dashboard' %}</a>
 			</li>
-			<li class="{% if 'school' in request.path %}active{% endif %}">
-				<a href="{% url 'school_list' %}"><i class="fas fa-university"></i>{% trans 'Manage Schools' %}</a>
+			<li class="{% if '/superadmin/schools/' in request.path %}active{% endif %}">
+				<a href="{% url 'superadmin:school_list' %}"><i class="fas fa-university"></i>{% trans 'Manage Schools' %}</a>
 			</li>
 			{% endif %}
 			
@@ -64,6 +68,9 @@
 			{% if request.user.is_lecturer or request.user.is_teacher or request.user.is_student %}
 			<li class="{% if request.path == ucl %}active{% endif %}">
 				<a href="{% url 'user_course_list' %}"><i class="fas fa-book"></i>{% trans 'My Subjects' %}</a>
+			</li>
+			<li class="{% if '/resources/' in request.path %}active{% endif %}">
+				<a href="{% url 'resources:overview' %}"><i class="fas fa-folder-open"></i>{% trans 'Learning Resources' %}</a>
 			</li>
 			<li class="{% if request.path == ttable %}active{% endif %}">
 				<a href="{% url 'timetable:timetable_dashboard' %}"><i class="fas fa-calendar-alt"></i>{% trans 'Timetable' %}</a>
@@ -123,11 +130,12 @@
 			<li class="{% if '/admin/lesson-notes/' in request.path %}active{% endif %}">
 				<a href="{% url 'lesson_note_admin_list' %}"><i class="fas fa-clipboard-list"></i>{% trans 'Review Lesson Notes' %}</a>
 			</li>
+
 			{% endif %}
 
 			{% if request.user.is_lecturer or request.user.is_teacher %}
 			<li class="{% if request.path == ascore %}active{% endif %}">
-				<a href="{% url 'add_score' %}"><i class="fas fa-table"></i>{% trans 'Manage Scores' %}</a>
+				<a href="{% url 'manage_scores' %}"><i class="fas fa-table"></i>{% trans 'Manage Scores' %}</a>
 			</li>
 			<li class="{% if '/lesson-notes/' in request.path and '/admin/' not in request.path %}active{% endif %}">
 				<a href="{% url 'lesson_note_list' %}"><i class="fas fa-book-reader"></i>{% trans 'Lesson Notes' %}</a>
@@ -153,7 +161,18 @@
 			<li class="{% if request.path == ar %}active{% endif %}">
 				<a href="{% url 'ass_results' %}"><i class="fa fa-list-ol"></i> {% trans 'Assessment Results' %}</a>
 			</li>
+			<li class="{% if '/attendance/my-attendance/' in request.path %}active{% endif %}">
+				<a href="{% url 'attendance:student_view' %}"><i class="fas fa-user-check"></i>{% trans 'My Attendance' %}</a>
+			</li>
+			{% endif %}
 
+			{% if request.user.is_parent %}
+			<li class="{% if '/attendance/parent-attendance/' in request.path %}active{% endif %}">
+				<a href="{% url 'attendance:parent_view' %}"><i class="fas fa-child"></i>{% trans 'Ward Attendance' %}</a>
+			</li>
+			<li class="{% if '/fees/history/' in request.path %}active{% endif %}">
+				<!-- Parents might want to see payment history too, keeping it simple for now as requested -->
+			</li>
 			{% endif %}
 			<br />
 			<p class="ms-3 text-secondary">&RightArrow; Others</p>
@@ -163,6 +182,11 @@
 			<li class="{% if request.path == cp %}active{% endif %}">
 				<a href="{% url 'change_password' %}"><i class="fas fa-key"></i>{% trans 'Change Password' %}</a>
 			</li>
+			{% if request.user.is_superuser or request.user.is_school_admin %}
+			<li class="{% if '/school/settings/' in request.path %}active{% endif %}">
+				<a href="{% url 'school_settings' %}"><i class="fas fa-school-flag"></i>{% trans 'School Settings' %}</a>
+			</li>
+			{% endif %}
 		</ul>
 	</div>
 

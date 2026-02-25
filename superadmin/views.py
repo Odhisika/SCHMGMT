@@ -179,3 +179,48 @@ def school_add_admin(request, pk):
         'school': school,
     }
     return render(request, 'superadmin/school_add_admin.html', context)
+
+
+@login_required
+@user_passes_test(is_superuser, login_url='/')
+def school_delete(request, pk):
+    """Delete a school and all associated data"""
+    school = get_object_or_404(School, pk=pk)
+    
+    if request.method == 'POST':
+        name = school.name
+        school.delete()
+        messages.success(request, _(f'School "{name}" and all its data have been permanently deleted.'))
+        return redirect('superadmin:school_list')
+    
+    context = {
+        'title': _(f'Delete School: {school.name}'),
+        'school': school,
+    }
+    return render(request, 'superadmin/school_confirm_delete.html', context)
+
+
+@login_required
+@user_passes_test(is_superuser, login_url='/')
+def school_reset_admin_password(request, pk):
+    """Reset password for all admins of a school"""
+    school = get_object_or_404(School, pk=pk)
+    admins = school.users.filter(is_school_admin=True)
+    
+    if request.method == 'POST':
+        new_password = request.POST.get('new_password')
+        if not new_password:
+            messages.error(request, _('Please provide a new password.'))
+        else:
+            for admin in admins:
+                admin.set_password(new_password)
+                admin.save()
+            messages.success(request, _(f'Password reset successfully for all admins of "{school.name}"'))
+            return redirect('superadmin:school_detail', pk=school.pk)
+            
+    context = {
+        'title': _(f'Reset Admin Password: {school.name}'),
+        'school': school,
+        'admins': admins,
+    }
+    return render(request, 'superadmin/school_reset_password.html', context)

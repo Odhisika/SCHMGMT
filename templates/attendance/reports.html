@@ -61,18 +61,33 @@
     </div>
 </div>
 
-<div class="stats-grid">
-    <div class="stat-card">
-        <p class="stat-value">{{ total_records }}</p>
-        <p class="stat-label">{% trans 'Total Records' %}</p>
+<div class="row users-count mb-4 px-3">
+    <div class="col-6 col-md-4 mb-3 px-2">
+        <div class="card-count p-3 bg-white shadow-sm border-0 rounded-3">
+            <h3><i class="fas fa-list text-info"></i></h3>
+            <div class="text-right">
+                {% trans 'Total Records' %}
+                <h2 class="text-dark">{{ total_records }}</h2>
+            </div>
+        </div>
     </div>
-    <div class="stat-card">
-        <p class="stat-value text-success">{{ present_count }}</p>
-        <p class="stat-label">{% trans 'Present' %}</p>
+    <div class="col-6 col-md-4 mb-3 px-2">
+        <div class="card-count p-3 bg-white shadow-sm border-0 rounded-3">
+            <h3><i class="fas fa-check-circle text-success"></i></h3>
+            <div class="text-right">
+                {% trans 'Present' %}
+                <h2 class="text-dark">{{ present_count }}</h2>
+            </div>
+        </div>
     </div>
-    <div class="stat-card">
-        <p class="stat-value text-danger">{{ absent_count }}</p>
-        <p class="stat-label">{% trans 'Absent' %}</p>
+    <div class="col-6 col-md-4 mb-3 px-2">
+        <div class="card-count p-3 bg-white shadow-sm border-0 rounded-3">
+            <h3><i class="fas fa-times-circle text-danger"></i></h3>
+            <div class="text-right">
+                {% trans 'Absent' %}
+                <h2 class="text-dark">{{ absent_count }}</h2>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -82,36 +97,47 @@
     </div>
     <div class="card-body-clean">
         {% if records %}
-        <table class="table-clean">
-            <thead>
-                <tr>
-                    <th>{% trans 'Date' %}</th>
-                    <th>{% trans 'Student' %}</th>
-                    <th>{% trans 'Class' %}</th>
-                    <th>{% trans 'Status' %}</th>
-                    <th>{% trans 'Remarks' %}</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for record in records %}
-                <tr>
-                    <td>{{ record.date }}</td>
-                    <td>{{ record.student.student.get_full_name }}</td>
-                    <td>{{ record.student.get_level_display }}</td>
-                    <td>
-                        {% if record.status == 'Present' %}
-                        <span class="badge-clean badge-success">{{ record.status }}</span>
-                        {% elif record.status == 'Absent' %}
-                        <span class="badge-clean badge-danger">{{ record.status }}</span>
-                        {% else %}
-                        <span class="badge-clean badge-warning">{{ record.status }}</span>
-                        {% endif %}
-                    </td>
-                    <td><small>{{ record.remarks|default:'-' }}</small></td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <div class="table-responsive table-shadow">
+            <table class="table table-bordered table-striped table-hover mb-0">
+                <thead class="bg-light">
+                    <tr>
+                        <th class="text-center">#</th>
+                        <th>{% trans 'Date' %}</th>
+                        <th>{% trans 'Student' %}</th>
+                        <th>{% trans 'Class' %}</th>
+                        <th class="text-center">{% trans 'Status' %}</th>
+                        <th>{% trans 'Remarks' %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in records %}
+                    <tr>
+                        <td class="text-center">{{ forloop.counter }}</td>
+                        <td>{{ record.date|date:"M d, Y" }}</td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="avatar-sm me-2 bg-light rounded-circle d-flex align-items-center justify-content-center" style="width: 30px; height: 30px;">
+                                    <i class="fas fa-user text-secondary" style="font-size: 12px;"></i>
+                                </div>
+                                <div style="font-weight: 500;">{{ record.student.student.get_full_name }}</div>
+                            </div>
+                        </td>
+                        <td>{{ record.student.get_level_display }}</td>
+                        <td class="text-center">
+                            {% if record.status == 'Present' %}
+                            <span class="badge-clean badge-success" style="min-width: 80px;">{{ record.status }}</span>
+                            {% elif record.status == 'Absent' %}
+                            <span class="badge-clean badge-danger" style="min-width: 80px;">{{ record.status }}</span>
+                            {% else %}
+                            <span class="badge-clean badge-warning" style="min-width: 80px;">{{ record.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td><small class="text-muted">{{ record.remarks|default:'-' }}</small></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
         {% else %}
         <div class="empty-state">
             <div class="empty-state-icon"><i class="fas fa-search"></i></div>

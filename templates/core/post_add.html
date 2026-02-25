@@ -4,30 +4,406 @@
 {% load crispy_forms_tags %}
 {% load static %}
 
+{% block header %}
+<style>
+    :root {
+        --primary-color: #4a90e2; /* Example brand color */
+        --card-bg: #ffffff;
+        --border-radius: 12px;
+        --input-bg: #f8f9fa;
+    }
+
+    .form-container {
+        max-width: 800px;
+        margin: 2rem auto;
+    }
+
+    .premium-card {
+        background: var(--card-bg);
+        border: none;
+        border-radius: var(--border-radius);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+        overflow: hidden;
+        transition: transform 0.2s ease;
+    }
+
+    .premium-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem;
+        position: relative;
+    }
+
+    .premium-header h2 {
+        font-weight: 700;
+        margin: 0;
+        font-size: 1.75rem;
+    }
+
+    .premium-header p {
+        opacity: 0.9;
+        margin-top: 0.5rem;
+        margin-bottom: 0;
+        font-size: 0.95rem;
+    }
+
+    .form-body {
+        padding: 2.5rem;
+    }
+
+    .form-section-title {
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #adb5bd;
+        font-weight: 700;
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+    }
+
+    .form-section-title::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: #e9ecef;
+        margin-left: 1rem;
+    }
+
+    .form-control, .form-select {
+        background-color: var(--input-bg);
+        border: 1px solid transparent;
+        border-radius: 8px;
+        padding: 0.75rem 1rem;
+        font-size: 0.95rem;
+        transition: all 0.3s ease;
+    }
+
+    .form-control:focus, .form-select:focus {
+        background-color: #fff;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+    }
+    
+    .btn-action {
+        border-radius: 8px;
+        padding: 0.75rem 2rem;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .btn-primary-custom {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        color: white;
+    }
+
+    .btn-primary-custom:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(118, 75, 162, 0.3);
+        color: white;
+    }
+
+    .user-select-container {
+        border: 2px dashed #dee2e6;
+        border-radius: 12px;
+        padding: 1.5rem;
+        background: #fdfdfd;
+        transition: border-color 0.3s;
+    }
+    
+    .user-select-container:hover {
+        border-color: #ced4da;
+    }
+
+    .user-list-item {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem;
+        border-radius: 8px;
+        transition: background-color 0.2s;
+        cursor: pointer;
+    }
+
+    .user-list-item:hover {
+        background-color: #f1f3f5;
+    }
+    
+    .user-avatar-placeholder {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: #e9ecef;
+        color: #495057;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 0.8rem;
+        margin-right: 12px;
+    }
+
+    /* Custom Checkbox */
+    .custom-control-input:checked ~ .custom-control-label::before {
+        border-color: var(--primary-color);
+        background-color: var(--primary-color);
+    }
+</style>
+{% endblock header %}
+
 {% block content %}
-
-<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
-    <ol class="breadcrumb">
-      <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
-      <li class="breadcrumb-item active" aria-current="page">{% trans 'Post form' %}</li>
-    </ol>
-</nav>
-
-{% include 'snippets/messages.html' %}
-
 <div class="row">
-    <div class="col-md-6 mx-auto">
-        <div class="card">
-            <p class="form-title">{% trans 'Post Form' %}</p>
-            <div class="card-body">
-                <form action="" method="POST">{% csrf_token %}
-                    {{ form|crispy }}
-                    <input class="btn btn-primary" type="submit" value="{% trans 'Save' %}">
-                    <a class="btn" href="{% url 'home' %}" style="float: right;">{% trans 'Cancel' %}</a>
+    <div class="col-12 form-container">
+        <!-- Breadcrumb -->
+        <nav aria-label="breadcrumb" class="mb-4 fade-in">
+            <ol class="breadcrumb bg-transparent p-0 m-0">
+                <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-decoration-none text-muted"><i class="fas fa-home me-1"></i>{% trans 'Home' %}</a></li>
+                <li class="breadcrumb-item active text-primary fw-bold" aria-current="page">{% trans 'New Post' %}</li>
+            </ol>
+        </nav>
+
+        {% include 'snippets/messages.html' %}
+
+        <div class="premium-card fade-in-up">
+            <div class="premium-header">
+                <h2><i class="fas fa-pen-nib me-2"></i>{% trans 'Create New Post' %}</h2>
+                <p>{% trans 'Share updates, news, or events with the school community.' %}</p>
+            </div>
+            
+            <div class="form-body">
+                <form action="" method="POST" id="post-form">{% csrf_token %}
+                    
+                    <!-- Content Section -->
+                    <div class="form-section-title">
+                        <i class="far fa-file-alt me-2 text-primary"></i> {% trans 'Content Details' %}
+                    </div>
+
+                    <div class="row g-4 mb-5">
+                        <div class="col-md-8">
+                            {{ form.title|as_crispy_field }}
+                        </div>
+                        <div class="col-md-4">
+                            {{ form.posted_as|as_crispy_field }}
+                        </div>
+                        <div class="col-12">
+                            {{ form.summary|as_crispy_field }}
+                        </div>
+                    </div>
+
+                    <!-- Targeting Section -->
+                    <div class="form-section-title">
+                        <i class="fas fa-bullseye me-2 text-danger"></i> {% trans 'Target Audience' %}
+                    </div>
+                    
+                    <div class="row g-4 mb-4">
+                        <div class="col-md-6">
+                            <div class="p-3 bg-light rounded-3 h-100 border">
+                                {{ form.target_division|as_crispy_field }}
+                                <div class="form-text mt-2"><i class="fas fa-info-circle me-1"></i> {% trans "Leave empty to broadcast to all school divisions." %}</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="p-3 bg-light rounded-3 h-100 border">
+                                {{ form.target_role|as_crispy_field }}
+                                <div class="form-text mt-2"><i class="fas fa-users me-1"></i> {% trans "Filter recipients by their role." %}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Specific User Selection Area -->
+                    <div id="specific-users-section" style="display: none;" class="mb-5 fade-in">
+                        <div class="user-select-container">
+                            <h6 class="fw-bold mb-3 text-dark"><i class="fas fa-user-check me-2 text-success"></i>{% trans "Select Specific Recipients" %}</h6>
+                            {{ form.specific_user_ids }} 
+                            
+                            <div class="input-group mb-3 shadow-sm">
+                                <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
+                                <input type="text" class="form-control border-start-0 ps-0" id="user-search" placeholder="{% trans 'Search by name...' %}">
+                            </div>
+                            
+                            <div class="border rounded-3 bg-white" style="max-height: 250px; overflow-y: auto;" id="user-list-container">
+                                <!-- Dynamic Content -->
+                                <div class="text-center text-muted py-4">
+                                    <div class="spinner-border text-primary spinner-border-sm mb-2" role="status"></div>
+                                    <div>{% trans "Loading users..." %}</div>
+                                </div>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mt-2">
+                                <small class="text-muted fst-italic">{% trans "* Selected users will receive this message." %}</small>
+                                <span class="badge bg-light text-dark border" id="selected-count">0 selected</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-3 pt-3 border-top">
+                        <a class="btn btn-light btn-action text-muted" href="{% url 'home' %}">{% trans 'Cancel' %}</a>
+                        <button class="btn btn-primary-custom btn-action shadow-sm" type="submit">
+                            <i class="fas fa-paper-plane me-2"></i>{% trans 'Publish Post' %}
+                        </button>
+                    </div>
                 </form>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const divisionSelect = document.getElementById('id_target_division');
+        const roleSelect = document.getElementById('id_target_role');
+        const specificSection = document.getElementById('specific-users-section');
+        const userListContainer = document.getElementById('user-list-container');
+        const userSearch = document.getElementById('user-search');
+        const hiddenInput = document.getElementById('id_specific_user_ids');
+        const selectedCountBadge = document.getElementById('selected-count');
+        
+        let selectedUsers = new Set();
+        
+        // Initial check
+        toggleSpecificSection();
+        updateCount();
+        
+        // Listeners
+        roleSelect.addEventListener('change', function() {
+            toggleSpecificSection();
+            if (this.value === 'SPECIFIC') {
+                fetchUsers();
+            }
+        });
+        
+        divisionSelect.addEventListener('change', function() {
+            if (roleSelect.value === 'SPECIFIC') {
+                fetchUsers();
+            }
+        });
+        
+        userSearch.addEventListener('input', debounce(function() {
+            fetchUsers(this.value);
+        }, 300));
+        
+        function toggleSpecificSection() {
+            if (roleSelect.value === 'SPECIFIC') {
+                specificSection.style.display = 'block';
+                specificSection.classList.add('show'); 
+                if (userListContainer.children.length <= 1) {
+                    fetchUsers();
+                }
+            } else {
+                specificSection.style.display = 'none';
+            }
+        }
+        
+        function fetchUsers(query = '') {
+            const division = divisionSelect.value;
+            const url = `{% url 'get_users_for_targeting' %}?division=${division}&q=${query}`;
+            
+            // Show loading state differently if it's a search update vs initial load
+            if (!query) {
+                userListContainer.innerHTML = '<div class="text-center text-muted py-4"><div class="spinner-border text-primary spinner-border-sm mb-2"></div><div>Loading users...</div></div>';
+            }
+            
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    renderUserList(data.results);
+                })
+                .catch(err => {
+                    console.error(err);
+                    userListContainer.innerHTML = '<div class="text-danger text-center py-4"><i class="fas fa-exclamation-circle me-1"></i> Error loading users.</div>';
+                });
+        }
+        
+        function renderUserList(users) {
+            userListContainer.innerHTML = '';
+            if (users.length === 0) {
+                userListContainer.innerHTML = '<div class="text-muted text-center py-4"><i class="far fa-address-book fa-2x mb-2 text-light-gray"></i><br>No matching users found.</div>';
+                return;
+            }
+            
+            const listGroup = document.createElement('div');
+            listGroup.className = 'list-group list-group-flush'; // Use standard bootstrap list group
+
+            users.forEach(user => {
+                const label = document.createElement('label');
+                label.className = 'list-group-item user-list-item d-flex align-items-center border-0 px-3';
+                label.style.cursor = 'pointer';
+                const isChecked = selectedUsers.has(String(user.id)) ? 'checked' : '';
+                
+                // Extract initials
+                const nameParts = user.text.split(' ')[0]; // crude but works for now
+                const initial = nameParts.charAt(0).toUpperCase();
+
+                label.innerHTML = `
+                    <div class="form-check d-flex align-items-center w-100 m-0">
+                        <input class="form-check-input user-checkbox me-3 mt-0" type="checkbox" value="${user.id}" ${isChecked}>
+                        <div class="user-avatar-placeholder shadow-sm">${initial}</div>
+                        <div class="flex-grow-1">
+                            <span class="fw-medium text-dark">${user.text.split('(')[0]}</span>
+                            <small class="text-muted d-block" style="font-size: 0.8em;">${user.text.split('(')[1].replace(')', '')}</small>
+                        </div>
+                    </div>
+                `;
+                
+                listGroup.appendChild(label);
+                
+                // Add event listener directly to this checkbox
+                const checkbox = label.querySelector('.user-checkbox');
+                checkbox.addEventListener('change', function() {
+                    const id = this.value;
+                    if (this.checked) {
+                        selectedUsers.add(id);
+                    } else {
+                        selectedUsers.delete(id);
+                    }
+                    updateHiddenInput();
+                    updateCount();
+                });
+            });
+            userListContainer.appendChild(listGroup);
+        }
+        
+        function updateHiddenInput() {
+            hiddenInput.value = Array.from(selectedUsers).join(',');
+        }
+        
+        function updateCount() {
+            selectedCountBadge.textContent = `${selectedUsers.size} selected`;
+        }
+        
+        function debounce(func, wait) {
+            let timeout;
+            return function() {
+                const context = this, args = arguments;
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(context, args), wait);
+            };
+        }
+        
+        // Populate set from hidden input if editing form with data
+        if (hiddenInput.value) {
+            hiddenInput.value.split(',').forEach(id => {
+                if(id) selectedUsers.add(id);
+            });
+            updateCount();
+        }
+    });
+
+    // Add simple animation styles dynamically to head
+    const style = document.createElement('style');
+    style.innerHTML = `
+        .fade-in-up { animation: fadeInUp 0.5s ease-out; }
+        .fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    `;
+    document.head.appendChild(style);
+</script>
 
 {% endblock content %}

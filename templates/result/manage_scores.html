@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% load static %}
+
+{% block title %}{{ title }} | {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12 mb-4">
+            <h2 class="h3 mb-2 text-gray-800">{{ title }}</h2>
+            <p class="mb-4">Select a class and subject to manage student scores.</p>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-xl-6 col-lg-8 col-md-10">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">Score Entry Selection</h6>
+                </div>
+                <div class="card-body">
+                    <form id="scoreSelectionForm">
+                        <div class="mb-3">
+                            <label for="levelSelect" class="form-label">Select Class/Level</label>
+                            <select class="form-select" id="levelSelect" required>
+                                <option value="">Choose...</option>
+                                {% for code, name in levels %}
+                                <option value="{{ code }}">{{ name }}</option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">Only classes in your division are shown.</small>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="subjectSelect" class="form-label">Select Subject</label>
+                            <select class="form-select" id="subjectSelect" required>
+                                <option value="">Choose...</option>
+                                {% for subject in subjects %}
+                                <option value="{{ subject.id }}">{{ subject.title }} ({{ subject.code }}) - {{ subject.level }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-edit me-2"></i> Enter Scores
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block js %}
+<script>
+    document.getElementById('scoreSelectionForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const level = document.getElementById('levelSelect').value;
+        const subject = document.getElementById('subjectSelect').value;
+        
+        if (level && subject) {
+            // Construct URL: /result/enter-scores/LEVEL/?subject=ID
+            // Note: We need the base URL from Django
+            const baseUrl = "{% url 'enter_scores' 'PLACEHOLDER' %}".replace('PLACEHOLDER', level);
+            window.location.href = `${baseUrl}?subject=${subject}`;
+        }
+    });
+</script>
+{% endblock js %}

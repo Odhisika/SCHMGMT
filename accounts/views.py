@@ -22,7 +22,7 @@ from accounts.forms import (
 )
 from accounts.models import Parent, Student, User
 from core.models import Semester
-from course.models import Course
+from course.models import Course, CourseAllocation
 from result.models import TakenCourse, Result
 
 # ########################################################
@@ -180,9 +180,13 @@ def admin_panel(request):
 
 @login_required
 def profile_update(request):
+    is_admin = request.user.is_superuser or request.user.is_school_admin
     if request.method == "POST":
         form = ProfileUpdateForm(
-            request.POST, request.FILES, instance=request.user, school=request.school
+            request.POST, request.FILES, 
+            instance=request.user, 
+            school=request.school,
+            is_admin=is_admin
         )
         if form.is_valid():
             form.save()
@@ -190,7 +194,11 @@ def profile_update(request):
             return redirect("profile")
         messages.error(request, "Please correct the error(s) below.")
     else:
-        form = ProfileUpdateForm(instance=request.user, school=request.school)
+        form = ProfileUpdateForm(
+            instance=request.user, 
+            school=request.school,
+            is_admin=is_admin
+        )
     return render(request, "setting/profile_info_change.html", {"form": form})
 
 
@@ -244,7 +252,10 @@ def edit_staff(request, pk):
     lecturer = get_object_or_404(User, is_lecturer=True, pk=pk, school=request.school)
     if request.method == "POST":
         form = ProfileUpdateForm(
-            request.POST, request.FILES, instance=lecturer, school=request.school
+            request.POST, request.FILES, 
+            instance=lecturer, 
+            school=request.school,
+            is_admin=True
         )
         if form.is_valid():
             form.save()
@@ -253,7 +264,7 @@ def edit_staff(request, pk):
             return redirect("lecturer_list")
         messages.error(request, "Please correct the error below.")
     else:
-        form = ProfileUpdateForm(instance=lecturer, school=request.school)
+        form = ProfileUpdateForm(instance=lecturer, school=request.school, is_admin=True)
     return render(
         request, "accounts/edit_lecturer.html", {"title": "Edit Lecturer", "form": form}
     )
@@ -358,7 +369,10 @@ def edit_student(request, pk):
     student_user = get_object_or_404(User, is_student=True, pk=pk, school=request.school)
     if request.method == "POST":
         form = ProfileUpdateForm(
-            request.POST, request.FILES, instance=student_user, school=request.school
+            request.POST, request.FILES, 
+            instance=student_user, 
+            school=request.school,
+            is_admin=True
         )
         if form.is_valid():
             form.save()
@@ -367,7 +381,7 @@ def edit_student(request, pk):
             return redirect("student_list")
         messages.error(request, "Please correct the error below.")
     else:
-        form = ProfileUpdateForm(instance=student_user, school=request.school)
+        form = ProfileUpdateForm(instance=student_user, school=request.school, is_admin=True)
     return render(
         request, "accounts/edit_student.html", {"title": "Edit Student", "form": form}
     )

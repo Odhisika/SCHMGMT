@@ -1,93 +1,340 @@
 {% extends 'base.html' %}
 {% load i18n static custom_filters %}
 
-{% block extra_css %}
+{% block header %}
 <link rel="stylesheet" href="{% static 'css/clean-ui.css' %}">
+<style>
+    .marking-container {
+        max-width: 900px;
+        margin: 0 auto;
+    }
+    
+    .progress-bar-container {
+        background: #f1f3f4;
+        border-radius: 10px;
+        height: 10px;
+        margin: 20px 0;
+        overflow: hidden;
+    }
+    
+    .progress-bar-fill {
+        background: #1a73e8;
+        height: 100%;
+        width: {% widthratio marked_count total_count 100 %}%;
+        transition: width 0.5s ease;
+    }
+    
+    .student-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 16px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+        border-left: 4px solid #dadce0;
+    }
+    
+    .student-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+    
+    .student-info {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+    
+    .student-avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: #f1f3f4;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        color: #5f6368;
+    }
+    
+    .status-group {
+        display: flex;
+        gap: 8px;
+    }
+    
+    .status-btn {
+        border: 2px solid #dadce0;
+        background: white;
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    
+    .status-btn.present:hover, .status-btn.present.active { border-color: #34a853; color: #1e8e3e; background: #e6f4ea; }
+    .status-btn.absent:hover, .status-btn.absent.active { border-color: #ea4335; color: #d93025; background: #fce8e6; }
+    .status-btn.late:hover, .status-btn.late.active { border-color: #fbbc04; color: #b06000; background: #fef7e0; }
+    .status-btn.excused:hover, .status-btn.excused.active { border-color: #1a73e8; color: #174ea6; background: #e8f0fe; }
+    
+    .remarks-input {
+        border: 1px solid #dadce0;
+        border-radius: 8px;
+        padding: 8px 12px;
+        font-size: 13px;
+        width: 100%;
+        margin-top: 10px;
+        display: none; /* Hidden by default, shown when needed */
+    }
+    
+    .student-card.removing {
+        transform: translateX(50px);
+        opacity: 0;
+        pointer-events: none;
+    }
+    
+    .toast-container {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        z-index: 1000;
+    }
+    
+    .toast-pill {
+        background: #323232;
+        color: white;
+        padding: 12px 24px;
+        border-radius: 50px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        margin-top: 10px;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        animation: slideUp 0.3s ease;
+    }
+    
+    @keyframes slideUp {
+        from { transform: translateY(20px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+</style>
 {% endblock %}
 
 {% block title %}{{ title }} - {{ level_name }} | {% trans 'Attendance' %}{% endblock %}
 
 {% block content %}
-<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
-    <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
-        <li class="breadcrumb-item"><a href="{% url 'attendance:dashboard' %}">{% trans 'Attendance' %}</a></li>
-        <li class="breadcrumb-item active">{{ level_name }}</li>
-    </ol>
-</nav>
+<div class="marking-container">
+    <nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'attendance:dashboard' %}">{% trans 'Attendance' %}</a></li>
+            <li class="breadcrumb-item active">{{ level_name }}</li>
+        </ol>
+    </nav>
 
-<div class="title-1"><i class="fas fa-check-square"></i> {% trans 'Mark Attendance' %} - {{ level_name }}</div>
-<br>
-
-{% include 'snippets/messages.html' %}
-
-<div class="card-clean">
-    <div class="card-header-clean">
-        <h3>{% trans 'Date' %}: {{ attendance_date }}</h3>
+    <div class="d-flex justify-content-between align-items-end mb-2">
+        <div>
+            <div class="title-1 mb-0"><i class="fas fa-check-double text-primary"></i> {% trans 'Daily Attendance' %}</div>
+            <p class="text-muted mb-0">{{ level_name }} &bull; {{ attendance_date|date:"F d, Y" }}</p>
+        </div>
+        <div class="text-end">
+            <span class="badge bg-primary rounded-pill mb-1" id="counter-badge">{{ marked_count }}/{{ total_count }}</span>
+            <div class="small text-muted">{% trans 'Marked Students' %}</div>
+        </div>
     </div>
-    <div class="card-body-clean">
-        <form method="post" class="form-clean">
-            {% csrf_token %}
-            
-            <table class="table-clean">
-                <thead>
-                    <tr>
-                        <th style="width: 50px;">#</th>
-                        <th>{% trans 'Student Name' %}</th>
-                        <th style="width: 200px;">{% trans 'Status' %}</th>
-                        <th>{% trans 'Remarks' %}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for student in students %}
-                    {% with record=existing_attendance|default_if_none:None|get_item:student.id %}
-                    <tr>
-                        <td>{{ forloop.counter }}</td>
-                        <td>{{ student.student.get_full_name }}</td>
-                        <td>
-                            <select name="status_{{ student.id }}" class="form-select" style="padding: 8px;">
-                                <option value="Present" {% if record.status == 'Present' or not record %}selected{% endif %}>
-                                    ✓ {% trans 'Present' %}
-                                </option>
-                                <option value="Absent" {% if record.status == 'Absent' %}selected{% endif %}>
-                                    ✗ {% trans 'Absent' %}
-                                </option>
-                                <option value="Late" {% if record.status == 'Late' %}selected{% endif %}>
-                                    ⧗ {% trans 'Late' %}
-                                </option>
-                                <option value="Excused" {% if record.status == 'Excused' %}selected{% endif %}>
-                                    ☐ {% trans 'Excused' %}
-                                </option>
-                            </select>
-                        </td>
-                        <td>
-                            <input type="text" name="remarks_{{ student.id }}" 
-                                   value="{{ record.remarks|default:'' }}" 
-                                   placeholder="{% trans 'Optional reason' %}"
-                                   style="padding: 8px; border: 1px solid #dadce0; border-radius: 4px; width: 100%;">
-                        </td>
-                    </tr>
-                    {% endwith %}
-                    {% empty %}
-                    <tr>
-                        <td colspan="4" class="empty-state">
-                            <p>{% trans 'No students in this class' %}</p>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            
-            <div style="margin-top: 24px; display: flex; gap: 12px;">
-                <button type="submit" class="btn-primary-clean">
-                    <i class="fas fa-save"></i> {% trans 'Save Attendance' %}
-                </button>
-                <a href="{% url 'attendance:dashboard' %}" class="btn-outline-clean">
-                    {% trans 'Cancel' %}
+
+    <div class="progress-bar-container">
+        <div class="progress-bar-fill" id="marking-progress"></div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div id="status-msg" class="text-muted small">
+            {% if total_count == marked_count %}
+                <span class="text-success"><i class="fas fa-check-circle"></i> {% trans 'All students marked!' %}</span>
+            {% else %}
+                {% trans 'Click a button to mark attendance for each student.' %}
+            {% endif %}
+        </div>
+        <div>
+            {% if not show_all %}
+                <a href="?date={{ attendance_date|date:'Y-m-d' }}&show_all=true" class="btn btn-sm btn-light border">
+                    <i class="fas fa-eye"></i> {% trans 'Show Already Marked' %}
                 </a>
+            {% else %}
+                <a href="?date={{ attendance_date|date:'Y-m-d' }}" class="btn btn-sm btn-primary">
+                    <i class="fas fa-filter"></i> {% trans 'Show Only Remaining' %}
+                </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div id="student-list">
+        {% for student in students %}
+        {% with record=existing_attendance|get_item:student.id %}
+        <div class="student-card" id="student-row-{{ student.id }}" data-student-id="{{ student.id }}">
+            <div class="student-info">
+                <div class="student-avatar">
+                   {{ student.student.first_name|first }}{{ student.student.last_name|first }}
+                </div>
+                <div>
+                    <div class="fw-bold fs-5">{{ student.student.get_full_name }}</div>
+                    <div class="text-muted small">{{ student.student.username }}</div>
+                    <input type="text" id="remarks-{{ student.id }}" class="remarks-input" placeholder="{% trans 'Optional remarks (e.g. Sick, Late 10min)' %}">
+                </div>
             </div>
-        </form>
+            
+            <div class="status-group">
+                <button class="status-btn present {% if record.status == 'Present' %}active{% endif %}" onclick="markStudent({{ student.id }}, 'Present')">
+                    <i class="fas fa-check"></i> {% trans 'Present' %}
+                </button>
+                <button class="status-btn absent {% if record.status == 'Absent' %}active{% endif %}" onclick="markStudent({{ student.id }}, 'Absent')">
+                    <i class="fas fa-times"></i> {% trans 'Absent' %}
+                </button>
+                <button class="status-btn late {% if record.status == 'Late' %}active{% endif %}" onclick="markStudent({{ student.id }}, 'Late')">
+                    <i class="fas fa-clock"></i> {% trans 'Late' %}
+                </button>
+                <button class="status-btn excused {% if record.status == 'Excused' %}active{% endif %}" onclick="markStudent({{ student.id }}, 'Excused')">
+                    <i class="fas fa-calendar-check"></i> {% trans 'Excused' %}
+                </button>
+                <button class="btn btn-sm btn-light border-0 ms-2" onclick="toggleRemarks({{ student.id }})" title="{% trans 'Add Remarks' %}">
+                    <i class="fas fa-comment-dots"></i>
+                </button>
+            </div>
+        </div>
+        {% endwith %}
+        {% empty %}
+        <div class="empty-state text-center py-5 bg-white rounded-3 shadow-sm">
+            <i class="fas fa-check-circle text-success mb-3" style="font-size: 50px;"></i>
+            <h3>{% trans 'All Done!' %}</h3>
+            <p class="text-muted">{% trans 'All students in this class have been marked for today.' %}</p>
+            <a href="{% url 'attendance:dashboard' %}" class="btn btn-primary">
+                <i class="fas fa-arrow-left"></i> {% trans 'Go to Dashboard' %}
+            </a>
+        </div>
+        {% endfor %}
     </div>
 </div>
 
+<div class="toast-container" id="toast-container"></div>
+
+
+    <script>
+        let markedCount = {{ marked_count }};
+        const totalCount = {{ total_count }};
+
+        function toggleRemarks(studentId) {
+            const input = document.getElementById(`remarks-${studentId}`);
+            input.style.display = input.style.display === 'block' ? 'none' : 'block';
+            if (input.style.display === 'block') input.focus();
+        }
+
+        function markStudent(studentId, status) {
+            const remarks = document.getElementById(`remarks-${studentId}`).value;
+            const card = document.getElementById(`student-row-${studentId}`);
+            
+            // Disable buttons to prevent double-click
+            const buttons = card.querySelectorAll('.status-btn');
+            buttons.forEach(btn => btn.disabled = true);
+            
+            const formData = new FormData();
+            formData.append('student_id', studentId);
+            formData.append('status', status);
+            formData.append('remarks', remarks);
+            formData.append('date', '{{ attendance_date|date:"Y-m-d" }}');
+            formData.append('level', '{{ level }}');
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+            fetch("{% url 'attendance:save_attendance_ajax' %}", {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showToast(data.message, 'success');
+                    
+                    {% if not show_all %}
+                    // Animate and remove
+                    card.classList.add('removing');
+                    setTimeout(() => {
+                        card.remove();
+                        updateProgress();
+                        checkEmpty();
+                    }, 400);
+                    {% else %}
+                    // Just update buttons
+                    buttons.forEach(btn => {
+                        btn.disabled = false;
+                        btn.classList.remove('active');
+                        if (btn.classList.contains(status.toLowerCase())) {
+                            btn.classList.add('active');
+                        }
+                    });
+                    {% endif %}
+                } else {
+                    showToast(data.message, 'error');
+                    buttons.forEach(btn => btn.disabled = false);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('{% trans "An error occurred while saving." %}', 'error');
+                buttons.forEach(btn => btn.disabled = false);
+            });
+        }
+
+        function updateProgress() {
+            markedCount++;
+            const percent = Math.min((markedCount / totalCount) * 100, 100);
+            document.getElementById('marking-progress').style.width = percent + '%';
+            document.getElementById('counter-badge').innerText = markedCount + '/' + totalCount;
+            
+            if (markedCount >= totalCount) {
+                 document.getElementById('status-msg').innerHTML = '<span class="text-success"><i class="fas fa-check-circle"></i> {% trans "All students marked!" %}</span>';
+            }
+        }
+
+        function checkEmpty() {
+            const list = document.getElementById('student-list');
+            if (list.children.length === 0) {
+                list.innerHTML = `
+                    <div class="empty-state text-center py-5 bg-white rounded-3 shadow-sm">
+                        <i class="fas fa-check-circle text-success mb-3" style="font-size: 50px;"></i>
+                        <h3>{% trans "All Done!" %}</h3>
+                        <p class="text-muted">{% trans "All students in this class have been marked for today." %}</p>
+                        <a href="{% url 'attendance:dashboard' %}" class="btn btn-primary">
+                            <i class="fas fa-arrow-left"></i> {% trans "Go to Dashboard" %}
+                        </a>
+                    </div>
+                `;
+            }
+        }
+
+        function showToast(message, type) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'toast-pill';
+            
+            const icon = type === 'success' ? 'fa-check-circle text-success' : 'fa-exclamation-triangle text-danger';
+            toast.innerHTML = `<i class="fas ${icon}"></i> <span>${message}</span>`;
+            
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+    </script>
 {% endblock %}

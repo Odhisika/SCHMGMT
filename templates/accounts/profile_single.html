@@ -4,130 +4,247 @@
 
 {% load static %}
 
-
 {% block content %}
 
 {% if user.is_authenticated %}
 
-<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb" class="mb-4">
     <ol class="breadcrumb">
-      <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
+      <li class="breadcrumb-item"><a href="/" class="text-decoration-none text-muted">{% trans 'Home' %}</a></li>
       <li class="breadcrumb-item active" aria-current="page">{{ user.get_full_name }}</li>
     </ol>
 </nav>
 
 {% include 'snippets/messages.html' %}
 
-<div class="row">
-
-    <div class="col-md-3 mx-auto">
-        <div class="card  p-2">
-            <div class="text-center">
-                <img src="{{ user.picture.url }}" class="w-100">
-                <ul class="px-2 list-unstyled">
-                    <li>{{ user.get_full_name|title }}</li>
-                    <li><strong>{% trans 'Last login' %}: </strong>{{ user.last_login|date }}</li>
-                    <li><strong>{% trans 'Role' %}: </strong>
-                        {{ user.get_user_role }}
-                    </li>
-                </ul>
+<div class="container-fluid p-0">
+    <!-- Hero Section -->
+    <div class="profile-hero mb-4 rounded-4 shadow-sm overflow-hidden position-relative">
+        <div class="hero-bg"></div>
+        <div class="hero-content p-4 p-md-5 d-md-flex align-items-end">
+            <div class="profile-img-wrap position-relative me-md-4 mb-3 mb-md-0">
+                {% if user.picture %}
+                    <img src="{{ user.picture.url }}" alt="{{ user.get_full_name }}" class="rounded-circle border border-4 border-white shadow-lg" style="width: 160px; height: 160px; object-fit: cover;">
+                {% else %}
+                    <div class="rounded-circle border border-4 border-white shadow-lg bg-light d-flex align-items-center justify-content-center" style="width: 160px; height: 160px;">
+                        <i class="fas fa-user fa-4x text-secondary"></i>
+                    </div>
+                {% endif %}
             </div>
-            <hr>
-            {% if request.user.is_superuser %}
-            <div class="d-flex flex-column">
-                {% if user.is_student %}
-                <a href="{% url 'student_edit' pk=user.id %}">
-                    <i class="fas fa-user-edit unstyled"></i><span class="mobile-hide">{% trans 'Edit Profile' %}</span>
-                </a>
-                <a href="{% url 'student_program_edit' user.id %}">
-                    <i class="fas fa-pen-to-square unstyled"></i><span class="mobile-hide">{% trans 'Change Program' %}</span>
-                </a>
+            <div class="flex-grow-1 text-white">
+                <p class="badge bg-light text-primary mb-2 px-3 py-2 rounded-pill fw-bold">{{ user.get_user_role }}</p>
+                <h1 class="display-6 fw-bold mb-1">{{ user.get_full_name|title }}</h1>
+                <p class="mb-0 opacity-75"><i class="fas fa-clock me-1"></i> {% trans 'Last login' %}: {{ user.last_login|date:"M d, Y H:i" }}</p>
+            </div>
+            <div class="mt-4 mt-md-0 d-flex gap-2">
+                {% if request.user.is_superuser or request.user == user %}
+                    {% if user.is_student %}
+                        <a href="{% url 'student_edit' pk=user.id %}" class="btn btn-light rounded-pill px-4 fw-bold">
+                            <i class="fas fa-user-edit me-2 text-primary"></i>{% trans 'Edit Profile' %}
+                        </a>
+                    {% elif user.is_lecturer %}
+                        <a href="{% url 'staff_edit' pk=user.id %}" class="btn btn-light rounded-pill px-4 fw-bold">
+                            <i class="fas fa-user-edit me-2 text-primary"></i>{% trans 'Edit Profile' %}
+                        </a>
+                    {% else %}
+                        <a href="{% url 'edit_profile' %}" class="btn btn-light rounded-pill px-4 fw-bold">
+                            <i class="fas fa-user-edit me-2 text-primary"></i>{% trans 'Edit Profile' %}
+                        </a>
+                    {% endif %}
                 {% endif %}
-                {% if user.is_lecturer %}
-                <a href="{% url 'staff_edit' pk=user.id %}">
-                    <i class="fas fa-user-edit unstyled"></i><span class="mobile-hide">{% trans 'Edit Profile' %}</span>
-                </a>
-                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Main Stats/Courses Column -->
+        <div class="col-lg-8">
+            {% if user.is_lecturer %}
+            <div class="card border-0 shadow-sm rounded-4 mb-4">
+                <div class="card-header bg-white border-0 py-3">
+                    <h5 class="card-title mb-0 fw-bold text-primary"><i class="fas fa-book-open me-2"></i>{% trans 'My Assigned Courses' %}</h5>
+                </div>
+                <div class="card-body py-0">
+                    <div class="list-group list-group-flush">
+                        {% for course in courses %}
+                        <a href="{{ course.get_absolute_url }}" class="list-group-item list-group-item-action py-3 border-0 d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-0 fw-bold">{{ course.title }}</h6>
+                                <p class="text-muted small mb-0">{{ course.code }} | {{ course.level }}</p>
+                            </div>
+                            <i class="fas fa-chevron-right text-muted small"></i>
+                        </a>
+                        {% empty %}
+                        <div class="py-4 text-center">
+                            <p class="text-muted mb-0">{% trans 'No courses assigned to this teacher yet.' %}</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
             </div>
             {% endif %}
-        </div>
-    </div>
 
-    <div class="col-md-9 mx-auto">
-        <div class="card">
-            <div class="card-body">
-                <!-- {% if user.is_student %}
-                <p class="form-title"><i class="fas fa-book-open"></i>Enrolled Courses</p>
-                <div class="dashboard-description">
-                    {% if courses %}
-                        <div class="flex">
-                            {% for course in courses %}
-                                <div class="flex"><a class="edit-btn" href="{{ course.get_absolute_url }}">{{ course }}</a></div>
-                            {% endfor %}
+            {% if user.is_student %}
+            <div class="card border-0 shadow-sm rounded-4 mb-4">
+                <div class="card-header bg-white border-0 py-3">
+                    <h5 class="card-title mb-0 fw-bold text-primary"><i class="fas fa-graduation-cap me-2"></i>{% trans 'Academic Information' %}</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-4">
+                        <div class="col-sm-6">
+                            <div class="p-3 bg-light rounded-3">
+                                <p class="text-muted small mb-1">{% trans 'Current Level' %}</p>
+                                <h6 class="fw-bold mb-0">{{ student.level }}</h6>
+                            </div>
                         </div>
-                    {% else %}
-                            <div class="text-danger"><i class="far fa-frown"></i>No courses!</div>
-                    {% endif %}
+                        <div class="col-sm-6">
+                            <div class="p-3 bg-light rounded-3">
+                                <p class="text-muted small mb-1">{% trans 'Current Program' %}</p>
+                                <h6 class="fw-bold mb-0">{{ student.program }}</h6>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <h6 class="fw-bold mb-3">{% trans 'Enrolled Subjects' %}</h6>
+                            {% if courses %}
+                            <div class="d-flex flex-wrap gap-2">
+                                {% for course in courses %}
+                                <span class="badge bg-white border text-dark p-2 rounded-3 shadow-sm">{{ course.course.title }}</span>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <p class="text-danger small"><i class="fas fa-exclamation-triangle me-1"></i>{% trans 'No subjects enrolled for current term.' %}</p>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
-                {% endif %} -->
-    
-                {% if user.is_lecturer %}
-                <p class="fw-bold"><i class="fas fa-book-open"></i> {% trans 'My Courses' %}</p>
-                {% if courses %}
-                <ul>
-                    {% for course in courses %}
-                    <li><a href="{{ course.get_absolute_url }}" class="text-primary">{{ course }}</a></li>
-                    {% endfor %}
-                </ul>
-                {% else %}
-                <div class="text-danger">{% trans 'No courses assigned!' %}</div>
-                {% endif %}
-                <hr>
-                {% endif %}
-    
-                <p class="fw-bold"><i class="me-2 fas fa-user"></i> {% trans 'Personal Info' %}</p>
-                <div class="dashboard-description">
-                    <p><strong>{% trans 'First Name' %}:</strong> {{ user.first_name|title }}</p>
-                    <p><strong>{% trans 'Last Name' %}:</strong> {{ user.last_name|title }}</p>
-                    <p><strong>{% trans 'ID No.' %}:</strong> {{ user.username }}</p>
-                    {% if user.department %}
-                    <p><strong>{% trans 'Department/Section' %}:</strong> {{ user.department.title }}</p>
-                    {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- Personal Details Card -->
+            <div class="card border-0 shadow-sm rounded-4 mb-4">
+                <div class="card-header bg-white border-0 py-3">
+                    <h5 class="card-title mb-0 fw-bold text-primary"><i class="fas fa-id-card me-2"></i>{% trans 'Profile Details' %}</h5>
                 </div>
-                {% if user.is_student %}
-                <hr>
-                <p class="fw-bold"><i class="me-2 fas fa-graduation-cap"></i> {% trans 'Applicant Info' %}</p>
-                <div class="dashboard-description">
-                    <p><strong>{% trans 'School' %}: </strong>Unity College</p>
-                    <p><strong>{% trans 'Level' %}: </strong>{{ level.level }}</p>
-                    <p><strong>{% trans 'Program' %}: </strong>{{ student.program }}</p>
+                <div class="card-body">
+                    <div class="row g-4">
+                        <div class="col-md-6 d-flex align-items-start">
+                            <div class="bg-light p-2 rounded-3 me-3"><i class="fas fa-user-tag text-muted"></i></div>
+                            <div>
+                                <p class="text-muted small mb-0">{% trans 'Full Name' %}</p>
+                                <h6 class="fw-bold mb-0">{{ user.get_full_name|title }}</h6>
+                            </div>
+                        </div>
+                        <div class="col-md-6 d-flex align-items-start">
+                            <div class="bg-light p-2 rounded-3 me-3"><i class="fas fa-fingerprint text-muted"></i></div>
+                            <div>
+                                <p class="text-muted small mb-0">{% trans 'Identification Number' %}</p>
+                                <h6 class="fw-bold mb-0">{{ user.username }}</h6>
+                            </div>
+                        </div>
+                        <div class="col-md-6 d-flex align-items-start">
+                            <div class="bg-light p-2 rounded-3 me-3"><i class="fas fa-venus-mars text-muted"></i></div>
+                            <div>
+                                <p class="text-muted small mb-0">{% trans 'Gender' %}</p>
+                                <h6 class="fw-bold mb-0">{{ user.get_gender_display|default:user.gender }}</h6>
+                            </div>
+                        </div>
+                        <div class="col-md-6 d-flex align-items-start">
+                            <div class="bg-light p-2 rounded-3 me-3"><i class="fas fa-building text-muted"></i></div>
+                            <div>
+                                <p class="text-muted small mb-0">{% trans 'Department' %}</p>
+                                <h6 class="fw-bold mb-0">{{ user.department.title|default:"N/A" }}</h6>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                {% endif %}
-    
-                <hr>
-                <p class="fw-bold"><i class="me-2 fas fa-phone-square-alt"></i>{% trans 'Contact Info' %}</p>
-                <div class="dashboard-description">
-                    <p><strong>{% trans 'Email' %}:</strong> {{ user.email }}</p>
-                    <p><strong>{% trans 'Tel No.' %}:</strong> {{ user.phone }}</p>
-                    <p><strong>{% trans 'Address/city' %}:</strong> {{ user.address }}</p>
+            </div>
+        </div>
+
+        <!-- Sidebar Info Column -->
+        <div class="col-lg-4">
+            <!-- Contact Card -->
+            <div class="card border-0 shadow-sm rounded-4 mb-4 text-center p-4">
+                <div class="bg-light p-4 rounded-circle mx-auto mb-3" style="width: 80px; height: 80px; display: flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-envelope-open-text fa-2x text-primary"></i>
                 </div>
-    
-                <hr>
-                <p class="fw-bold"><i class="me-2 fa fa-calendar-day"></i>{% trans 'Important Dates' %}</p>
-                <div class="dashboard-description">
-                    <p><strong>{% trans 'Last login' %}:</strong> {{ user.last_login }}</p>
-                    {% if current_semester and current_session %}
-                    <p><strong>{% trans 'Academic Year' %}:</strong> {{ current_semester }} {% trans 'Term' %} {{ current_session }}</p>
-                    {% endif %}
-                    <p><strong>{% trans 'Registered Date' %}:</strong> {{ user.date_joined|date }}</p>
+                <h5 class="fw-bold">{% trans 'Contact Information' %}</h5>
+                <p class="text-muted small mb-4">{% trans 'Official contact details registered with the school.' %}</p>
+                <div class="text-start">
+                    <div class="mb-3">
+                        <p class="text-muted small mb-0">{% trans 'Email Address' %}</p>
+                        <h6 class="fw-bold mb-0"><a href="mailto:{{ user.email }}" class="text-decoration-none">{{ user.email }}</a></h6>
+                    </div>
+                    <div class="mb-3">
+                        <p class="text-muted small mb-0">{% trans 'Phone Number' %}</p>
+                        <h6 class="fw-bold mb-0">{{ user.phone }}</h6>
+                    </div>
+                    <div class="mb-0">
+                        <p class="text-muted small mb-0">{% trans 'Home Address' %}</p>
+                        <h6 class="fw-bold mb-0">{{ user.address }}</h6>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Date Card -->
+            <div class="card border-0 shadow-sm rounded-4 mb-4">
+                <div class="card-body">
+                    <h6 class="fw-bold mb-3">{% trans 'Account Activity' %}</h6>
+                    <div class="d-flex align-items-center mb-3">
+                        <i class="fas fa-calendar-check text-muted me-3"></i>
+                        <div>
+                            <p class="text-muted small mb-0">{% trans 'Member Since' %}</p>
+                            <h6 class="fw-bold mb-0">{{ user.date_joined|date:"M d, Y" }}</h6>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center mb-0">
+                        <i class="fas fa-history text-muted me-3"></i>
+                        <div>
+                            <p class="text-muted small mb-0">{% trans 'Last Login' %}</p>
+                            <h6 class="fw-bold mb-0">{{ user.last_login|date:"M d, Y - H:i" }}</h6>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-
-    <div class="col-md-3 mx-auto"></div>
-
 </div>
+
+<style>
+    .profile-hero {
+        background: linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%);
+        min-height: 280px;
+        display: flex;
+        align-items: flex-end;
+    }
+    .hero-bg {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-image: url('https://www.transparenttextures.com/patterns/cubes.png');
+        opacity: 0.1;
+    }
+    .hero-content {
+        position: relative;
+        z-index: 1;
+        width: 100%;
+    }
+    .card {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .card:hover {
+        box-shadow: 0 0.5rem 1.5rem rgba(0,0,0,0.08) !important;
+    }
+    .list-group-item:hover {
+        background-color: #f8f9fa;
+    }
+    .badge.bg-white {
+        font-weight: 500;
+        border-color: #eaecf0 !important;
+    }
+</style>
+
 {% endif %}
 
 {% endblock content %}

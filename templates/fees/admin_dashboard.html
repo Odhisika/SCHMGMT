@@ -29,6 +29,55 @@
         color: #202124;
         margin-bottom: 16px;
     }
+
+    /* Modern 3D Buttons Styling */
+    .btn-3d {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 20px;
+        border-radius: 12px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.2s ease;
+        border: none;
+        cursor: pointer;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
+        transform: translateY(0);
+    }
+    
+    .btn-3d:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 7px 14px rgba(0, 0, 0, 0.1), 0 3px 6px rgba(0, 0, 0, 0.08);
+    }
+    
+    .btn-3d:active {
+        transform: translateY(1px);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .btn-3d i {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.2);
+        font-size: 14px;
+    }
+
+    .btn-3d-primary { background-color: #1a73e8; color: white; }
+    .btn-3d-success { background-color: #34a853; color: white; }
+    .btn-3d-info { background-color: #00bcd4; color: white; }
+    .btn-3d-danger { background-color: #ea4335; color: white; }
+
+    .action-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px; /* Better spacing between buttons */
+    }
 </style>
 {% endblock %}
 
@@ -49,20 +98,60 @@
         <h2 style="margin: 0; font-size: 22px; color: #202124;"><i class="fas fa-money-bill-wave" style="margin-right: 10px; color: #1a73e8;"></i>{% trans 'Payment Management' %}</h2>
         <p style="margin: 4px 0 0; color: #5f6368; font-size: 14px;">{{ current_term }}</p>
     </div>
-    <div style="display: flex; gap: 12px;">
-        <a href="{% url 'fees:fee_list' %}" class="btn-primary-clean" style="text-decoration: none; display: inline-flex; align-items: center; gap: 8px;">
-            <i class="fas fa-cog" style="background: rgba(0,0,0,0.1); width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px;"></i> 
+    <div class="action-group">
+        <a href="{% url 'fees:fee_list' %}" class="btn-3d btn-3d-primary">
+            <i class="fas fa-cog"></i> 
             <span>{% trans 'Fee Structure' %}</span>
         </a>
-        <a href="{% url 'fees:record_payment' %}" class="btn-success-clean" style="text-decoration: none; display: inline-flex; align-items: center; gap: 8px;">
-            <i class="fas fa-plus" style="background: rgba(0,0,0,0.1); width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px;"></i>
+        <a href="{% url 'fees:record_payment' %}" class="btn-3d btn-3d-success">
+            <i class="fas fa-plus"></i>
             <span>{% trans 'Record Payment' %}</span>
         </a>
-        <a href="{% url 'fees:bank_account_list' %}" class="btn-info-clean" style="text-decoration: none; display: inline-flex; align-items: center; gap: 8px; background-color: #00bcd4; color: white;">
-            <i class="fas fa-university" style="background: rgba(0,0,0,0.1); width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px;"></i>
+        <a href="{% url 'fees:bank_account_list' %}" class="btn-3d btn-3d-info">
+            <i class="fas fa-university"></i>
             <span>{% trans 'Bank Accounts' %}</span>
         </a>
+        <a href="{% url 'fees:defaulters_list' %}" class="btn-3d btn-3d-danger">
+            <i class="fas fa-user-times"></i>
+            <span>{% trans 'View Defaulters' %}</span>
+        </a>
     </div>
+</div>
+
+<!-- Division Tabs -->
+<ul class="nav nav-pills mb-4" id="pills-tab" role="tablist">
+    {% for division_code, division_name in divisions %}
+    <li class="nav-item" role="presentation">
+        <a class="nav-link {% if current_division == division_code %}active{% endif %}" 
+           href="?division={{ division_code }}" role="tab">
+            {{ division_name }}
+        </a>
+    </li>
+    {% endfor %}
+</ul>
+
+<!-- Filter Toolbar -->
+<div class="card p-3 shadow-sm border-0 bg-light mb-4">
+    <form method="get" class="row align-items-center">
+        <input type="hidden" name="division" value="{{ current_division }}">
+        <div class="col-md-8">
+            <h5 class="mb-0">{% trans 'Term Statistics' %}: <strong>{{ current_term|default:"Not Set" }}</strong></h5>
+            <p class="text-muted mb-0 small">{% trans 'Showing data for' %} <strong>{{ current_division_name }}</strong></p>
+        </div>
+        <div class="col-md-4">
+            <div class="input-group">
+                <span class="input-group-text bg-white"><i class="fas fa-filter"></i></span>
+                <select name="level" class="form-select" onchange="this.form.submit()">
+                    <option value="">{% trans 'All Levels' %}</option>
+                    {% for code, name in division_levels %}
+                    <option value="{{ code }}" {% if selected_level == code %}selected{% endif %}>
+                        {{ name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </form>
 </div>
 
 <div class="row users-count px-3">
@@ -102,7 +191,7 @@
             <h3><i class="fas fa-chart-line text-info"></i></h3>
             <div class="text-right">
                 {% trans 'Collection Rate' %}
-                <h2 class="text-dark">--%</h2>
+                <h2 class="text-dark">{{ collection_rate }}%</h2>
             </div>
         </div>
     </div>
@@ -122,7 +211,7 @@
     
     <!-- Bank Account Management Card -->
     <div class="col-6 col-md-3 mb-3 px-2">
-        <div class="card-count p-3 bg-white shadow-sm border-0 rounded-3" style="cursor: pointer;" onclick="window.location='{% url 'fees:bank_account_list' %}'">
+        <div class="card-count p-3 bg-white shadow-sm border-0 rounded-3" style="cursor: pointer;" onclick="window.location='{% url 'fees:bank_account_list' %}';">
             <h3><i class="fas fa-university text-success"></i></h3>
             <div class="text-right">
                 {% trans 'Bank Accounts' %}

@@ -3,6 +3,54 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/clean-ui.css' %}">
+<style>
+    .term-filter {
+        background: #fff;
+        padding: 1.25rem 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        margin-bottom: 2rem;
+    }
+    
+    .weekly-card {
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        margin-bottom: 2rem;
+        overflow: hidden;
+    }
+    .weekly-header {
+        background: var(--light);
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid #dee2e6;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .weekly-header h4 {
+        margin: 0;
+        color: var(--dark);
+        font-size: 1.1rem;
+        font-weight: 600;
+    }
+    .table-calendar th, .table-calendar td {
+        vertical-align: middle;
+        padding: 1.25rem 0.5rem;
+    }
+    .status-icon-large {
+        font-size: 1.5rem;
+        margin-bottom: 0.25rem;
+    }
+    .remark-box {
+        margin-top: 0.5rem;
+        font-size: 0.75rem;
+        background: #f8f9fa;
+        color: #6c757d;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        word-break: break-word;
+    }
+</style>
 {% endblock %}
 
 {% block title %}{{ title }} | {% trans 'My Attendance' %}{% endblock %}
@@ -15,66 +63,163 @@
     </ol>
 </nav>
 
-<div class="title-1"><i class="fas fa-user-check"></i> {% trans 'My Attendance' %}</div>
-<br>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="title-1 mb-0"><i class="fas fa-user-check"></i> {% trans 'My Attendance' %}</div>
+</div>
 
-<div class="alert-info-clean">
+<div class="alert-info-clean mb-4">
     <i class="fas fa-id-card"></i> <strong>{{ student.student.get_full_name }}</strong> - {{ student.get_level_display }}
 </div>
 
-<div class="stats-grid">
-    <div class="stat-card" style="border-top: 4px solid var(--primary);">
-        <p class="stat-value">{{ attendance_rate }}%</p>
-        <p class="stat-label">{% trans 'Attendance Rate' %}</p>
+<div class="term-filter">
+    <form method="GET" class="d-flex align-items-center gap-3">
+        <label for="term_id" class="fw-bold mb-0">{% trans 'Term' %}:</label>
+        <select name="term_id" id="term_id" class="form-select w-auto" onchange="this.form.submit()">
+            {% for term in terms %}
+            <option value="{{ term.id }}" {% if selected_term and selected_term.id == term.id %}selected{% endif %}>
+                {{ term }} {% if term.is_current_term %}(Current){% endif %}
+            </option>
+            {% endfor %}
+        </select>
+    </form>
+</div>
+
+<div class="row users-count mb-4">
+    <div class="col-6 col-md-4 mb-3">
+        <div class="card-count p-3 bg-white shadow-sm border-0 rounded-3">
+            <h3><i class="fas fa-chart-pie text-primary"></i></h3>
+            <div class="text-right">
+                {% trans 'Attendance Rate' %}
+                <h2 class="text-dark">{{ attendance_rate }}%</h2>
+            </div>
+        </div>
     </div>
-    <div class="stat-card">
-        <p class="stat-value text-success">{{ present }}</p>
-        <p class="stat-label">{% trans 'Days Present' %}</p>
+    <div class="col-6 col-md-4 mb-3">
+        <div class="card-count p-3 bg-white shadow-sm border-0 rounded-3">
+            <h3><i class="fas fa-check-circle text-success"></i></h3>
+            <div class="text-right">
+                {% trans 'Days Present' %}
+                <h2 class="text-dark">{{ present }}</h2>
+            </div>
+        </div>
     </div>
-    <div class="stat-card">
-        <p class="stat-value text-danger">{{ absent }}</p>
-        <p class="stat-label">{% trans 'Days Absent' %}</p>
+    <div class="col-6 col-md-4 mb-3">
+        <div class="card-count p-3 bg-white shadow-sm border-0 rounded-3">
+            <h3><i class="fas fa-times-circle text-danger"></i></h3>
+            <div class="text-right">
+                {% trans 'Days Absent' %}
+                <h2 class="text-dark">{{ absent }}</h2>
+            </div>
+        </div>
     </div>
 </div>
 
-<div class="card-clean">
-    <div class="card-header-clean">
-        <h3>{% trans 'Recent History' %}</h3>
-    </div>
-    <div class="card-body-clean">
-        {% if records %}
-        <table class="table-clean">
-            <thead>
-                <tr>
-                    <th>{% trans 'Date' %}</th>
-                    <th>{% trans 'Status' %}</th>
-                    <th>{% trans 'Remarks' %}</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for record in records %}
-                <tr>
-                    <td>{{ record.date }}</td>
-                    <td>
-                        {% if record.status == 'Present' %}
-                        <span class="badge-clean badge-success">{{ record.status }}</span>
-                        {% elif record.status == 'Absent' %}
-                        <span class="badge-clean badge-danger">{{ record.status }}</span>
-                        {% else %}
-                        <span class="badge-clean badge-warning">{{ record.status }}</span>
-                        {% endif %}
-                    </td>
-                    <td>{{ record.remarks|default:'-' }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% else %}
-        <div class="empty-state">
-            <div class="empty-state-icon"><i class="fas fa-calendar-times"></i></div>
-            <p class="empty-state-text">{% trans 'No attendance records found for this term.' %}</p>
+<h3 class="mb-3">{% trans 'Attendance History' %}</h3>
+
+{% if weekly_data %}
+    {% for week in weekly_data %}
+    <div class="weekly-card">
+        <div class="weekly-header">
+            <h4>{% trans 'Week' %} {{ week.week_num }}</h4>
+            <span class="badge bg-secondary">{{ week.start_date|date:"M d" }} - {{ week.end_date|date:"M d, Y" }}</span>
         </div>
+        <div class="table-responsive">
+            <table class="table table-bordered table-calendar text-center mb-0 bg-white">
+                <thead class="bg-light">
+                    <tr>
+                        {% for day in week.days %}
+                        <th style="width: 20%;" class="border-bottom-0">
+                            <div class="text-uppercase text-secondary small fw-bold">{{ day.date|date:"l" }}</div>
+                            <div class="text-dark small">{{ day.date|date:"M d" }}</div>
+                        </th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        {% for day in week.days %}
+                        <td class="bg-white">
+                            {% if day.status == 'Present' %}
+                                <div class="text-success">
+                                    <i class="fas fa-check-circle status-icon-large"></i>
+                                    <div class="small fw-bold mt-1">{% trans 'Present' %}</div>
+                                </div>
+                            {% elif day.status == 'Absent' %}
+                                <div class="text-danger">
+                                    <i class="fas fa-times-circle status-icon-large"></i>
+                                    <div class="small fw-bold mt-1">{% trans 'Absent' %}</div>
+                                </div>
+                            {% elif day.status == 'Late' %}
+                                <div class="text-warning">
+                                    <i class="fas fa-clock status-icon-large"></i>
+                                    <div class="small fw-bold mt-1">{% trans 'Late' %}</div>
+                                </div>
+                            {% elif day.status == 'Pending' %}
+                                <div class="text-secondary">
+                                    <i class="fas fa-minus-circle status-icon-large" style="opacity: 0.5;"></i>
+                                    <div class="small mt-1">{% trans 'Pending' %}</div>
+                                </div>
+                            {% else %}
+                                <div class="text-light">
+                                    <i class="fas fa-calendar-minus status-icon-large text-muted"></i>
+                                    <div class="small text-muted mt-1">{% trans 'Not Started' %}</div>
+                                </div>
+                            {% endif %}
+                            
+                            {% if day.record and day.record.remarks %}
+                                <div class="remark-box bg-light text-muted border border-light mt-2 rounded p-2 text-wrap" title="{{ day.record.remarks }}">
+                                    <i class="fas fa-comment-dots"></i> {{ day.record.remarks|truncatechars:20 }}
+                                </div>
+                            {% endif %}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endfor %}
+{% elif records %}
+    <!-- Fallback if term has no start/end date configured -->
+    <div class="card-clean">
+        <div class="card-body-clean">
+            <div class="table-responsive">
+                <table class="table-clean">
+                    <thead>
+                        <tr>
+                            <th>{% trans 'Date' %}</th>
+                            <th>{% trans 'Status' %}</th>
+                            <th>{% trans 'Remarks' %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for record in records %}
+                        <tr>
+                            <td>{{ record.date }}</td>
+                            <td>
+                                {% if record.status == 'Present' %}
+                                <span class="badge-clean badge-success">{{ record.status }}</span>
+                                {% elif record.status == 'Absent' %}
+                                <span class="badge-clean badge-danger">{{ record.status }}</span>
+                                {% else %}
+                                <span class="badge-clean badge-warning">{{ record.status }}</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ record.remarks|default:'-' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+{% else %}
+    <div class="empty-state">
+        <div class="empty-state-icon"><i class="fas fa-calendar-times"></i></div>
+        <p class="empty-state-text">{% trans 'No attendance records found for this term.' %}</p>
+        {% if selected_term and not selected_term.start_date %}
+        <p class="text-muted small">Term dates may not be configured by the administration yet.</p>
         {% endif %}
     </div>
-</div>
+{% endif %}
 {% endblock %}

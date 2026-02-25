@@ -1,0 +1,119 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans 'Review Promotion Request' %}{% endblock %}
+
+{% block content %}
+
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'promotion_requests_list' %}">{% trans 'Promotion Requests' %}</a></li>
+    <li class="breadcrumb-item active">{% trans 'Review' %}</li>
+  </ol>
+</nav>
+
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-header bg-white border-bottom py-3">
+        <h5 class="mb-0 fw-bold">
+          {% if promo_request.request_type == 'PROMOTE' %}
+          <span class="text-success"><i class="fas fa-arrow-up me-2"></i>{% trans 'Promotion Request' %}</span>
+          {% else %}
+          <span class="text-warning"><i class="fas fa-arrow-down me-2"></i>{% trans 'Hold-Back Request' %}</span>
+          {% endif %}
+        </h5>
+      </div>
+      <div class="card-body">
+
+        <div class="row g-3 mb-4">
+          <div class="col-md-6">
+            <label class="text-muted small fw-semibold">{% trans 'STUDENT' %}</label>
+            <p class="fw-bold mb-0">{{ promo_request.student.student.get_full_name }}</p>
+            <small class="text-muted">{{ promo_request.result.level }} &bull; {{ promo_request.result.term }}</small>
+          </div>
+          <div class="col-md-3">
+            <label class="text-muted small fw-semibold">{% trans 'TERM AVERAGE' %}</label>
+            <p class="fw-bold fs-4 mb-0">
+              {% if promo_request.result.term_average %}
+              {{ promo_request.result.term_average }}%
+              {% else %}—{% endif %}
+            </p>
+          </div>
+          <div class="col-md-3">
+            <label class="text-muted small fw-semibold">{% trans 'AUTO STATUS' %}</label>
+            <p class="mb-0">
+              <span class="badge bg-{{ promo_request.result.promotion_status_color }} fs-6">
+                {{ promo_request.result.promotion_status_label }}
+              </span>
+            </p>
+          </div>
+        </div>
+
+        <div class="bg-light rounded-3 p-3 mb-4">
+          <label class="text-muted small fw-semibold">{% trans 'REASON FOR REQUEST' %}</label>
+          <p class="mb-0">{{ promo_request.reason }}</p>
+        </div>
+
+        <div class="d-flex gap-2 mb-1">
+          <span class="text-muted small">{% trans 'Submitted by:' %}</span>
+          <span class="small fw-semibold">{{ promo_request.requested_by.get_full_name }}</span>
+          <span class="text-muted small">on {{ promo_request.created_at|date:"d M Y, H:i" }}</span>
+        </div>
+
+        {% if promo_request.status != 'PENDING' %}
+        <div class="alert {% if promo_request.status == 'APPROVED' %}alert-success{% else %}alert-danger{% endif %} mt-3">
+          <strong>{{ promo_request.get_status_display }}</strong>
+          {% if promo_request.reviewed_by %}
+          {% trans 'by' %} {{ promo_request.reviewed_by.get_full_name }}
+          on {{ promo_request.updated_at|date:"d M Y" }}
+          {% endif %}
+          {% if promo_request.admin_notes %}
+          <p class="mb-0 mt-2"><em>{{ promo_request.admin_notes }}</em></p>
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if promo_request.status == 'PENDING' %}
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-bottom py-3">
+        <h6 class="mb-0 fw-bold">{% trans 'Admin Decision' %}</h6>
+      </div>
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label class="form-label fw-semibold">{% trans 'Admin Notes' %} <small class="text-muted">({% trans 'optional' %})</small></label>
+            <textarea name="admin_notes" class="form-control" rows="3" placeholder="{% trans 'Explain your decision...' %}"></textarea>
+          </div>
+          <div class="d-flex gap-3">
+            <button type="submit" name="action" value="approve"
+                    class="btn btn-success px-4"
+                    onclick="return confirm('{% trans 'Approve this request?' %}')">
+              <i class="fas fa-check me-2"></i>{% trans 'Approve' %}
+            </button>
+            <button type="submit" name="action" value="reject"
+                    class="btn btn-outline-danger px-4"
+                    onclick="return confirm('{% trans 'Reject this request?' %}')">
+              <i class="fas fa-times me-2"></i>{% trans 'Reject' %}
+            </button>
+            <a href="{% url 'promotion_requests_list' %}" class="btn btn-outline-secondary ms-auto">
+              {% trans 'Cancel' %}
+            </a>
+          </div>
+        </form>
+      </div>
+    </div>
+    {% else %}
+    <a href="{% url 'promotion_requests_list' %}" class="btn btn-outline-secondary">
+      ← {% trans 'Back to Requests' %}
+    </a>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}

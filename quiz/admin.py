@@ -12,6 +12,10 @@ from .models import (
     MCQuestion,
     Choice,
     EssayQuestion,
+    TrueFalseQuestion,
+    FillInTheBlankQuestion,
+    Assignment,
+    AssignmentSubmission,
     Sitting,
 )
 
@@ -48,7 +52,30 @@ class QuizAdminForm(TranslationModelForm):
 
 
 class QuizAdmin(TranslationAdmin):
-    pass
+    list_display = ('title', 'course', 'category', 'available_from', 'available_until', 'time_limit_minutes', 'draft')
+    list_filter = ('category', 'draft', 'exam_paper', 'single_attempt')
+    search_fields = ('title', 'description')
+    
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('title', 'course', 'description', 'category')
+        }),
+        ('Quiz Settings', {
+            'fields': ('random_order', 'answers_at_end', 'exam_paper', 'single_attempt', 'pass_mark', 'draft')
+        }),
+        ('Scheduling & Availability', {
+            'fields': ('available_from', 'available_until'),
+            'description': 'Set when the quiz is available to students'
+        }),
+        ('Time Limits', {
+            'fields': ('time_limit_minutes',),
+            'description': 'Leave blank for unlimited time'
+        }),
+        ('Answer Display', {
+            'fields': ('allow_review_after_submission', 'show_correct_answers_after'),
+            'description': 'Control when students can see answers'
+        }),
+    )
     # form = QuizAdminForm
     # fields = (
     #     "title",
@@ -94,8 +121,80 @@ class EssayQuestionAdmin(admin.ModelAdmin):
     filter_horizontal = ("quiz",)
 
 
+class TrueFalseQuestionAdmin(admin.ModelAdmin):
+    list_display = ("content", "correct_answer")
+    fields = (
+        "content",
+        "quiz",
+        "correct_answer",
+        "explanation",
+        "figure",
+    )
+    search_fields = ("content", "explanation")
+    filter_horizontal = ("quiz",)
+
+
+class FillInTheBlankQuestionAdmin(admin.ModelAdmin):
+    list_display = ("content", "correct_answer", "case_sensitive")
+    fields = (
+        "content",
+        "quiz",
+        "correct_answer",
+        "case_sensitive",
+        "explanation",
+        "figure",
+    )
+    search_fields = ("content", "explanation")
+    filter_horizontal = ("quiz",)
+
+
+class AssignmentSubmissionInline(admin.TabularInline):
+    model = AssignmentSubmission
+    extra = 0
+    readonly_fields = ("student", "submitted_file", "submission_date", "is_late")
+    fields = ("student", "submission_date", "grade", "feedback", "is_late")
+
+
+class AssignmentAdmin(admin.ModelAdmin):
+    list_display = ("title", "quiz", "due_date", "max_score", "is_overdue")
+    list_filter = ("due_date", "quiz__course")
+    search_fields = ("title", "description")
+    fields = (
+        "quiz",
+        "title",
+        "description",
+        "file",
+        "due_date",
+        "max_score",
+    )
+    inlines = [AssignmentSubmissionInline]
+
+
+class AssignmentSubmissionAdmin(admin.ModelAdmin):
+    list_display = ("student", "assignment", "submission_date", "grade", "is_late", "is_graded")
+    list_filter = ("submission_date", "assignment")
+    search_fields = ("student__username", "student__first_name", "student__last_name", "assignment__title")
+    readonly_fields = ("submission_date", "is_late")
+    fields = (
+        "assignment",
+        "student",
+        "submitted_file",
+        "submission_text",
+        "submission_date",
+        "grade",
+        "feedback",
+        "graded_by",
+        "graded_at",
+        "is_late",
+    )
+
+
 admin.site.register(Quiz, QuizAdmin)
 admin.site.register(MCQuestion, MCQuestionAdmin)
 admin.site.register(Progress, ProgressAdmin)
 admin.site.register(EssayQuestion, EssayQuestionAdmin)
+admin.site.register(TrueFalseQuestion, TrueFalseQuestionAdmin)
+admin.site.register(FillInTheBlankQuestion, FillInTheBlankQuestionAdmin)
+admin.site.register(Assignment, AssignmentAdmin)
+admin.site.register(AssignmentSubmission, AssignmentSubmissionAdmin)
 admin.site.register(Sitting)

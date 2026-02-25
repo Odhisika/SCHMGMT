@@ -22,6 +22,7 @@ urlpatterns = [
     
     # We still need authentication
     path("accounts/", include("accounts.urls")),
+    path("resources/", include("resources.urls")),
     path("attendance/", include("attendance.urls")),
     path("fees/", include("fees.urls")),
     

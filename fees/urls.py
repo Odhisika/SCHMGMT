@@ -34,6 +34,9 @@ urlpatterns = [
     # Payment reference lookup
     path('reference-lookup/', views.payment_reference_lookup, name='payment_reference_lookup'),
     
+    # Defaulters list
+    path('defaulters/', views.defaulters_list, name='defaulters_list'),
+    
     # PDF Receipt download
     path('payment/<int:payment_id>/receipt/', download_payment_receipt, name='download_receipt'),
     

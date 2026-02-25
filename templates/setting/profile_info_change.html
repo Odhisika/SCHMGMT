@@ -6,41 +6,170 @@
 
 {% block content %}
 
-<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb" class="mb-4">
     <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
-        <li class="breadcrumb-item active" aria-current="page">{% trans 'Account setting' %}</li>
+        <li class="breadcrumb-item"><a href="/" class="text-decoration-none text-muted">{% trans 'Home' %}</a></li>
+        <li class="breadcrumb-item active" aria-current="page">{% trans 'Account Settings' %}</li>
     </ol>
 </nav>
 
-<p class="title-1"><i class="fas fa-user-edit"></i>{% trans 'Account Settings' %}</p>
-
-{% include 'snippets/messages.html' %}
-
-<form action="" method="POST" enctype="multipart/form-data">{% csrf_token %}
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="form-title">{% trans 'Email' %} &amp; {% trans 'Personal Info' %}</div>
-                <div class="card-body">
-                    {{ form.email|as_crispy_field }}
-                    {{ form.first_name|as_crispy_field }}
-                    {{ form.last_name|as_crispy_field }}
-                    {{ form.gender|as_crispy_field }}
-                    {{ form.phone|as_crispy_field }}
-                    {{ form.address|as_crispy_field }}
-                </div>
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="d-flex align-items-center mb-4">
+            <div class="bg-primary text-white p-3 rounded-circle me-3 shadow-sm">
+                <i class="fas fa-user-gear fa-2x"></i>
+            </div>
+            <div>
+                <h1 class="h3 mb-1 fw-bold">{% trans 'Account Settings' %}</h1>
+                <p class="text-muted mb-0">{% trans 'Manage your personal information and profile preferences' %}</p>
             </div>
         </div>
-        <div class="col-md-6">
-            <div class="card">
-                <p class="form-title">{% trans 'Others' %}</p>
-                <div class="card-body">
-                    {{ form.picture|as_crispy_field }}
+
+        {% include 'snippets/messages.html' %}
+
+        <form action="" method="POST" enctype="multipart/form-data" class="needs-validation" novalidate>
+            {% csrf_token %}
+            
+            <div class="row g-4">
+                <!-- Sidebar / Navigation -->
+                <div class="col-md-3">
+                    <div class="card border-0 shadow-sm rounded-4 sticky-top" style="top: 2rem;">
+                        <div class="card-body p-1">
+                            <div class="list-group list-group-flush rounded-4">
+                                <a href="{% url 'edit_profile' %}" class="list-group-item list-group-item-action active border-0 py-3 rounded-4 mb-1">
+                                    <i class="fas fa-user-edit me-2"></i> {% trans 'General Information' %}
+                                </a>
+                                <a href="{% url 'change_password' %}" class="list-group-item list-group-item-action border-0 py-3 rounded-4 mb-1">
+                                    <i class="fas fa-lock me-2"></i> {% trans 'Security & Password' %}
+                                </a>
+                                <!-- Add more links as needed -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Content Area -->
+                <div class="col-md-9">
+                    <!-- Profile Picture Card -->
+                    <div class="card border-0 shadow-sm rounded-4 mb-4">
+                        <div class="card-header bg-white border-0 py-3">
+                            <h5 class="card-title mb-0 fw-bold">{% trans 'Profile Photo' %}</h5>
+                        </div>
+                        <div class="card-body py-4">
+                            <div class="d-flex align-items-center">
+                                <div class="position-relative me-4">
+                                    {% if request.user.picture %}
+                                        <img src="{{ request.user.picture.url }}" alt="Profile" class="rounded-circle shadow-sm" style="width: 120px; height: 120px; object-fit: cover; border: 4px solid #fff;">
+                                    {% else %}
+                                        <div class="rounded-circle shadow-sm bg-light d-flex align-items-center justify-content-center" style="width: 120px; height: 120px; border: 4px solid #fff;">
+                                            <i class="fas fa-user fa-3x text-secondary"></i>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <div class="flex-grow-1">
+                                    <p class="text-muted small mb-3">{% trans 'Upload a professional photo to help others recognize you. JPG, PNG or GIF. Max 5MB.' %}</p>
+                                    <div class="custom-file-upload">
+                                        {{ form.picture|as_crispy_field }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Personal Information Card -->
+                    <div class="card border-0 shadow-sm rounded-4 mb-4">
+                        <div class="card-header bg-white border-0 py-3">
+                            <h5 class="card-title mb-0 fw-bold">{% trans 'Personal Information' %}</h5>
+                        </div>
+                        <div class="card-body py-4">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    {{ form.first_name|as_crispy_field }}
+                                </div>
+                                <div class="col-md-6">
+                                    {{ form.last_name|as_crispy_field }}
+                                </div>
+                                <div class="col-md-6">
+                                    {{ form.email|as_crispy_field }}
+                                </div>
+                                <div class="col-md-6">
+                                    {{ form.phone|as_crispy_field }}
+                                </div>
+                                <div class="col-md-6">
+                                    {{ form.gender|as_crispy_field }}
+                                </div>
+                                <div class="col-md-6">
+                                    {{ form.department|as_crispy_field }}
+                                </div>
+                                <div class="col-12">
+                                    {{ form.address|as_crispy_field }}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-footer bg-light border-0 py-3 text-end rounded-bottom-4">
+                            <button class="btn btn-primary px-5 py-2 fw-bold shadow-sm" type="submit">
+                                <i class="fas fa-check-circle me-1"></i> {% trans 'Save Changes' %}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
+        </form>
     </div>
-    <button class="btn btn-primary" type="submit">{% trans 'Update Profile' %}</button>
-</form>
+</div>
+
+<style>
+    body {
+        background-color: #f8f9fa;
+    }
+    .card {
+        transition: all 0.3s ease;
+    }
+    .list-group-item {
+        color: #5f6368;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+    .list-group-item:hover {
+        background-color: #f1f3f4;
+        color: #1a73e8;
+    }
+    .list-group-item.active {
+        background-color: #e8f0fe !important;
+        color: #1a73e8 !important;
+        border-left: 4px solid #1a73e8 !important;
+    }
+    .form-control, .form-select {
+        border: 1px solid #dadce0;
+        border-radius: 8px;
+        padding: 0.6rem 1rem;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: #1a73e8;
+        box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.15);
+    }
+    .form-label {
+        font-weight: 600;
+        color: #3c4043;
+        margin-bottom: 0.5rem;
+    }
+    .btn-primary {
+        background-color: #1a73e8;
+        border-color: #1a73e8;
+        border-radius: 8px;
+    }
+    .btn-primary:hover {
+        background-color: #1765cc;
+        border-color: #1765cc;
+    }
+    /* Hide the ugly default crispy photo input labels/help text if needed or just refine it */
+    #div_id_picture label {
+        display: none;
+    }
+    #div_id_picture .invalid-feedback {
+        display: block;
+    }
+</style>
+
 {% endblock content %}

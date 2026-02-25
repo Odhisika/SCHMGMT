@@ -3,9 +3,6 @@
 	<div class="container">
 		<div class="nav-wrapper">
 
-			<div class="toggle-btn" onclick="toggleSidebar()">
-				<i class="fas fa-bars"></i>
-			</div>
 
 			<form class="form-header" action="{% url 'query' %}" method="GET" 
 				hx-get="{% url 'query' %}" hx-target="#main-content" hx-select="#main-content" hx-push-url="true">

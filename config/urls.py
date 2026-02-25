@@ -28,6 +28,7 @@ urlpatterns += i18n_patterns(
     path("result/", include("result.urls")),
     path("search/", include("search.urls")),
     path("quiz/", include("quiz.urls")),
+    path("resources/", include("resources.urls")),  # Course learning resources
     path("payments/", include("payments.urls")),
     path("school/", include("school.urls")),
     path("attendance/", include("attendance.urls")),  # Attendance system

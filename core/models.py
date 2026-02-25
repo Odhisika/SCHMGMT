@@ -1,6 +1,7 @@
 from django.db import models
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
+from django.conf import settings
 
 
 NEWS = _("News")
@@ -60,6 +61,37 @@ class NewsAndEvents(models.Model):
     upload_time = models.DateTimeField(auto_now=False, auto_now_add=True, null=True)
     school = models.ForeignKey("school.School", on_delete=models.CASCADE, null=True, blank=True)
 
+    # Targeted Messaging
+    target_division = models.CharField(
+        max_length=25,
+        choices=settings.DIVISION_CHOICES,
+        blank=True,
+        null=True,
+        help_text=_("Send to all users in this division (Leave empty for all divisions)")
+    )
+    
+    TARGET_ROLES = (
+        ("ALL", _("All Roles")),
+        ("TEACHERS", _("Teachers")),
+        ("STUDENTS", _("Students")),
+        ("PARENTS", _("Parents")),
+        ("SPECIFIC", _("Specific Users")),
+    )
+    
+    target_role = models.CharField(
+        max_length=20,
+        choices=TARGET_ROLES,
+        default="ALL",
+        help_text=_("Target a specific role within the division")
+    )
+    
+    specific_users = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        related_name="targeted_posts",
+        help_text=_("Send to specific individuals (Overrides division/role if 'Specific Users' role is selected)")
+    )
+
     objects = NewsAndEventsManager()
 
     def __str__(self):
@@ -70,6 +102,8 @@ class Term(models.Model):
     term = models.CharField(max_length=10, choices=TERM, blank=True)
     year = models.CharField(max_length=4, help_text="Academic year (e.g., 2024)", default="2024")
     is_current_term = models.BooleanField(default=False, blank=True, null=True)
+    start_date = models.DateField(null=True, blank=True, help_text=_("Term start date"))
+    end_date = models.DateField(null=True, blank=True, help_text=_("Term end date"))
     next_term_begins = models.DateField(null=True, blank=True)
     school = models.ForeignKey("school.School", on_delete=models.CASCADE, null=True, blank=True)
     result_released = models.BooleanField(default=False, help_text="Release results to students for this term")

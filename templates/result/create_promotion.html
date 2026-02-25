@@ -17,6 +17,18 @@
     </div>
     <div class="card-body">
         
+        <!-- Division Tabs -->
+        <ul class="nav nav-pills mb-3" id="pills-tab" role="tablist">
+            {% for division_code, division_name in divisions %}
+            <li class="nav-item" role="presentation">
+                <a class="nav-link {% if current_division == division_code %}active{% endif %}" 
+                   href="?division={{ division_code }}" role="tab">
+                    {{ division_name }}
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+
         {% if not is_third_term %}
         <div class="alert alert-warning">
             <i class="fas fa-exclamation-triangle"></i> 
@@ -26,15 +38,18 @@
         </div>
         {% endif %}
 
-        <form method="get" class="row g-3">
+        <form method="get" class="row g-3 mb-4">
+            <input type="hidden" name="division" value="{{ current_division }}">
             <div class="col-md-6">
-                <label for="level" class="form-label">{% trans 'Select Class to Promote From:' %}</label>
-                <select name="level" id="level" class="form-select" onchange="this.form.submit()">
-                    <option value="">{% trans 'Choose a level...' %}</option>
-                    {% for key, value in levels %}
-                        <option value="{{ key }}" {% if selected_level == key %}selected{% endif %}>{{ value }}</option>
-                    {% endfor %}
-                </select>
+                <div class="input-group">
+                    <span class="input-group-text bg-white"><i class="fas fa-filter"></i></span>
+                    <select name="level" id="level" class="form-select" onchange="this.form.submit()">
+                        <option value="">{% trans 'Choose a level to promote from...' %}</option>
+                        {% for key, value in levels %}
+                            <option value="{{ key }}" {% if selected_level == key %}selected{% endif %}>{{ value }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
             </div>
         </form>
 

@@ -42,7 +42,15 @@ class ProgramFilterView(FilterView):
     template_name = "course/program_list.html"
 
     def get_queryset(self):
-        return Program.objects.filter(school=self.request.school)
+        queryset = Program.objects.filter(school=self.request.school)
+        
+        # Filter by division for teachers who are not admins
+        user = self.request.user
+        if not (user.is_superuser or user.is_school_admin):
+            if user.division:
+                queryset = queryset.filter(division=user.division)
+        
+        return queryset
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -51,33 +59,63 @@ class ProgramFilterView(FilterView):
         # Import settings for level constants
         from django.conf import settings
         
+        # Determine visible divisions based on user role
+        user = self.request.user
+        is_admin = user.is_superuser or user.is_school_admin
+        user_division = user.division if hasattr(user, 'division') else None
+
+        # Helper to check visibility
+        def is_visible(division_name):
+            return is_admin or (user_division == division_name)
+
         # Get class levels grouped by division
-        context['nursery_levels'] = [
-            (settings.NURSERY_1, "Nursery 1"),
-            (settings.NURSERY_2, "Nursery 2"),
-            (settings.KG_1, "KG 1"),
-            (settings.KG_2, "KG 2"),
-        ]
+        # Only populate if visible to the user
         
-        context['primary_levels'] = [
-            (settings.PRIMARY_1, "Primary 1"),
-            (settings.PRIMARY_2, "Primary 2"),
-            (settings.PRIMARY_3, "Primary 3"),
-            (settings.PRIMARY_4, "Primary 4"),
-            (settings.PRIMARY_5, "Primary 5"),
-            (settings.PRIMARY_6, "Primary 6"),
-        ]
+        context['nursery_levels'] = []
+        if is_visible(settings.DIVISION_NURSERY):
+            context['nursery_levels'] = [
+                (settings.NURSERY_1, "Nursery 1"),
+                (settings.NURSERY_2, "Nursery 2"),
+                (settings.KG_1, "KG 1"),
+                (settings.KG_2, "KG 2"),
+            ]
         
-        context['jhs_levels'] = [
-            (settings.JHS_1, "JHS 1"),
-            (settings.JHS_2, "JHS 2"),
-            (settings.JHS_3, "JHS 3"),
-        ]
+        context['primary_levels'] = []
+        if is_visible(settings.DIVISION_PRIMARY):
+            context['primary_levels'] = [
+                (settings.PRIMARY_1, "Primary 1"),
+                (settings.PRIMARY_2, "Primary 2"),
+                (settings.PRIMARY_3, "Primary 3"),
+                (settings.PRIMARY_4, "Primary 4"),
+                (settings.PRIMARY_5, "Primary 5"),
+                (settings.PRIMARY_6, "Primary 6"),
+            ]
+        
+        context['jhs_levels'] = []
+        if is_visible(settings.DIVISION_JHS):
+            context['jhs_levels'] = [
+                (settings.JHS_1, "JHS 1"),
+                (settings.JHS_2, "JHS 2"),
+                (settings.JHS_3, "JHS 3"),
+            ]
+            
+        # Determine active tab
+        active_tab = '' 
+        if context['nursery_levels']:
+            active_tab = 'nursery'
+        elif context['primary_levels']:
+            active_tab = 'primary'
+        elif context['jhs_levels']:
+            active_tab = 'jhs'
+            
+        context['active_tab'] = active_tab
         
         # Count subjects for each level
         from course.models import Course
         level_subject_counts = {}
-        for level_code, level_name in context['nursery_levels'] + context['primary_levels'] + context['jhs_levels']:
+        all_visible_levels = context['nursery_levels'] + context['primary_levels'] + context['jhs_levels']
+        
+        for level_code, level_name in all_visible_levels:
             count = Course.objects.filter(level=level_code, school=self.request.school).count()
             level_subject_counts[level_code] = count
         

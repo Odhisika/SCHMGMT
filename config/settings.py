@@ -70,6 +70,7 @@ PROJECT_APPS = [
     "fees.apps.FeesConfig",  # Fee management & payment system
     "timetable.apps.TimetableConfig",
     "superadmin.apps.SuperadminConfig",  # Super Admin Portal
+    "resources.apps.ResourcesConfig",  # Course learning resources (files, videos)
 ]
 
 # Combine all apps

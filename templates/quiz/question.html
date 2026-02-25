@@ -1,7 +1,6 @@
 {% extends "base.html" %}
 {% load i18n%}
 
-
 {% block title %} {{ quiz.title }} | {% trans 'Learning management system' %} {% endblock %}
 {% block description %} {{ quiz.title }} - {{ quiz.description }} {% endblock %}
 
@@ -18,160 +17,285 @@
 	</ol>
 </nav>
 
-<div class="title-1">{{ quiz.title|title|truncatechars:25 }}</div>
-<br>
+<div class="container-fluid">
+	<div class="row">
+		<!-- Main Quiz Area -->
+		<div class="col-lg-9">
+			<div class="card mb-3">
+				<div class="card-header d-flex justify-content-between align-items-center">
+					<h5 class="mb-0">{{ quiz.title|title }}</h5>
+					{% if show_timer %}
+					<div id="timer-display" class="badge bg-danger fs-6 px-3 py-2">
+						<i class="fas fa-clock me-1"></i>
+						<span id="timer-minutes">--</span>:<span id="timer-seconds">--</span>
+					</div>
+					{% endif %}
+				</div>
+				<div class="card-body">
+					{% if progress %}
+					<div class="mb-3">
+						<small class="text-muted">{% trans "Question" %} {{ progress.0|add:1 }} {% trans "of" %} {{ progress.1 }}</small>
+						<div class="progress" style="height: 5px;">
+							<div class="progress-bar" role="progressbar" style="width: {% widthratio progress.0 progress.1 100 %}%"></div>
+						</div>
+					</div>
+					{% endif %}
 
-<div class="container">
+					{% if question %}
+					<div class="question-content">
+						<h4 class="mb-4">{{ question.content }}</h4>
 
-	{% if previous.answers %}
+						{% if question.figure %}
+						<div class="text-center mb-4">
+							<img src="{{ question.figure.url }}" alt="{{ question.content }}" class="img-fluid rounded" style="max-width: 600px;"/>
+						</div>
+						{% endif %}
 
-	<p class="muted"><small>{% trans "The previous question" %}:</small></p>
-	<p>{{ previous.previous_question }}</p>
+						<form id="quiz-form" method="POST">{% csrf_token %}
+							<input type="hidden" name="question_id" value="{{ question.id }}">
 
-	{% if previous.previous_outcome %}
-		<div class="alert alert-success">
-	{% else %}
-		<div class="alert alert-warning">
-	{% endif %}
-		<p class="mb-0"><small>
-			{% trans "Your answer was" %} </small>
-			<strong>
-			{{ previous.previous_outcome|yesno:"correct,incorrect" }}
-			</strong>
-		</p>
+							<div class="answer-choices">
+								{% for answer in form.answers %}
+								<div class="form-check answer-option mb-3">
+									{{ answer }}
+								</div>
+								{% endfor %}
+							</div>
 
+							<div class="d-flex justify-content-between mt-4">
+								<button type="button" class="btn btn-outline-secondary" disabled>
+									<i class="fas fa-arrow-left me-1"></i> {% trans "Previous" %}
+								</button>
+								<button type="submit" class="btn btn-primary btn-lg">
+									{% trans "Submit Answer" %} <i class="fas fa-arrow-right ms-1"></i>
+								</button>
+							</div>
+						</form>
+					</div>
+					{% endif %}
+				</div>
+			</div>
+
+			<!-- Previous Answer Feedback -->
+			{% if previous.answers %}
+			<div class="card mb-3">
+				<div class="card-header {% if previous.previous_outcome %}bg-success text-white{% else %}bg-warning{% endif %}">
+					<i class="fas {% if previous.previous_outcome %}fa-check-circle{% else %}fa-times-circle{% endif %} me-2"></i>
+					{% trans "Previous Question" %}: {{ previous.previous_outcome|yesno:"Correct,Incorrect" }}
+				</div>
+				<div class="card-body">
+					<p class="fw-bold">{{ previous.previous_question }}</p>
+					
+					{% if previous.answers %}
+					<table class="table table-sm">
+						<tbody>
+							{% for answer in previous.answers %}
+							{% if answer.correct %}
+							<tr class="table-success">
+								<td>{{ answer }}</td>
+								<td class="text-end"><i class="fas fa-check text-success"></i> {% trans "Correct Answer" %}</td>
+							</tr>
+							{% else %}
+							<tr>
+								<td>{{ answer }}</td>
+								<td class="text-end">
+									{% if previous.question_type.MCQuestion %}
+										{% if answer.id|add:"0" == previous.previous_answer|add:"0" %}
+											<i class="fas fa-times text-danger"></i> {% trans "Your Answer" %}
+										{% endif %}
+									{% endif %}
+								</td>
+							</tr>
+							{% endif %}
+							{% endfor %}
+						</tbody>
+					</table>
+					{% endif %}
+
+					{% if previous.previous_question.explanation %}
+					<div class="alert alert-info mt-3">
+						<strong>{% trans "Explanation" %}:</strong> {{ previous.previous_question.explanation }}
+					</div>
+					{% endif %}
+				</div>
+			</div>
+			{% endif %}
 		</div>
-		
-        {% load i18n %}
-        {% if previous.answers %}
-          <table class="table table-striped table-bordered">
-            <tbody>
-              {% for answer in previous.answers %}
-                {% if answer.correct %}
-                  <tr class="success">
-                    <td>{{ answer }}</td>
-                  <td class="text-success"><strong>{% trans "This is the correct answer" %}</strong></td>
-				  </tr>
-                {% else %}
-                  <tr>
-                    <td>{{ answer }}</td>
-                    <td>
-                    {% if previous.question_type.MCQuestion %}
-                      {% if answer.id|add:"0" == previous.previous_answer|add:"0" %}
-                        {% trans "This was your answer." %}
-                      {% endif %}
-                    {% endif %}
-                    </td>
-                  {% endif %}
-                  </tr>
-              {% endfor %}
-            </tbody>
-          </table>
 
-          {% if user_was_incorrect %}
-            <div class="text-danger">
-              <strong>{% trans "You answered the above question incorrectly" %}</strong>
-            </div>
-          {% endif %}
+		<!-- Sidebar: Question Palette & Info -->
+		<div class="col-lg-3">
+			<div class="card sticky-top" style="top: 20px;">
+				<div class="card-header">
+					<h6 class="mb-0">{% trans "Quiz Info" %}</h6>
+				</div>
+				<div class="card-body">
+					<p class="mb-2"><small class="text-muted">{% trans "Category" %}:</small></p>
+					<p class="mb-3"><span class="badge bg-primary">{{ quiz.category|title }}</span></p>
 
-        {% endif %}
-		
+					{% if quiz.time_limit_minutes %}
+					<p class="mb-2"><small class="text-muted">{% trans "Time Limit" %}:</small></p>
+					<p class="mb-3">{{ quiz.time_limit_minutes }} {% trans "minutes" %}</p>
+					{% endif %}
 
-        <p><strong>{% trans "Explanation" %}:</strong></p>
-        <p class="p-2" style="background-color: #fcf8e3;">
-          {% if previous.previous_question.explanation %}
-            {{ previous.previous_question.explanation }}
-          {% else %}
-            {% trans "No explanation set to this question." %}
-          {% endif %}
-		</p>
-		
-		<!-- <p><strong>{% trans "Explanation" %}:</strong></p>
-		<div class="well " style="background-color: #fcf8e3;">
-		<p>{{ previous.previous_question.explanation }}</p>
-		</div> -->
+					{% if quiz.single_attempt %}
+					<div class="alert alert-warning small">
+						<i class="fas fa-exclamation-triangle me-1"></i> {% trans "Single attempt only" %}
+					</div>
+					{% endif %}
 
-		<hr>
-
-	{% endif %}
-
-	<br />
-
-	{% if question %}
-
-	{% if progress.0|add:1 == 1 %}
-
-	<div class="modal fade show" id="instractionModal" tabindex="-1" aria-labelledby="instractionModalLabel" aria-hidden="true">
-		<div class="modal-dialog">
-		  <div class="modal-content">
-			<div class="modal-header">
-			  <h1 class="modal-title fs-5" id="instractionModalLabel">{% trans 'Quiz instractions' %}</h1>
-			  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+					<!-- Question Palette (Future Enhancement)
+					<hr>
+					<p class="mb-2"><small class="text-muted">{% trans "Questions" %}:</small></p>
+					<div class="question-palette">
+						<div class="d-grid gap-2" style="grid-template-columns: repeat(5, 1fr);">
+							{% for i in "12345678901234567890"|make_list %}
+							<button class="btn btn-sm btn-outline-secondary">{{ forloop.counter }}</button>
+							{% endfor %}
+						</div>
+					</div>
+					-->
+				</div>
 			</div>
-			<div class="modal-body">
-				{% blocktrans %} 
-				You can't go back to the previous question after you submit it, 
-				so double check your answer before proceeding to the next one!
-				{% endblocktrans %}
-			</div>
-			<div class="modal-footer">
-			  <button type="button" class="btn btn-primary" data-bs-dismiss="modal">{% trans 'Understood' %}</button>
-			</div>
-		  </div>
 		</div>
-	  </div>
-	{% endif %}
-
-	{% if progress %}
-	<div class="text-light rounded small px-2 bg-danger" style="float: right;">
-	{% trans "Question" %} {{ progress.0|add:1 }} {% trans "of" %} {{ progress.1 }}
 	</div>
-	{% endif %}
-
-	<p>
-		<small class="muted">{% trans "Quiz category" %}:</small>
-		<strong>{{ quiz.category }}</strong>
-	</p>
-
-	<div class="card">
-		<div class="lead p-2">{{ question.content }}</div>
-
-		{% if question.figure %}
-		<div class="col-md-8 mx-auto">
-			<img class="q-img" src="{{ question.figure.url }}" alt="{{ question.content }}" style="max-width: 100%;"/>
-		</div>
-		{% endif %}
-		<div class="card-subtitle p-4">
-			<form action="" method="POST">{% csrf_token %}
-				<input type="hidden" name="question_id" value="{{ question.id }}">
-
-				<ul class="list-group">
-
-					{% for answer in form.answers %}
-					<li class="list-group-item">
-						{{ answer }}
-					</li>
-					{% endfor %}
-
-				</ul>
-				<br>
-				<input type="submit" value="Check" class="btn btn-large btn-block btn-primary" />
-				<!-- <input type="submit" value={% trans "Previous" %} class="btn btn-large btn-block btn-outline-primary" > -->
-			</form>
-		</div>
-
-		{% endif %}
-	</div>
-
 </div>
 
 {% endblock %}
 
 {% block js %}
+{% if show_timer %}
 <script>
-	const instractionModal = new bootstrap.Modal('#instractionModal', {
-		keyboard: false
-	})
-	instractionModal.show();
+	// Timer initialized from server - always a positive number for new sittings
+	let timeRemaining = {{ time_remaining_seconds|default:0 }};
+	const timerDisplay = document.getElementById('timer-display');
+	const timerMinutes = document.getElementById('timer-minutes');
+	const timerSeconds = document.getElementById('timer-seconds');
+
+	function updateTimer() {
+		if (timeRemaining < 0) timeRemaining = 0;
+
+		const minutes = Math.floor(timeRemaining / 60);
+		const seconds = timeRemaining % 60;
+		
+		timerMinutes.textContent = minutes.toString().padStart(2, '0');
+		timerSeconds.textContent = seconds.toString().padStart(2, '0');
+
+		// At 5 minutes → turn orange
+		if (timeRemaining <= 300 && timeRemaining > 60) {
+			timerDisplay.classList.remove('bg-danger');
+			timerDisplay.classList.add('bg-warning', 'text-dark');
+		}
+		
+		// At 1 minute → back to red + pulse
+		if (timeRemaining <= 60) {
+			timerDisplay.classList.remove('bg-warning', 'text-dark');
+			timerDisplay.classList.add('bg-danger', 'pulse');
+		}
+		
+		// Time up — auto-submit
+		if (timeRemaining <= 0) {
+			clearInterval(timerInterval);
+			timerDisplay.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i> TIME UP';
+			setTimeout(function() {
+				document.getElementById('quiz-form').submit();
+			}, 1500);
+			return;
+		}
+		
+		timeRemaining--;
+	}
+	
+	// Run immediately so display shows right away
+	updateTimer();
+	const timerInterval = setInterval(updateTimer, 1000);
+	
+	// Warn on page close
+	window.addEventListener('beforeunload', function (e) {
+		e.preventDefault();
+		e.returnValue = '';
+	});
 </script>
+
+<style>
+	@keyframes pulse {
+		0%, 100% { opacity: 1; transform: scale(1); }
+		50% { opacity: 0.85; transform: scale(1.03); }
+	}
+	.pulse {
+		animation: pulse 0.8s infinite;
+	}
+</style>
+{% endif %}
+
+{% if progress.0|add:1 == 1 %}
+<script>
+	// Show instruction modal on first question
+	const instructionModal = new bootstrap.Modal(document.getElementById('instructionModal'), {
+		keyboard: false
+	});
+	
+	// Auto-show modal
+	window.addEventListener('load', function() {
+		instructionModal.show();
+	});
+</script>
+
+<!-- Instructions Modal -->
+<div class="modal fade" id="instructionModal" tabindex="-1" aria-labelledby="instructionModalLabel" aria-hidden="true">
+	<div class="modal-dialog">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title" id="instructionModalLabel">{% trans 'Quiz Instructions' %}</h5>
+				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+			</div>
+			<div class="modal-body">
+				<ul>
+					{% if quiz.time_limit_minutes %}
+					<li>{% blocktrans with time=quiz.time_limit_minutes %}This quiz has a time limit of {{ time }} minutes.{% endblocktrans %}</li>
+					<li>{% trans "The timer will countdown automatically." %}</li>
+					<li>{% trans "Your quiz will be auto-submitted when time expires." %}</li>
+					{% endif %}
+					{% if not quiz.answers_at_end %}
+					<li>{% trans "You can't go back to previous questions after submitting." %}</li>
+					<li>{% trans "Double-check your answers before submitting!" %}</li>
+					{% endif %}
+					{% if quiz.single_attempt %}
+					<li><strong>{% trans "You only get ONE attempt at this quiz." %}</strong></li>
+					{% endif %}
+				</ul>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn btn-primary" data-bs-dismiss="modal">{% trans 'I Understand - Start Quiz' %}</button>
+			</div>
+		</div>
+	</div>
+</div>
+{% endif %}
+
+<style>
+	.answer-option label {
+		display: block;
+		padding: 15px;
+		border: 2px solid #e0e0e0;
+		border-radius: 8px;
+		cursor: pointer;
+		transition: all 0.2s;
+	}
+	
+	.answer-option:hover label {
+		border-color: #007bff;
+		background-color: #f8f9fa;
+	}
+	
+	.answer-option input[type="radio"]:checked + label,
+	.answer-option input[type="radio"]:checked ~ label {
+		border-color: #007bff;
+		background-color: #e7f3ff;
+		font-weight: 500;
+	}
+	
+	.sticky-top {
+		position: sticky;
+	}
+</style>
 {% endblock js %}

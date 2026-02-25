@@ -74,28 +74,51 @@
     </div>
     <div class="card-body-clean">
         {% if recent_sessions %}
-        <table class="table-clean">
-            <thead>
-                <tr>
-                    <th>{% trans 'Date' %}</th>
-                    <th>{% trans 'Class' %}</th>
-                    <th>{% trans 'Present' %}</th>
-                    <th>{% trans 'Absent' %}</th>
-                    <th>{% trans 'Marked By' %}</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for session in recent_sessions %}
-                <tr>
-                    <td>{{ session.date }}</td>
-                    <td>{{ session }}</td>
-                    <td><span class="badge-success">{{ session.present_count }}</span></td>
-                    <td><span class="badge-danger">{{ session.absent_count }}</span></td>
-                    <td>{{ session.marked_by.get_full_name }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <div class="table-responsive table-shadow">
+            <table class="table table-bordered table-striped table-hover mb-0">
+                <thead class="bg-light">
+                    <tr>
+                        <th class="text-center">#</th>
+                        <th>{% trans 'Date' %}</th>
+                        <th>{% trans 'Class' %}</th>
+                        <th class="text-center">{% trans 'Present' %}</th>
+                        <th class="text-center">{% trans 'Absent' %}</th>
+                        <th>{% trans 'Marked By' %}</th>
+                        <th class="text-center">{% trans 'Actions' %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for session in recent_sessions %}
+                    <tr>
+                        <td class="text-center">{{ forloop.counter }}</td>
+                        <td>{{ session.date|date:"M d, Y" }}</td>
+                        <td>
+                            <div style="font-weight: 500;">{{ session }}</div>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge-clean badge-success" style="min-width: 40px;">{{ session.present_count }}</span>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge-clean badge-danger" style="min-width: 40px;">{{ session.absent_count }}</span>
+                        </td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="avatar-sm me-2 bg-light rounded-circle d-flex align-items-center justify-content-center" style="width: 30px; height: 30px;">
+                                    <i class="fas fa-user-edit text-secondary" style="font-size: 12px;"></i>
+                                </div>
+                                <span>{{ session.marked_by.get_full_name }}</span>
+                            </div>
+                        </td>
+                        <td class="text-center">
+                            <a href="{% url 'attendance:mark_attendance' level=session.level %}?date={{ session.date|date:'Y-m-d' }}" class="btn btn-sm btn-outline-clean" title="{% trans 'View/Edit Session' %}">
+                                <i class="fas fa-eye text-primary"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
         {% else %}
         <div class="empty-state">
             <div class="empty-state-icon"><i class="fas fa-clipboard"></i></div>

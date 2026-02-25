@@ -1,0 +1,187 @@
+{% extends 'base.html' %}
+{% load i18n static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/clean-ui.css' %}">
+<style>
+    .status-badge {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    .status-paid { background: #e6f4ea; color: #1e8e3e; }
+    .status-partial { background: #fef7e0; color: #f9ab00; }
+    .status-owing { background: #fce8e6; color: #d93025; }
+    
+    .filter-section {
+        background: white;
+        padding: 20px;
+        border-radius: 12px;
+        margin-bottom: 24px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    /* Modern 3D Buttons Styling */
+    .btn-3d {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 20px;
+        border-radius: 12px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.2s ease;
+        border: none;
+        cursor: pointer;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
+        transform: translateY(0);
+    }
+    
+    .btn-3d:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 7px 14px rgba(0, 0, 0, 0.1), 0 3px 6px rgba(0, 0, 0, 0.08);
+    }
+    
+    .btn-3d:active {
+        transform: translateY(1px);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .btn-3d-info { background-color: #00bcd4; color: white; }
+    .btn-3d-success { background-color: #34a853; color: white; }
+</style>
+{% endblock %}
+
+{% block title %}{% trans 'Defaulters List' %} | {{ block.super }}{% endblock %}
+
+{% block content %}
+<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'fees:dashboard' %}">{% trans 'Payments' %}</a></li>
+        <li class="breadcrumb-item active">{% trans 'Fee Status' %}</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="title-1 mb-0"><i class="fas fa-user-times"></i> {% trans 'Fee Defaulters & Payments' %}</div>
+    <div class="text-muted small">{% trans 'Term' %}: <strong>{{ current_term }}</strong></div>
+</div>
+
+{% include 'snippets/messages.html' %}
+
+<!-- Division Tabs -->
+<ul class="nav nav-pills mb-4" id="pills-tab" role="tablist">
+    {% for division_code, division_name in divisions %}
+    <li class="nav-item" role="presentation">
+        <a class="nav-link {% if current_division == division_code %}active{% endif %}" 
+           href="?division={{ division_code }}{% if status_filter %}&status={{ status_filter }}{% endif %}" role="tab">
+            {{ division_name }}
+        </a>
+    </li>
+    {% endfor %}
+</ul>
+
+<!-- Filters -->
+<div class="filter-section">
+    <form method="get" class="row g-3 align-items-center">
+        <input type="hidden" name="division" value="{{ current_division }}">
+        
+        <div class="col-md-4">
+            <label class="form-label small fw-bold">{% trans 'Filter by Level' %}</label>
+            <select name="level" class="form-select" onchange="this.form.submit()">
+                <option value="">{% trans 'All Levels' %}</option>
+                {% for code, name in division_levels %}
+                <option value="{{ code }}" {% if selected_level == code %}selected{% endif %}>{{ name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="col-md-4">
+            <label class="form-label small fw-bold">{% trans 'Filter by Status' %}</label>
+            <select name="status" class="form-select" onchange="this.form.submit()">
+                <option value="">{% trans 'All Statuses' %}</option>
+                <option value="paid" {% if status_filter == 'paid' %}selected{% endif %}>{% trans 'Fully Paid' %}</option>
+                <option value="partial" {% if status_filter == 'partial' %}selected{% endif %}>{% trans 'Partially Paid' %}</option>
+                <option value="owing" {% if status_filter == 'owing' %}selected{% endif %}>{% trans 'Not Paid' %}</option>
+            </select>
+        </div>
+        
+        <div class="col-md-4 d-flex align-items-end">
+            <button type="submit" class="btn btn-primary w-100">
+                <i class="fas fa-search me-2"></i> {% trans 'Filter Students' %}
+            </button>
+        </div>
+    </form>
+</div>
+
+<div class="card p-0 shadow-sm border-0">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="bg-light">
+                <tr>
+                    <th class="ps-4">{% trans 'Student' %}</th>
+                    <th>{% trans 'Level' %}</th>
+                    <th>{% trans 'Total Fees' %}</th>
+                    <th>{% trans 'Amount Paid' %}</th>
+                    <th>{% trans 'Balance' %}</th>
+                    <th>{% trans 'Status' %}</th>
+                    <th class="text-end pe-4">{% trans 'Actions' %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in student_data %}
+                <tr>
+                    <td class="ps-4">
+                        <div class="d-flex align-items-center">
+                            <div class="avatar-sm me-3 bg-light rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                                <i class="fas fa-user text-secondary"></i>
+                            </div>
+                            <div>
+                                <div class="fw-bold">{{ item.student.student.get_full_name }}</div>
+                                <div class="text-muted small">{{ item.student.student.username }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>{{ item.student.level }}</td>
+                    <td>{{ settings.CURRENCY_SYMBOL }}{{ item.total_fees|floatformat:2 }}</td>
+                    <td class="text-success fw-bold">{{ settings.CURRENCY_SYMBOL }}{{ item.total_paid|floatformat:2 }}</td>
+                    <td class="{% if item.balance > 0 %}text-danger{% endif %} fw-bold">
+                        {{ settings.CURRENCY_SYMBOL }}{{ item.balance|floatformat:2 }}
+                    </td>
+                    <td>
+                        <span class="status-badge status-{{ item.status|lower }}">
+                            {% if item.status == 'PAID' %}{% trans 'Fully Paid' %}
+                            {% elif item.status == 'PARTIAL' %}{% trans 'Partial' %}
+                            {% else %}{% trans 'Owing' %}{% endif %}
+                        </span>
+                    </td>
+                    <td class="text-end pe-4">
+                        <div class="d-flex justify-content-end gap-2">
+                            <a href="{% url 'fees:payment_history' item.student.id %}" class="btn-3d btn-3d-info" style="padding: 8px 12px;" title="{% trans 'Payment History' %}">
+                                <i class="fas fa-history"></i>
+                            </a>
+                            <a href="{% url 'fees:record_payment_student' student_id=item.student.id %}" class="btn-3d btn-3d-success" style="padding: 8px 12px;" title="{% trans 'Record Payment' %}">
+                                <i class="fas fa-plus"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center py-5">
+                        <div class="text-muted">
+                            <i class="fas fa-search mb-3" style="font-size: 40px;"></i>
+                            <p>{% trans 'No students found matching the selected filters.' %}</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

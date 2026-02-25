@@ -56,34 +56,73 @@
     
     <!-- Roster Tab -->
     <div class="tab-pane fade show active" id="roster" role="tabpanel" aria-labelledby="roster-tab">
-        <div class="row">
-            {% for student in students %}
-            <div class="col-6 col-md-3 mb-3">
-                <a href="{% url 'profile_single' student.student.id %}" style="text-decoration: none;">
-                    <div class="card-clean p-3 text-center h-100 d-flex flex-column align-items-center justify-content-center shadow-sm" style="margin-bottom: 0; min-height: 100px; transition: transform 0.2s; border: 1px solid #f1f3f4;">
-                        {% if student.student.picture %}
-                        <img src="{{ student.student.picture.url }}" class="rounded-circle mb-2" width="40" height="40" alt="" style="object-fit: cover; border: 2px solid #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                        {% else %}
-                        <div class="rounded-circle mb-2 bg-light d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; border: 2px solid #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                            <i class="fas fa-user text-muted"></i>
-                        </div>
-                        {% endif %}
-                        <h6 class="m-0 text-dark fw-bold">{{ student.student.get_full_name }}</h6>
-                        <small class="badge bg-light text-muted mt-2">{{ student.student.username }}</small>
-                    </div>
-                </a>
-            </div>
-            {% empty %}
-            <div class="col-12 text-center py-5">
-                <div class="empty-state">
-                    <div class="empty-state-icon"><i class="fas fa-users-slash"></i></div>
-                    <h5 class="text-muted">{% trans 'No students found in' %} {{ level_name }}</h5>
-                    {% if request.user.is_superuser or request.user.is_school_admin %}
-                    <a href="{% url 'add_student' %}?level={{ level_code }}" class="btn-outline-clean mt-2 d-inline-block">{% trans 'Register First Student' %}</a>
-                    {% endif %}
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="ps-4">#</th>
+                                <th>{% trans 'Photo' %}</th>
+                                <th>{% trans 'Full Name' %}</th>
+                                <th>{% trans 'ID Number' %}</th>
+                                <th>{% trans 'Program' %}</th>
+                                <th>{% trans 'Gender' %}</th>
+                                <th class="text-center">{% trans 'Actions' %}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for student in students %}
+                            <tr>
+                                <td class="ps-4 text-muted">{{ forloop.counter }}</td>
+                                <td>
+                                    {% if student.student.picture %}
+                                    <img src="{{ student.student.picture.url }}" class="rounded-circle" width="40" height="40" alt="" style="object-fit: cover; border: 1px solid #eee;">
+                                    {% else %}
+                                    <div class="rounded-circle bg-light d-flex align-items-center justify-content-center text-muted" style="width: 40px; height: 40px; border: 1px solid #eee;">
+                                        <i class="fas fa-user"></i>
+                                    </div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="fw-bold text-dark">{{ student.student.get_full_name }}</div>
+                                </td>
+                                <td><span class="badge bg-light text-muted fw-normal">{{ student.student.username }}</span></td>
+                                <td>{{ student.program }}</td>
+                                <td>{{ student.student.get_gender_display }}</td>
+                                <td class="text-center">
+                                    <div class="btn-group">
+                                        <a href="{% url 'profile_single' student.student.id %}" class="btn btn-sm btn-outline-clean me-1" title="{% trans 'View Profile' %}">
+                                            <i class="fas fa-eye text-primary"></i>
+                                        </a>
+                                        {% if request.user.is_superuser or request.user.is_school_admin %}
+                                        <a href="{% url 'student_edit' student.student.id %}" class="btn btn-sm btn-outline-clean me-1" title="{% trans 'Edit' %}">
+                                            <i class="fas fa-edit text-warning"></i>
+                                        </a>
+                                        <a href="{% url 'student_delete' student.student.id %}" class="btn btn-sm btn-outline-clean" title="{% trans 'Delete' %}">
+                                            <i class="fas fa-trash text-danger"></i>
+                                        </a>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="7" class="text-center py-5">
+                                    <div class="empty-state">
+                                        <div class="empty-state-icon"><i class="fas fa-users-slash"></i></div>
+                                        <h5 class="text-muted">{% trans 'No students found in' %} {{ level_name }}</h5>
+                                        {% if request.user.is_superuser or request.user.is_school_admin %}
+                                        <a href="{% url 'add_student' %}?level={{ level_code }}" class="btn-outline-clean mt-2 d-inline-block">{% trans 'Register First Student' %}</a>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
             </div>
-            {% endfor %}
         </div>
     </div>
 

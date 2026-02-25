@@ -92,13 +92,34 @@ class PaymentReceiptGenerator:
     def _build_header(self):
         """Build school header"""
         elements = []
+        import os
+        
+        school = self.payment.school
+        
+        # Add school logo if available
+        if getattr(school, 'logo', None) and school.logo:
+            try:
+                logo_path = school.logo.path
+                if os.path.exists(logo_path):
+                    img = Image(logo_path, width=1.5*inch, height=1.5*inch)
+                    img.hAlign = 'CENTER'
+                    elements.append(img)
+                    elements.append(Spacer(1, 0.1*inch))
+            except Exception:
+                pass
         
         # School name
-        school_name = self.payment.school.name
+        school_name = school.name
         elements.append(Paragraph(school_name, self.styles['SchoolHeader']))
         
-        # School address if available
-        if hasattr(self.payment.school, 'address') and self.payment.school.address:
+        # School address and contact info if available
+        contact_info = []
+        if getattr(school, 'address', None) and school.address:
+            contact_info.append(school.address)
+        if getattr(school, 'phone', None) and school.phone:
+            contact_info.append(school.phone)
+            
+        if contact_info:
             address_style = ParagraphStyle(
                 'Address',
                 parent=self.styles['Normal'],
@@ -106,7 +127,7 @@ class PaymentReceiptGenerator:
                 textColor=colors.HexColor('#5f6368'),
                 alignment=TA_CENTER
             )
-            elements.append(Paragraph(self.payment.school.address, address_style))
+            elements.append(Paragraph(" | ".join(contact_info), address_style))
         
         return elements
     

@@ -52,7 +52,7 @@ def class_level_detail(request, level_code):
     allocations = CourseAllocation.objects.filter(
         courses__in=courses,
         teacher__school=request.school
-    ).select_related('teacher').prefetch_related('courses')
+    ).select_related('teacher').prefetch_related('courses').distinct()
     
     # Build a mapping of course -> teachers
     course_teachers = {}
@@ -60,7 +60,8 @@ def class_level_detail(request, level_code):
         for course in allocation.courses.all():
             if course.id not in course_teachers:
                 course_teachers[course.id] = []
-            course_teachers[course.id].append(allocation.teacher)
+            if allocation.teacher not in course_teachers[course.id]:
+                course_teachers[course.id].append(allocation.teacher)
     
     # Get teachers in this division for assignment
     division_teachers = User.objects.filter(

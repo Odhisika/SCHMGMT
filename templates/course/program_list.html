@@ -26,31 +26,37 @@
 
 <!-- Division Tabs -->
 <ul class="nav nav-tabs mt-4" id="divisionTab" role="tablist">
+    {% if nursery_levels %}
     <li class="nav-item" role="presentation">
-      <button class="nav-link active" id="nursery-tab" data-bs-toggle="tab" data-bs-target="#nursery" type="button" role="tab" aria-controls="nursery" aria-selected="true">
+      <button class="nav-link {% if active_tab == 'nursery' %}active{% endif %}" id="nursery-tab" data-bs-toggle="tab" data-bs-target="#nursery" type="button" role="tab" aria-controls="nursery" aria-selected="{% if active_tab == 'nursery' %}true{% else %}false{% endif %}">
         <i class="fas fa-baby me-2"></i>{% trans 'Nursery/Pre-School' %}
       </button>
     </li>
+    {% endif %}
+    
+    {% if primary_levels %}
     <li class="nav-item" role="presentation">
-      <button class="nav-link" id="primary-tab" data-bs-toggle="tab" data-bs-target="#primary" type="button" role="tab" aria-controls="primary" aria-selected="false">
+      <button class="nav-link {% if active_tab == 'primary' %}active{% endif %}" id="primary-tab" data-bs-toggle="tab" data-bs-target="#primary" type="button" role="tab" aria-controls="primary" aria-selected="{% if active_tab == 'primary' %}true{% else %}false{% endif %}">
         <i class="fas fa-child me-2"></i>{% trans 'Primary School' %}
       </button>
     </li>
+    {% endif %}
+    
+    {% if jhs_levels %}
     <li class="nav-item" role="presentation">
-      <button class="nav-link" id="jhs-tab" data-bs-toggle="tab" data-bs-target="#jhs" type="button" role="tab" aria-controls="jhs" aria-selected="false">
+      <button class="nav-link {% if active_tab == 'jhs' %}active{% endif %}" id="jhs-tab" data-bs-toggle="tab" data-bs-target="#jhs" type="button" role="tab" aria-controls="jhs" aria-selected="{% if active_tab == 'jhs' %}true{% else %}false{% endif %}">
         <i class="fas fa-user-graduate me-2"></i>{% trans 'JHS' %}
       </button>
     </li>
-    <li class="nav-item" role="presentation">
-      <button class="nav-link" id="other-tab" data-bs-toggle="tab" data-bs-target="#other" type="button" role="tab" aria-controls="other" aria-selected="false">
-        <i class="fas fa-book me-2"></i>{% trans 'Others' %}
-      </button>
-    </li>
+    {% endif %}
+    
+
 </ul>
 
 <div class="tab-content" id="divisionTabContent">
     <!-- Nursery Tab -->
-    <div class="tab-pane fade show active" id="nursery" role="tabpanel" aria-labelledby="nursery-tab">
+    <!-- Nursery Tab -->
+    <div class="tab-pane fade {% if active_tab == 'nursery' %}show active{% endif %}" id="nursery" role="tabpanel" aria-labelledby="nursery-tab">
         <div class="row mt-4">
             {% for level_code, level_name in nursery_levels %}
             <div class="col-md-3 col-sm-6 mb-3">
@@ -71,7 +77,8 @@
     </div>
 
     <!-- Primary Tab -->
-    <div class="tab-pane fade" id="primary" role="tabpanel" aria-labelledby="primary-tab">
+    <!-- Primary Tab -->
+    <div class="tab-pane fade {% if active_tab == 'primary' %}show active{% endif %}" id="primary" role="tabpanel" aria-labelledby="primary-tab">
         <div class="row mt-4">
             {% for level_code, level_name in primary_levels %}
             <div class="col-md-3 col-sm-6 mb-3">
@@ -92,7 +99,8 @@
     </div>
 
     <!-- JHS Tab -->
-    <div class="tab-pane fade" id="jhs" role="tabpanel" aria-labelledby="jhs-tab">
+    <!-- JHS Tab -->
+    <div class="tab-pane fade {% if active_tab == 'jhs' %}show active{% endif %}" id="jhs" role="tabpanel" aria-labelledby="jhs-tab">
         <div class="row mt-4">
             {% for level_code, level_name in jhs_levels %}
             <div class="col-md-3 col-sm-6 mb-3">
@@ -112,13 +120,6 @@
         </div>
     </div>
 
-    <!-- Others Tab (for programs not tied to specific levels) -->
-    <div class="tab-pane fade" id="other" role="tabpanel" aria-labelledby="other-tab">
-        <div class="alert alert-info mt-4">
-            <i class="fas fa-info-circle me-2"></i>
-            {% trans 'Other programs and departments that are not tied to specific class levels.' %}
-        </div>
-        {% include 'course/snippets/program_table.html' with programs=filter.qs division='Other' %}
-    </div>
+
 </div>
 {% endblock content %}

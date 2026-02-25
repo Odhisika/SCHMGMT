@@ -1,0 +1,134 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans 'Quiz Results' %}: {{ quiz.title }}{% endblock %}
+
+{% block content %}
+
+<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
+        <li class="breadcrumb-item"><a href="{{ course.get_absolute_url }}">{{ course }}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'quiz_index' course.slug %}">{% trans 'Quizzes' %}</a></li>
+        <li class="breadcrumb-item active">{% trans 'Results' %}</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-start mb-4">
+    <div>
+        <h2 class="mb-1">{{ quiz.title|title }}</h2>
+        <p class="text-muted mb-0">{{ course }} &bull; {{ quiz.get_questions.count }} {% trans 'questions' %} &bull; {% trans 'Pass mark' %}: {{ quiz.pass_mark }}%</p>
+    </div>
+    <a href="{% url 'quiz_index' course.slug %}" class="btn btn-light btn-sm">
+        <i class="fas fa-arrow-left me-1"></i>{% trans 'Back' %}
+    </a>
+</div>
+
+<!-- Summary Stats -->
+<div class="row g-3 mb-4">
+    <div class="col-sm-4">
+        <div class="card border-0 shadow-sm text-center py-3">
+            <div class="fs-2 fw-bold text-primary">{{ total_students }}</div>
+            <div class="text-muted small">{% trans 'Students Attempted' %}</div>
+        </div>
+    </div>
+    <div class="col-sm-4">
+        <div class="card border-0 shadow-sm text-center py-3">
+            <div class="fs-2 fw-bold text-success">{{ passed_count }}</div>
+            <div class="text-muted small">{% trans 'Passed' %}</div>
+        </div>
+    </div>
+    <div class="col-sm-4">
+        <div class="card border-0 shadow-sm text-center py-3">
+            <div class="fs-2 fw-bold text-danger">{{ total_students|add:"-"|add:passed_count }}</div>
+            <div class="text-muted small">{% trans 'Failed' %}</div>
+        </div>
+    </div>
+</div>
+
+{% if student_results %}
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+        <h5 class="mb-0">{% trans 'Student Results' %}</h5>
+        <span class="badge bg-secondary">{{ quiz.max_attempts }} {% trans 'max attempt(s)' %}</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>#</th>
+                    <th>{% trans 'Student' %}</th>
+                    <th>{% trans 'Best Score' %}</th>
+                    <th>{% trans 'Percentage' %}</th>
+                    <th>{% trans 'Attempts' %}</th>
+                    <th>{% trans 'Status' %}</th>
+                    <th>{% trans 'Completed' %}</th>
+                    <th class="text-center">{% trans 'Actions' %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for result in student_results %}
+                <tr>
+                    <td class="text-muted small">{{ forloop.counter }}</td>
+                    <td>
+                        <div class="d-flex align-items-center gap-2">
+                            {% if result.student.profile_image %}
+                            <img src="{{ result.student.profile_image.url }}" class="rounded-circle" width="32" height="32" style="object-fit:cover;" alt="">
+                            {% else %}
+                            <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center text-white" style="width:32px;height:32px;font-size:12px;">
+                                {{ result.student.first_name|slice:":1" }}{{ result.student.last_name|slice:":1" }}
+                            </div>
+                            {% endif %}
+                            <span>{{ result.student.get_full_name|default:result.student.username }}</span>
+                        </div>
+                    </td>
+                    <td>
+                        <strong>{{ result.best_sitting.get_current_score }}</strong>
+                        <span class="text-muted">/ {{ result.best_sitting.get_max_score }}</span>
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="progress flex-grow-1" style="height: 6px; min-width: 60px;">
+                                <div class="progress-bar {% if result.passed %}bg-success{% else %}bg-danger{% endif %}"
+                                     style="width: {{ result.best_sitting.get_percent_correct }}%"></div>
+                            </div>
+                            <span class="small">{{ result.best_sitting.get_percent_correct }}%</span>
+                        </div>
+                    </td>
+                    <td>
+                        {% if result.attempts_count > 1 %}
+                        <span class="badge bg-info text-dark">{{ result.attempts_count }}</span>
+                        {% else %}
+                        <span class="text-muted">1</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if result.passed %}
+                        <span class="badge bg-success"><i class="fas fa-check me-1"></i>{% trans 'Passed' %}</span>
+                        {% else %}
+                        <span class="badge bg-danger"><i class="fas fa-times me-1"></i>{% trans 'Failed' %}</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-muted small">
+                        {% if result.best_sitting.end %}{{ result.best_sitting.end|date:"N j, Y" }}{% else %}—{% endif %}
+                    </td>
+                    <td class="text-center">
+                        <a href="{% url 'quiz_marking_detail' result.best_sitting.pk %}"
+                           class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="text-center py-5 text-muted">
+    <i class="fas fa-users fa-3x mb-3 d-block opacity-25"></i>
+    <h5>{% trans 'No students have attempted this quiz yet.' %}</h5>
+</div>
+{% endif %}
+
+{% endblock %}

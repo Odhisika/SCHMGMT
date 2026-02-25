@@ -23,10 +23,51 @@ class EssayForm(forms.Form):
         )
 
 
+class TrueFalseForm(forms.Form):
+    """Form for True/False questions"""
+    def __init__(self, question, *args, **kwargs):
+        super(TrueFalseForm, self).__init__(*args, **kwargs)
+        self.fields["answers"] = forms.ChoiceField(
+            choices=question.get_choices_list(),
+            widget=RadioSelect
+        )
+
+
+class FillInTheBlankForm(forms.Form):
+    """Form for Fill in the Blank questions"""
+    def __init__(self, question, *args, **kwargs):
+        super(FillInTheBlankForm, self).__init__(*args, **kwargs)
+        self.fields["answers"] = forms.CharField(
+            max_length=200,
+            widget=forms.TextInput(attrs={
+                "class": "form-control",
+                "placeholder": _("Enter your answer here...")
+            })
+        )
+
+
+TIME_LIMIT_CHOICES = [
+    ('', _('No time limit')),
+    (15, _('15 minutes')),
+    (30, _('30 minutes')),
+    (45, _('45 minutes')),
+    (60, _('1 hour')),
+    (90, _('1.5 hours')),
+    (120, _('2 hours')),
+    (180, _('3 hours')),
+]
+
+
 class QuizAddForm(forms.ModelForm):
-    class Meta:
-        model = Quiz
-        exclude = []
+    time_limit_minutes = forms.TypedChoiceField(
+        choices=TIME_LIMIT_CHOICES,
+        coerce=int,
+        empty_value=None,
+        required=False,
+        label=_('Time Limit'),
+        help_text=_('How long students have to complete the quiz.'),
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
 
     questions = forms.ModelMultipleChoiceField(
         queryset=Question.objects.all().select_subclasses(),
@@ -35,17 +76,75 @@ class QuizAddForm(forms.ModelForm):
         widget=FilteredSelectMultiple(verbose_name=_("Questions"), is_stacked=False),
     )
 
+    class Meta:
+        model = Quiz
+        fields = [
+            'category', 'title', 'description', 'pass_mark',
+            'random_order', 'answers_at_end', 'exam_paper', 'single_attempt',
+            'max_attempts', 'draft', 'time_limit_minutes',
+            'available_from', 'available_until',
+            'allow_review_after_submission', 'show_correct_answers_after',
+        ]
+        widgets = {
+            'available_from': forms.DateTimeInput(
+                attrs={'type': 'datetime-local', 'class': 'form-control'},
+                format='%Y-%m-%dT%H:%M',
+            ),
+            'available_until': forms.DateTimeInput(
+                attrs={'type': 'datetime-local', 'class': 'form-control'},
+                format='%Y-%m-%dT%H:%M',
+            ),
+            'show_correct_answers_after': forms.DateTimeInput(
+                attrs={'type': 'datetime-local', 'class': 'form-control'},
+                format='%Y-%m-%dT%H:%M',
+            ),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'pass_mark': forms.NumberInput(attrs={'class': 'form-control', 'min': 0, 'max': 100}),
+            'category': forms.Select(attrs={'class': 'form-select'}),
+            'title': forms.TextInput(attrs={'class': 'form-control'}),
+        }
+
     def __init__(self, *args, **kwargs):
-        super(QuizAddForm, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
+        # Support ISO datetime-local format for HTML5 inputs
+        for field_name in ('available_from', 'available_until', 'show_correct_answers_after'):
+            self.fields[field_name].input_formats = ['%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M:%S']
+            self.fields[field_name].required = False
+
+        # Populate questions from existing instance
         if self.instance.pk:
             self.fields["questions"].initial = (
                 self.instance.question_set.all().select_subclasses()
             )
+            # Pre-fill datetime-local values
+            for field_name in ('available_from', 'available_until', 'show_correct_answers_after'):
+                value = getattr(self.instance, field_name, None)
+                if value:
+                    self.initial[field_name] = value.strftime('%Y-%m-%dT%H:%M')
+
+    def clean(self):
+        cleaned_data = super().clean()
+        available_from = cleaned_data.get('available_from')
+        available_until = cleaned_data.get('available_until')
+        show_correct_after = cleaned_data.get('show_correct_answers_after')
+
+        if available_from and available_until:
+            if available_until <= available_from:
+                self.add_error('available_until', _('Close date must be after the open date.'))
+
+        if show_correct_after and available_until:
+            if show_correct_after < available_until:
+                self.add_error(
+                    'show_correct_answers_after',
+                    _('Correct answers should be revealed after the quiz closes, not before.')
+                )
+
+        return cleaned_data
 
     def save(self, commit=True):
-        quiz = super(QuizAddForm, self).save(commit=False)
+        quiz = super().save(commit=False)
         quiz.save()
-        quiz.question_set.set(self.cleaned_data["questions"])
+        quiz.question_set.set(self.cleaned_data.get("questions", []))
         self.save_m2m()
         return quiz
 

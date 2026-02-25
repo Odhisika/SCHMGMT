@@ -19,19 +19,14 @@
 
 <div class="d-flex justify-content-between align-items-center mb-4">
 	<h1 class="title-1">{% trans 'Dashboard' %}</h1>
-	<div class="dropdown">
-		<button type="button" class="btn btn-light dropdown-toggle" data-bs-toggle="dropdown"
-			aria-expanded="false">
-			<i class="fas fa-cog"></i>
-		</button>
-		<div class="dropdown-menu">
-			<h6 class="dropdown-header">{% trans 'Dashboard settings' %}</h6>
-			<button class="dropdown-item active" type="button">{% trans 'Display grid' %}</button>
-			<button class="dropdown-item" type="button">{% trans 'Display table' %}</button>
-			<hr>
-			<button class="dropdown-item" type="button">{% trans 'Manage dashboard' %}</button>
-		</div>
-	</div>
+    
+    <!-- Division Filter Pills -->
+    	<div class="btn-group" role="group" aria-label="Division Filter">
+        <a href="?division=ALL" class="btn btn-outline-primary {% if selected_division == 'ALL' %}active{% endif %}">{% trans 'All' %}</a>
+        <a href="?division=Nursery" class="btn btn-outline-primary {% if selected_division == 'Nursery' %}active{% endif %}">{% trans 'Nursery' %}</a>
+        <a href="?division=Primary" class="btn btn-outline-primary {% if selected_division == 'Primary' %}active{% endif %}">{% trans 'Primary' %}</a>
+        <a href="?division=JHS" class="btn btn-outline-primary {% if selected_division == 'JHS' %}active{% endif %}">{% trans 'JHS' %}</a>
+    </div>
 </div>
 
 <div class="row users-count px-3">
@@ -71,6 +66,7 @@
 			</div>
 		</div>
 	</div>
+    <!-- Keeping other placeholders as 0 since they likely don't exist in DB yet -->
 	<div class="col-6 col-md-3 mb-3 px-2">
 		<div class="card-count p-3 bg-white shadow-sm border-0 rounded-3">
 			<h3><i class="fas fa-utensils text-secondary"></i></h3>
@@ -124,8 +120,9 @@
 	</div>
 	<div class="col-md-6 p-2">
 		<div class="chart-wrap">
+            <!-- Renaming this chart as per new data -->
 			<i class="fas fa-expand-alt"></i>
-			<canvas id="students_grade"></canvas>
+			<canvas id="staffing"></canvas> 
 		</div>
 	</div>
 	<div class="col-md-6 p-2">
@@ -145,29 +142,39 @@
 <div class="bg-white p-3">
 	<h5 class="border-bottom pb-2">{% trans 'School Demographics' %}</h5>
 	<div class="row">
-		<div class="col-md-4">
+		<div class="col-md-6 mx-auto">
 			<i class="fas fa-expand-alt"></i>
 			<canvas id="gender"></canvas>
-		</div>
-		<div class="col-md-4">
-			<i class="fas fa-expand-alt"></i>
-			<canvas id="ethnicity"></canvas>
-		</div>
-		<div class="col-md-4">
-			<i class="fas fa-expand-alt"></i>
-			<canvas id="language"></canvas>
 		</div>
 	</div>
 </div>
 
-{% endblock content %}
-
-{% block js %}
-
 <script src="{% url 'javascript-catalog' %}"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="{% static 'js/dashboard.js' %}"></script>
+
+<!-- Safer Data Passing -->
+<script id="dashboard-data-payload" type="application/json">
+    {
+        "traffic": {{ traffic_data|safe }},
+        "enrollment": {{ enrollment_data|safe }},
+        "staffing": {{ staffing_data|safe }},
+        "gender": {{ gender_data|safe }}
+    }
+</script>
+
 <script>
+    // Handle chart cleanup for HTMX/SPA navigation
+    function safelyDestroyChart(canvasId) {
+        try {
+            const chart = Chart.getChart(canvasId);
+            if (chart) {
+                chart.destroy();
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
 	$('.fa-expand-alt').click(function () {
 		if ($(this).parent('.chart-wrap').parent('.col-md-6').hasClass('expand')) {
 			$('.col-md-6.expand').removeClass('expand');
@@ -177,273 +184,170 @@
 			$(this).parent('.chart-wrap').parent('.col-md-6').addClass('expand');
 		}
 	})
-</script>
-<script>
-	const malesCount = {{ males_count }}
-const femalesCount = {{ females_count }}
 
-$(document).ready(function () {
+    function initDashboardCharts() {
+        if (typeof Chart === 'undefined') {
+            console.warn("Chart.js not loaded yet.");
+            return;
+        }
 
-    // Setup
-    const labels = [
-        gettext('January'),
-        gettext('February'),
-        gettext('March'),
-        gettext('April'),
-        gettext('May'),
-        gettext('June'),
-    ];
-    // Professional Palette: Google Blue #1a73e8, Google Gray #5f6368, Light Gray #dadce0
-    const data = {
-        labels: labels,
-        datasets: [{
-            label: gettext('Students'),
-            backgroundColor: 'rgba(26, 115, 232, 0.1)', // Google Blue very light
-            borderColor: '#1a73e8', // Google Blue
-            borderWidth: 2,
-            pointBackgroundColor: '#1a73e8',
-            tension: 0.4,
-            data: [0, 10, 5, 2, 20, 30, 45]
-        }, {
-            label: gettext('Teachers'),
-            backgroundColor: 'rgba(95, 99, 104, 0.1)', // Google Gray very light
-            borderColor: '#5f6368', // Google Gray
-            borderWidth: 2,
-            pointBackgroundColor: '#5f6368',
-            tension: 0.4,
-            data: [20, 0, 15, 4, 6, 4, 60],
-        }]
-    };
+        const payloadEl = document.getElementById('dashboard-data-payload');
+        if (!payloadEl) return;
+        
+        let payload;
+        try {
+            payload = JSON.parse(payloadEl.textContent);
+        } catch (e) {
+            console.error("Failed to parse chart data", e);
+            return;
+        }
 
-    var traffic = document.getElementById('traffic');
-    var chart = new Chart(traffic, {
-        type: 'line',
-        data: data,
-        options: {
-            responsive: true,
-            plugins: {
-                title: {
-                    display: true,
-                    text: gettext('System Usage'),
-                    padding: 20,
-                    font: { size: 16, weight: 'bold' },
-                    color: '#202124'
+        const trafficData = payload.traffic;
+        const enrollmentData = payload.enrollment;
+        const staffingData = payload.staffing;
+        const genderData = payload.gender;
+
+        // 1. User Growth (Traffic)
+        safelyDestroyChart('traffic');
+        const trafficCanvas = document.getElementById('traffic');
+        if (trafficCanvas) {
+            new Chart(trafficCanvas.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: trafficData.labels,
+                    datasets: [{
+                        label: gettext('Students'),
+                        backgroundColor: 'rgba(26, 115, 232, 0.1)', 
+                        borderColor: '#1a73e8', 
+                        borderWidth: 2,
+                        pointBackgroundColor: '#1a73e8',
+                        tension: 0.4,
+                        data: trafficData.students
+                    }, {
+                        label: gettext('Teachers'),
+                        backgroundColor: 'rgba(95, 99, 104, 0.1)', 
+                        borderColor: '#5f6368', 
+                        borderWidth: 2,
+                        pointBackgroundColor: '#5f6368',
+                        tension: 0.4,
+                        data: trafficData.teachers
+                    }]
                 },
-                legend: {
-                    position: 'top',
-                    align: 'end',
-                    labels: { usePointStyle: true, boxWidth: 8 }
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: { display: true, text: gettext('User Growth (Last 6 Months)'), padding: 20 },
+                        legend: { position: 'top', align: 'end' }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, grid: { borderDash: [2, 4], color: '#f1f3f4' } },
+                        x: { grid: { display: false } }
+                    }
                 }
-            },
-            scales: {
-                y: { grid: { borderDash: [2, 4], color: '#f1f3f4' }, beginAtZero: true },
-                x: { grid: { display: false } }
-            }
+            });
         }
-    });
 
-    // Setup
-    const labelsEnrollment = [
-        '2022',
-        '2023',
-        '2024',
-        '2025',
-    ];
-    const dataEnrollment = {
-        labels: labelsEnrollment,
-        datasets: [{
-            label: gettext('Primary'),
-            backgroundColor: '#1a73e8', // Google Blue
-            borderRadius: 4,
-            data: [100, 120, 150, 180]
-        }, {
-            label: gettext('JHS'),
-            backgroundColor: '#8ab4f8', // Lighter Blue
-            borderRadius: 4,
-            data: [50, 60, 75, 90],
-        }]
-    };
-
-    var enrollement = document.getElementById('enrollement');
-    var chart = new Chart(enrollement, {
-        type: 'bar',
-        data: dataEnrollment,
-        options: {
-            responsive: true,
-            plugins: {
-                title: {
-                    display: true,
-                    text: gettext('Enrollment per level'),
-                    padding: 20,
-                    font: { size: 16, weight: 'bold' },
-                    color: '#202124'
+        // 2. Enrollment by Level
+        safelyDestroyChart('enrollement');
+        const enrollmentCanvas = document.getElementById('enrollement');
+        if (enrollmentCanvas) {
+            new Chart(enrollmentCanvas.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: enrollmentData.labels,
+                    datasets: [{
+                        label: gettext('Students'),
+                        backgroundColor: '#1a73e8', 
+                        borderRadius: 4,
+                        data: enrollmentData.data
+                    }]
                 },
-                legend: { position: 'top', align: 'end', labels: { usePointStyle: true, boxWidth: 8 } }
-            },
-            scales: {
-                y: { grid: { borderDash: [2, 4], color: '#f1f3f4' } },
-                x: { grid: { display: false } }
-            }
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: { display: true, text: gettext('Enrollment per Level'), padding: 20 },
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, grid: { borderDash: [2, 4], color: '#f1f3f4' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
         }
-    });
 
-    // Average grade setup
-    const labelsGrade = [
-        '2017',
-        '2018',
-        '2019',
-        '2020',
-        '2022',
-    ];
-    const dataGrade = {
-        labels: labelsGrade,
-        datasets: [{
-            label: gettext("Primary"),
-            backgroundColor: '#1a73e8', // Google Blue
-            borderRadius: 4,
-            data: [70, 75, 72, 78]
-        }, {
-            label: gettext("JHS"),
-            backgroundColor: '#5f6368', // Google Gray
-            borderRadius: 4,
-            data: [65, 68, 70, 72],
-        }]
-    };
+        // 3. Teachers by Department
+        safelyDestroyChart('staffing');
+        const staffingCanvas = document.getElementById('staffing');
+        if (staffingCanvas) {
+            new Chart(staffingCanvas.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: staffingData.labels,
+                    datasets: [{
+                        label: gettext("Teachers"),
+                        backgroundColor: '#da932c', 
+                        borderRadius: 4,
+                        data: staffingData.data
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: { display: true, text: gettext('Teachers by Department'), padding: 20 },
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, grid: { borderDash: [2, 4], color: '#f1f3f4' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        // 4. Demographics
+        safelyDestroyChart('gender');
+        const genderCanvas = document.getElementById('gender');
+        if (genderCanvas) {
+            new Chart(genderCanvas.getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: genderData.labels,
+                    datasets: [{
+                        data: genderData.data,
+                        backgroundColor: ['#1a73e8', '#fbbc04'],
+                        borderWidth: 0,
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: {
+                        title: { display: true, text: gettext('Student Gender Distribution'), padding: 20 },
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
+        }
+    }
+
+    // Initialize logic
+    if (typeof htmx !== 'undefined') {
+        htmx.onLoad(function(content) {
+            initDashboardCharts();
+        });
+    } else {
+        document.addEventListener('DOMContentLoaded', initDashboardCharts);
+    }
     
-    var students_grade = document.getElementById('students_grade');
-    var chart = new Chart(students_grade, {
-        type: 'bar',
-        data: dataGrade,
-        options: {
-            responsive: true,
-            plugins: {
-                title: {
-                    display: true,
-                    text: gettext('Average Academic Performance'),
-                    padding: 20,
-                    font: { size: 16, weight: 'bold' },
-                    color: '#202124'
-                },
-                legend: { position: 'top', align: 'end', labels: { usePointStyle: true, boxWidth: 8 } }
-            },
-            scales: {
-                y: { grid: { borderDash: [2, 4], color: '#f1f3f4' } },
-                x: { grid: { display: false } }
-            }
-        }
-    });
-
-    const dataGender = {
-        labels: [
-            gettext('Boys'),
-            gettext('Girls')
-        ],
-        datasets: [{
-            data: [malesCount, femalesCount],
-            backgroundColor: [
-            '#1a73e8', // Google Blue
-            '#fbbc04'  // Google Yellow (Accent) instead of pink
-            ],
-            borderWidth: 0,
-            hoverOffset: 4
-        }]
-    };
-
-    var gender = document.getElementById('gender');
-    var chart = new Chart(gender, {
-        type: 'doughnut', // Doughnut looks more modern than pie
-        data: dataGender,
-        options: {
-            responsive: true,
-            cutout: '70%',
-            plugins: {
-                title: {
-                    display: true,
-                    text: gettext('Students Gender'),
-                    padding: 20,
-                    font: { size: 16, weight: 'bold' },
-                    color: '#202124'
-                },
-                legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } }
-            }
-        }
-    });
-
-    const dataQualification = {
-        labels: [
-            gettext('Master Degree'),
-            gettext('Bachelor Degree'),
-            gettext('Diploma/Cert')
-        ],
-        datasets: [{
-            data: [10, 45, 25],
-            backgroundColor: [
-            '#1a73e8', // Blue
-            '#5f6368', // Gray
-            '#8ab4f8'  // Light Blue
-            ],
-            borderWidth: 0,
-            hoverOffset: 4
-        }]
-    };
-    var ethnicity = document.getElementById('ethnicity');
-    var chart = new Chart(ethnicity, {
-        type: 'doughnut',
-        data: dataQualification,
-        options: {
-            responsive: true,
-            cutout: '70%',
-            plugins: {
-                title: {
-                    display: true,
-                    text: gettext('Teacher Qualifications'),
-                    padding: 20,
-                    font: { size: 16, weight: 'bold' },
-                    color: '#202124'
-                },
-                legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } }
-            }
-        }
-    });
-
-    const dataLevels = {
-        labels: [
-            gettext('Primary 1-3'),
-            gettext('Primary 4-6'),
-            gettext('JHS 1-3')
-        ],
-        datasets: [{
-            data: [35, 40, 25],
-            backgroundColor: [
-            '#1a73e8',
-            '#5f6368',
-            '#e8eaed' // Very light gray
-            ],
-            borderWidth: 0,
-            hoverOffset: 4
-        }]
-    };
-    var language = document.getElementById('language');
-    var chart = new Chart(language, {
-        type: 'doughnut',
-        data: dataLevels,
-        options: {
-            responsive: true,
-            cutout: '70%',
-            plugins: {
-                title: {
-                    display: true,
-                    text: gettext('Population by Class Stage'),
-                    padding: 20,
-                    font: { size: 16, weight: 'bold' },
-                    color: '#202124'
-                },
-                legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } }
-            }
-        }
-    });
-})
+    // Fallback: also try running immediately in case this script runs after DOMContentLoaded
+    initDashboardCharts();
 
 </script>
 
-{% endblock %}
+{% endblock content %}

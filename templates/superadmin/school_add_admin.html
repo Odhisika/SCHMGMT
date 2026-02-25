@@ -11,8 +11,12 @@
     </ol>
 </nav>
 
-<div class="title-1"><i class="fas fa-user-shield"></i> {% trans 'Add Administrator to' %} {{ school.name }}</div>
-<br>
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+    <h1 class="title-1 mb-0"><i class="fas fa-user-shield"></i> {% trans 'Add Administrator' %}</h1>
+    <a href="{% url 'superadmin:school_detail' school.pk %}" class="btn btn-secondary">
+        <i class="fas fa-arrow-left"></i> {% trans 'Back to School' %}
+    </a>
+</div>
 
 {% include 'snippets/messages.html' %}
 
