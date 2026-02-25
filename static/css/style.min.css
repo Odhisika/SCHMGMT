@@ -1265,7 +1265,7 @@ video {
     align-items: center;
     cursor: pointer;
     border-radius: 6px;
-    transition: all 0.3s ease;
+    transition: left 0.3s ease;
 }
 
 .sidebar-tab-toggle:hover {
@@ -1282,10 +1282,10 @@ video {
 
 @media (max-width: 1150px) {
     .sidebar-tab-toggle {
-        left: 250px;
+        left: 15px;
     }
 
     .sidebar-tab-toggle.toggle-active {
-        left: 15px;
+        left: 250px;
     }
 }
