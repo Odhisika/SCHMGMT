@@ -7,15 +7,15 @@ from core.models import Term
 
 class AttendanceSession(models.Model):
     """Daily attendance session for a class/level"""
-    school = models.ForeignKey('school.School', on_delete=models.CASCADE)
-    term = models.ForeignKey(Term, on_delete=models.CASCADE)
+    school = models.ForeignKey('school.School', on_delete=models.CASCADE, related_name='student_attendance_sessions')
+    term = models.ForeignKey(Term, on_delete=models.CASCADE, related_name='student_attendance_sessions')
     level = models.CharField(max_length=25, choices=settings.LEVEL_CHOICES)
     date = models.DateField()
     marked_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
-        related_name='marked_attendance_sessions'
+        related_name='student_marked_attendance_sessions'
     )
     marked_at = models.DateTimeField(auto_now_add=True)
     notes = models.TextField(blank=True, help_text=_("General notes for this session"))
@@ -63,7 +63,7 @@ class AttendanceRecord(models.Model):
     student = models.ForeignKey(
         Student,
         on_delete=models.CASCADE,
-        related_name='attendance_records'
+        related_name='student_attendance_records'
     )
     status = models.CharField(
         max_length=10,

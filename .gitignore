@@ -150,3 +150,18 @@ media/result_sheet/*
 # Custom
 dump.rdb
 *.DS_Store
+# Temporary scripts
+check_*.py
+
+# Alibaba Cloud ARMS cache
+arms_cache/
+
+# IDE and Editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+Thumbs.db

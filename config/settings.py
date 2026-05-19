@@ -71,6 +71,7 @@ PROJECT_APPS = [
     "timetable.apps.TimetableConfig",
     "superadmin.apps.SuperadminConfig",  # Super Admin Portal
     "resources.apps.ResourcesConfig",  # Course learning resources (files, videos)
+    "student_attendance.apps.StudentAttendanceConfig",
 ]
 
 # Combine all apps
@@ -217,9 +218,9 @@ EMAIL_BACKEND = config(
 EMAIL_HOST = config("EMAIL_HOST", default="smtp.gmail.com")
 EMAIL_PORT = config("EMAIL_PORT", default=587)
 EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
-EMAIL_HOST_USER = config("EMAIL_HOST_USER")
-EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD")
-EMAIL_FROM_ADDRESS = config("EMAIL_FROM_ADDRESS")
+EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="youremail@example.com")
+EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="yourpassword")
+EMAIL_FROM_ADDRESS = config("EMAIL_FROM_ADDRESS", default="SkyLearn <youremail@example.com>")
 EMAIL_USE_SSL = False
 
 # crispy config
