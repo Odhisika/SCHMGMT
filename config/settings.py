@@ -30,7 +30,18 @@ SECRET_KEY = config(
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config("DEBUG", default=True, cast=bool)
 
-ALLOWED_HOSTS = ["127.0.0.1", "adilmohak1.pythonanywhere.com", "localhost", "127.0.0.1:8000", ".localhost"]
+ALLOWED_HOSTS = config(
+    "ALLOWED_HOSTS",
+    default="127.0.0.1,localhost,127.0.0.1:8000,.localhost,ssm.imperialacademy.edu.gh,.imperialacademy.edu.gh,adilmohak1.pythonanywhere.com",
+    cast=lambda v: [h.strip() for h in v.split(",") if h.strip()]
+)
+
+# Master/Admin domains for the Super Admin Portal
+MASTER_DOMAINS = config(
+    "MASTER_DOMAINS",
+    default="admin.localhost,master.localhost,127.0.0.1,ssm.imperialacademy.edu.gh",
+    cast=lambda v: [d.strip() for d in v.split(",") if d.strip()]
+)
 
 # change the default user models to our custom model
 AUTH_USER_MODEL = "accounts.User"

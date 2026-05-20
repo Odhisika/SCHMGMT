@@ -27,9 +27,11 @@
 </head>
 
 <body>
+    {% block sidebar_toggle %}
     <div id="sidebar-toggle" class="sidebar-tab-toggle" onclick="toggleSidebar()">
         <i class="fas fa-bars"></i>
     </div>
+    {% endblock %}
     {% block sidebar %}
         {% include 'sidebar.html' %}
     {% endblock %}

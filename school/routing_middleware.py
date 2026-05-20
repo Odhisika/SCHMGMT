@@ -13,11 +13,8 @@ class DomainRoutingMiddleware(MiddlewareMixin):
         host = request.get_host().split(':')[0].lower() # Remove port
         
         # Define your Master/Admin domains here
-        # In production, this would be ['admin.yoursite.com', 'portal.yoursite.com']
-        # For local testing: 
-        # 127.0.0.1 -> Master Console 
-        # localhost -> School App
-        admin_domains = ['admin.localhost', 'master.localhost', '127.0.0.1']
+        # Loaded dynamically from Django settings to support both local and production domains
+        admin_domains = getattr(settings, 'MASTER_DOMAINS', ['admin.localhost', 'master.localhost', '127.0.0.1'])
         
         if host in admin_domains:
             # Load the Master/Super Admin configuration
