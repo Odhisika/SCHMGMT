@@ -47,11 +47,26 @@ class School(models.Model):
     def __str__(self):
         return self.name
 
+    def _generate_unique_identifier(self, value, field_name):
+        base_value = slugify(value) or "school"
+        candidate = base_value
+        suffix = 2
+
+        queryset = type(self).objects.all()
+        if self.pk:
+            queryset = queryset.exclude(pk=self.pk)
+
+        while queryset.filter(**{field_name: candidate}).exists():
+            candidate = f"{base_value}-{suffix}"
+            suffix += 1
+
+        return candidate
+
     def save(self, *args, **kwargs):
         if not self.slug:
-            self.slug = slugify(self.name)
+            self.slug = self._generate_unique_identifier(self.name, "slug")
         if not self.subdomain:
-            self.subdomain = self.slug
+            self.subdomain = self._generate_unique_identifier(self.slug, "subdomain")
         super().save(*args, **kwargs)
 
     def get_active_users_count(self):

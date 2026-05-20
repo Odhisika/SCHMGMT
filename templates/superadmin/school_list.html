@@ -25,7 +25,7 @@
             <tr>
                 <th>#</th>
                 <th>{% trans 'Name' %}</th>
-                <th>{% trans 'Subdomain' %}</th>
+                <th>{% trans 'Domain' %}</th>
                 <th>{% trans 'Stats (S/T)' %}</th>
                 <th>{% trans 'Status' %}</th>
                 <th>{% trans 'Created' %}</th>
@@ -37,7 +37,13 @@
             <tr>
                 <td>{{ forloop.counter }}</td>
                 <td><strong>{{ school.name }}</strong></td>
-                <td><code>{{ school.subdomain }}</code></td>
+                <td>
+                    {% if school.custom_domain %}
+                    <code>{{ school.custom_domain }}</code>
+                    {% else %}
+                    <span class="text-muted">{% trans 'Main portal' %}</span>
+                    {% endif %}
+                </td>
                 <td>
                     <span class="badge bg-light text-dark">{{ school.get_student_count }} / {{ school.get_teacher_count }}</span>
                 </td>

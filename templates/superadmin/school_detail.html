@@ -53,8 +53,14 @@
                         <td>{{ school.name }}</td>
                     </tr>
                     <tr>
-                        <th>{% trans 'Subdomain' %}:</th>
-                        <td><code>{{ school.subdomain }}</code></td>
+                        <th>{% trans 'Domain' %}:</th>
+                        <td>
+                            {% if school.custom_domain %}
+                            <code>{{ school.custom_domain }}</code>
+                            {% else %}
+                            <span class="text-muted">{% trans 'Main portal' %}</span>
+                            {% endif %}
+                        </td>
                     </tr>
                     <tr>
                         <th>{% trans 'Email' %}:</th>

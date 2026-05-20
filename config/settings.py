@@ -53,6 +53,14 @@ MASTER_DOMAINS = config(
     cast=lambda v: [d.strip() for d in v.split(",") if d.strip()]
 )
 
+# When enabled, authenticated school users visiting a master domain
+# are redirected to their dedicated school subdomain.
+ENFORCE_SCHOOL_SUBDOMAIN_REDIRECTS = config(
+    "ENFORCE_SCHOOL_SUBDOMAIN_REDIRECTS",
+    default=False,
+    cast=bool,
+)
+
 # change the default user models to our custom model
 AUTH_USER_MODEL = "accounts.User"
 

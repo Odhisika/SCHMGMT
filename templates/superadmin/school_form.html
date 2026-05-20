@@ -46,13 +46,13 @@
                 </div>
                 <div class="col-md-6">
                     <div class="mb-3">
-                        <label for="{{ school_form.subdomain.id_for_label }}" class="form-label">
-                            {{ school_form.subdomain.label }} <span class="text-danger">*</span>
+                        <label for="{{ school_form.custom_domain.id_for_label }}" class="form-label">
+                            {{ school_form.custom_domain.label }}
                         </label>
-                        {{ school_form.subdomain }}
-                        <small class="form-text text-muted">{{ school_form.subdomain.help_text }}</small>
-                        {% if school_form.subdomain.errors %}
-                        <div class="text-danger">{{ school_form.subdomain.errors }}</div>
+                        {{ school_form.custom_domain }}
+                        <small class="form-text text-muted">{{ school_form.custom_domain.help_text }}</small>
+                        {% if school_form.custom_domain.errors %}
+                        <div class="text-danger">{{ school_form.custom_domain.errors }}</div>
                         {% endif %}
                     </div>
                 </div>

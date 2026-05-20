@@ -66,7 +66,7 @@
         <thead>
             <tr>
                 <th>{% trans 'Name' %}</th>
-                <th>{% trans 'Subdomain' %}</th>
+                <th>{% trans 'Domain' %}</th>
                 <th>{% trans 'Students' %}</th>
                 <th>{% trans 'Teachers' %}</th>
                 <th>{% trans 'Status' %}</th>
@@ -78,7 +78,13 @@
             {% for school in schools|slice:":10" %}
             <tr>
                 <td><strong>{{ school.name }}</strong></td>
-                <td><code>{{ school.subdomain }}</code></td>
+                <td>
+                    {% if school.custom_domain %}
+                    <code>{{ school.custom_domain }}</code>
+                    {% else %}
+                    <span class="text-muted">{% trans 'Main portal' %}</span>
+                    {% endif %}
+                </td>
                 <td>{{ school.get_student_count }}</td>
                 <td>{{ school.get_teacher_count }}</td>
                 <td>

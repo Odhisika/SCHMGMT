@@ -16,6 +16,27 @@ class SchoolMiddleware(MiddlewareMixin):
     - Allows superusers to bypass restrictions
     - Handles subdomain-based routing
     """
+
+    def _build_school_host(self, request, school):
+        """Build the preferred host for a school's dedicated domain."""
+        host = request.get_host().split(':')[0].lower()
+
+        if 'localhost' in host:
+            new_host = f"{school.subdomain}.localhost"
+            port = request.get_host().split(':')
+            if len(port) > 1:
+                new_host = f"{new_host}:{port[1]}"
+            return new_host
+
+        if '127.0.0.1' in host:
+            return None
+
+        parts = host.split('.')
+        if len(parts) >= 3:
+            parts[0] = school.subdomain
+            return '.'.join(parts)
+
+        return f"{school.subdomain}.{host}"
     
     def process_request(self, request):
         """Attach the current school to the request object."""
@@ -29,30 +50,15 @@ class SchoolMiddleware(MiddlewareMixin):
         admin_domains = getattr(settings, 'MASTER_DOMAINS', ['admin.localhost', 'master.localhost', '127.0.0.1'])
         if host in admin_domains and request.user.is_authenticated and not request.user.is_superuser:
             user_school = request.user.school
-            if user_school and user_school.subdomain:
-                current_scheme = 'https' if request.is_secure() else 'http'
-                
-                # Check if we are using localhost or a custom domain
-                if 'localhost' in host:
-                    new_host = f"{user_school.subdomain}.localhost"
-                    # Add port if present in original request
-                    port = request.get_host().split(':')
-                    if len(port) > 1:
-                        new_host = f"{new_host}:{port[1]}"
-                elif '127.0.0.1' in host:
-                    request.session['school_slug'] = user_school.slug
-                    request.school = user_school
-                    return None
-                else:
-                    # For production domain e.g. ssm.imperialacademy.edu.gh
-                    parts = host.split('.')
-                    if len(parts) >= 3:
-                        parts[0] = user_school.subdomain
-                        new_host = '.'.join(parts)
-                    else:
-                        new_host = f"{user_school.subdomain}.{host}"
-                
-                return redirect(f"{current_scheme}://{new_host}/")
+            if user_school:
+                request.session['school_slug'] = user_school.slug
+                request.school = user_school
+
+                if user_school.subdomain and getattr(settings, 'ENFORCE_SCHOOL_SUBDOMAIN_REDIRECTS', False):
+                    new_host = self._build_school_host(request, user_school)
+                    if new_host and new_host != request.get_host():
+                        current_scheme = 'https' if request.is_secure() else 'http'
+                        return redirect(f"{current_scheme}://{new_host}{request.get_full_path()}")
         
         # Special handling for superadmin routes - no school required
         if request.path.startswith('/superadmin/') or request.path.startswith('/admin/'):

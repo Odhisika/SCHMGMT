@@ -15,7 +15,7 @@ class SchoolCreationForm(forms.ModelForm):
         model = School
         fields = [
             'name', 'email', 'phone', 'address', 'website',
-            'subdomain', 'logo', 'primary_color', 'secondary_color', 'is_active'
+            'custom_domain', 'logo', 'primary_color', 'secondary_color', 'is_active'
         ]
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'School Name'}),
@@ -23,11 +23,9 @@ class SchoolCreationForm(forms.ModelForm):
             'phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '+1234567890'}),
             'address': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'website': forms.URLInput(attrs={'class': 'form-control', 'placeholder': 'https://school.com'}),
-            'subdomain': forms.TextInput(attrs={
+            'custom_domain': forms.URLInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'schoolname',
-                'pattern': '[a-z0-9-]+',
-                'title': 'Lowercase letters, numbers, and hyphens only'
+                'placeholder': 'https://schooldomain.com'
             }),
             'logo': forms.FileInput(attrs={'class': 'form-control'}),
             'primary_color': forms.TextInput(attrs={'class': 'form-control', 'type': 'color'}),
@@ -35,26 +33,8 @@ class SchoolCreationForm(forms.ModelForm):
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
         help_texts = {
-            'subdomain': _('Will be used as: subdomain.yourdomain.com'),
+            'custom_domain': _('Optional. Use this only if the school has its own purchased domain.'),
         }
-    
-    def clean_subdomain(self):
-        subdomain = self.cleaned_data.get('subdomain', '').lower()
-        
-        # Reserved subdomains
-        reserved = ['www', 'admin', 'superadmin', 'api', 'mail', 'ftp', 'localhost']
-        if subdomain in reserved:
-            raise forms.ValidationError(_('This subdomain is reserved.'))
-        
-        # Check if subdomain is already taken (excluding current instance)
-        qs = School.objects.filter(subdomain=subdomain)
-        if self.instance.pk:
-            qs = qs.exclude(pk=self.instance.pk)
-        
-        if qs.exists():
-            raise forms.ValidationError(_('This subdomain is already taken.'))
-        
-        return subdomain
 
 
 class SchoolAdminCreationForm(UserCreationForm):
