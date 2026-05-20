@@ -11,6 +11,16 @@ https://docs.djangoproject.com/en/2.2/ref/settings/
 """
 
 import os
+
+# Dynamic patch for os.utime to prevent PermissionError [Errno 1] during collectstatic on some hosting environments
+_original_utime = os.utime
+def _safe_utime(path, times=None, *args, **kwargs):
+    try:
+        _original_utime(path, times, *args, **kwargs)
+    except (PermissionError, OSError):
+        pass
+os.utime = _safe_utime
+
 from decouple import config
 from django.utils.translation import gettext_lazy as _
 from dotenv import load_dotenv
