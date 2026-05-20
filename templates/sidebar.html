@@ -44,7 +44,7 @@
 				<a href="{% url 'profile' %}"><i class="fas fa-user"></i>{% trans 'Profile' %}</a>
 			</li>
 
-			{% if request.user.is_superuser %}
+			{% if request.user.is_superuser and superadmin_urls_available %}
 			<li class="{% if '/superadmin/' == request.path %}active{% endif %}">
 				<a href="{% url 'superadmin:dashboard' %}"><i class="fas fa-user-shield"></i>{% trans 'Super Admin Dashboard' %}</a>
 			</li>

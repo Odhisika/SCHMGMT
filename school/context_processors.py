@@ -37,7 +37,9 @@ def tenant_aware_urls(request):
     """
     Provide tenant-aware URLs for templates
     """
-    context = {}
+    context = {
+        'superadmin_urls_available': getattr(request, 'urlconf', None) == 'config.urls_master',
+    }
     
     if hasattr(request, 'school') and request.school:
         school_slug = request.school.subdomain

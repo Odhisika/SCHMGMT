@@ -127,10 +127,21 @@ if systemctl is-active --quiet "$SYSTEMD_SERVICE" 2>/dev/null; then
     RESTARTED=true
 fi
 
+# 3. Apache2 (common when Django is served behind mod_wsgi or reverse-proxied)
+APACHE_SERVICE="apache2"
+
+if systemctl is-active --quiet "$APACHE_SERVICE" 2>/dev/null; then
+    echo -e "${GREEN}Found active systemd service: $APACHE_SERVICE. Restarting...${NC}"
+    sudo systemctl restart "$APACHE_SERVICE" || true
+    log_message "SUCCESS" "Systemd service $APACHE_SERVICE restarted"
+    RESTARTED=true
+fi
+
 if [ "$RESTARTED" = false ]; then
-    echo -e "${YELLOW}⚠️ No auto-detected server daemon (gunicorn/passenger) was restarted.${NC}"
-    echo -e "${YELLOW}   If running Gunicorn or Uwsgi via systemctl, you may want to run:${NC}"
+    echo -e "${YELLOW}⚠️ No auto-detected server daemon (gunicorn/apache2/passenger) was restarted.${NC}"
+    echo -e "${YELLOW}   If running Gunicorn, Apache2, or Uwsgi via systemctl, you may want to run:${NC}"
     echo -e "${BLUE}   sudo systemctl restart gunicorn${NC}"
+    echo -e "${BLUE}   sudo systemctl restart apache2${NC}"
     log_message "INFO" "No standard reload mechanism triggered"
 fi
 
