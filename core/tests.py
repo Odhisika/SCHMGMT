@@ -10,7 +10,7 @@ class PublicSidebarTests(TestCase):
         MASTER_DOMAINS=["admin.localhost", "127.0.0.1"],
         STATICFILES_STORAGE="django.contrib.staticfiles.storage.StaticFilesStorage",
     )
-    def test_superuser_can_open_public_home_without_superadmin_namespace_error(self):
+    def test_superuser_can_open_public_home_with_superadmin_link_available(self):
         user = User.objects.create_superuser(
             username="root",
             email="root@example.test",
@@ -21,4 +21,4 @@ class PublicSidebarTests(TestCase):
         response = self.client.get("/en/", HTTP_HOST="localhost")
 
         self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, "Super Admin Dashboard")
+        self.assertContains(response, "Super Admin Dashboard")

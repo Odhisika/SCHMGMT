@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.urls import get_resolver
 
 
 def school_context(request):
@@ -37,8 +38,9 @@ def tenant_aware_urls(request):
     """
     Provide tenant-aware URLs for templates
     """
+    resolver = get_resolver(getattr(request, 'urlconf', None))
     context = {
-        'superadmin_urls_available': getattr(request, 'urlconf', None) == 'config.urls_master',
+        'superadmin_urls_available': 'superadmin' in resolver.namespace_dict,
     }
     
     if hasattr(request, 'school') and request.school:

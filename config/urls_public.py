@@ -11,7 +11,8 @@ from django.views.i18n import JavaScriptCatalog
 # It strictly EXCLUDES the Super Admin Portal for security.
 
 urlpatterns = [
-    # No /superadmin/ here!
+    # Superadmin remains permission-gated, but can be reached from the shared host.
+    path("superadmin/", include("superadmin.urls")),
     
     # We keep /admin/ for School Staff (if you want them to use Django Admin, 
     # though usually we restrict this. Leaving it for now but secured by permissions).

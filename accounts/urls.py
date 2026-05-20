@@ -9,6 +9,7 @@ from django.urls import path, include
 #     LogoutView,
 # )
 from .views import (
+    RoleAwareLoginView,
     profile,
     profile_single,
     admin_panel,
@@ -38,6 +39,11 @@ from .forms import EmailValidationOnForgotPassword
 
 
 urlpatterns = [
+    path(
+        "login/",
+        RoleAwareLoginView.as_view(template_name="registration/login.html"),
+        name="login",
+    ),
     path('password_reset/', auth_views.PasswordResetView.as_view(
         form_class=EmailValidationOnForgotPassword,
         template_name='registration/password_reset.html'

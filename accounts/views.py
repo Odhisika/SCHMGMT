@@ -1,9 +1,11 @@
 from django.contrib import messages
+from django.contrib.auth import views as auth_views
 from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordChangeForm
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.template.loader import get_template, render_to_string
 from django.utils.decorators import method_decorator
 from django.views.generic import CreateView
@@ -44,6 +46,20 @@ def render_to_pdf(template_name, context):
 # ########################################################
 # Authentication and Registration
 # ########################################################
+
+
+class RoleAwareLoginView(auth_views.LoginView):
+    """Send super admins to the superadmin panel after the shared login."""
+
+    def get_success_url(self):
+        redirect_to = self.get_redirect_url()
+        if redirect_to:
+            return redirect_to
+
+        if self.request.user.is_superuser:
+            return reverse("superadmin:dashboard")
+
+        return reverse("home")
 
 
 def validate_username(request):

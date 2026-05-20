@@ -50,3 +50,21 @@ class SuperadminAccessTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response["Location"], "/accounts/login/?next=/")
+
+    @override_settings(
+        PUBLIC_DOMAINS=["localhost"],
+        MASTER_DOMAINS=["admin.localhost", "127.0.0.1"],
+        STATICFILES_STORAGE="django.contrib.staticfiles.storage.StaticFilesStorage",
+    )
+    def test_superadmin_dashboard_is_available_on_shared_public_host(self):
+        user = User.objects.create_superuser(
+            username="root",
+            email="root@example.test",
+            password="password",
+        )
+        self.client.force_login(user)
+
+        response = self.client.get("/superadmin/", HTTP_HOST="localhost")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Super Admin Dashboard")
