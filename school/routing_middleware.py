@@ -12,11 +12,14 @@ class DomainRoutingMiddleware(MiddlewareMixin):
     def process_request(self, request):
         host = request.get_host().split(':')[0].lower() # Remove port
         
-        # Define your Master/Admin domains here
-        # Loaded dynamically from Django settings to support both local and production domains
+        public_domains = getattr(settings, 'PUBLIC_DOMAINS', ['localhost'])
         admin_domains = getattr(settings, 'MASTER_DOMAINS', ['admin.localhost', 'master.localhost', '127.0.0.1'])
         
-        if host in admin_domains:
+        # Public domains take precedence so the hosted school portal
+        # never gets accidentally routed to the superadmin console.
+        if host in public_domains:
+            request.urlconf = 'config.urls_public'
+        elif host in admin_domains:
             # Load the Master/Super Admin configuration
             request.urlconf = 'config.urls_master'
         else:

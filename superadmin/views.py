@@ -9,6 +9,7 @@ from school.models import School
 from .forms import SchoolCreationForm, SchoolAdminCreationForm
 
 User = get_user_model()
+SUPERADMIN_LOGIN_URL = '/accounts/login/'
 
 
 def is_superuser(user):
@@ -17,7 +18,7 @@ def is_superuser(user):
 
 
 @login_required
-@user_passes_test(is_superuser, login_url='/')
+@user_passes_test(is_superuser, login_url=SUPERADMIN_LOGIN_URL)
 def dashboard(request):
     """Super admin dashboard"""
     schools = School.objects.all().order_by('-created_at')
@@ -33,7 +34,7 @@ def dashboard(request):
 
 
 @login_required
-@user_passes_test(is_superuser, login_url='/')
+@user_passes_test(is_superuser, login_url=SUPERADMIN_LOGIN_URL)
 def school_list(request):
     """List all schools"""
     schools = School.objects.all().order_by('-created_at')
@@ -46,7 +47,7 @@ def school_list(request):
 
 
 @login_required
-@user_passes_test(is_superuser, login_url='/')
+@user_passes_test(is_superuser, login_url=SUPERADMIN_LOGIN_URL)
 def school_create(request):
     """Create a new school with admin"""
     if request.method == 'POST':
@@ -88,7 +89,7 @@ def school_create(request):
 
 
 @login_required
-@user_passes_test(is_superuser, login_url='/')
+@user_passes_test(is_superuser, login_url=SUPERADMIN_LOGIN_URL)
 def school_detail(request, pk):
     """View school details"""
     school = get_object_or_404(School, pk=pk)
@@ -109,7 +110,7 @@ def school_detail(request, pk):
 
 
 @login_required
-@user_passes_test(is_superuser, login_url='/')
+@user_passes_test(is_superuser, login_url=SUPERADMIN_LOGIN_URL)
 def school_edit(request, pk):
     """Edit school details"""
     school = get_object_or_404(School, pk=pk)
@@ -134,7 +135,7 @@ def school_edit(request, pk):
 
 
 @login_required
-@user_passes_test(is_superuser, login_url='/')
+@user_passes_test(is_superuser, login_url=SUPERADMIN_LOGIN_URL)
 def school_toggle_active(request, pk):
     """Activate or deactivate a school"""
     school = get_object_or_404(School, pk=pk)
@@ -150,7 +151,7 @@ def school_toggle_active(request, pk):
 
 
 @login_required
-@user_passes_test(is_superuser, login_url='/')
+@user_passes_test(is_superuser, login_url=SUPERADMIN_LOGIN_URL)
 def school_add_admin(request, pk):
     """Add an admin to a school"""
     school = get_object_or_404(School, pk=pk)
@@ -182,7 +183,7 @@ def school_add_admin(request, pk):
 
 
 @login_required
-@user_passes_test(is_superuser, login_url='/')
+@user_passes_test(is_superuser, login_url=SUPERADMIN_LOGIN_URL)
 def school_delete(request, pk):
     """Delete a school and all associated data"""
     school = get_object_or_404(School, pk=pk)
@@ -201,7 +202,7 @@ def school_delete(request, pk):
 
 
 @login_required
-@user_passes_test(is_superuser, login_url='/')
+@user_passes_test(is_superuser, login_url=SUPERADMIN_LOGIN_URL)
 def school_reset_admin_password(request, pk):
     """Reset password for all admins of a school"""
     school = get_object_or_404(School, pk=pk)

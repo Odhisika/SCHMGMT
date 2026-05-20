@@ -47,8 +47,10 @@ class SchoolMiddleware(MiddlewareMixin):
         
         # If the user is on the master/admin domain but is a non-superuser, redirect them to their school domain
         host = request.get_host().split(':')[0].lower()
+        public_domains = getattr(settings, 'PUBLIC_DOMAINS', ['localhost'])
         admin_domains = getattr(settings, 'MASTER_DOMAINS', ['admin.localhost', 'master.localhost', '127.0.0.1'])
-        if host in admin_domains and request.user.is_authenticated and not request.user.is_superuser:
+        effective_admin_domains = [domain for domain in admin_domains if domain not in public_domains]
+        if host in effective_admin_domains and request.user.is_authenticated and not request.user.is_superuser:
             user_school = request.user.school
             if user_school:
                 request.session['school_slug'] = user_school.slug

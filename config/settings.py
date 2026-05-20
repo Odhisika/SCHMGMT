@@ -42,14 +42,23 @@ DEBUG = config("DEBUG", default=True, cast=bool)
 
 ALLOWED_HOSTS = config(
     "ALLOWED_HOSTS",
-    default="127.0.0.1,localhost,127.0.0.1:8000,.localhost,ssm.imperialacademy.edu.gh,.imperialacademy.edu.gh,adilmohak1.pythonanywhere.com",
+    default="127.0.0.1,localhost,.localhost",
     cast=lambda v: [h.strip() for h in v.split(",") if h.strip()]
 )
 
-# Master/Admin domains for the Super Admin Portal
+# Public domains for the hosted school portal.
+# Production values should come from the environment.
+PUBLIC_DOMAINS = config(
+    "PUBLIC_DOMAINS",
+    default="localhost",
+    cast=lambda v: [d.strip() for d in v.split(",") if d.strip()]
+)
+
+# Master/Admin domains for the Super Admin Portal.
+# Production values should come from the environment.
 MASTER_DOMAINS = config(
     "MASTER_DOMAINS",
-    default="admin.localhost,master.localhost,127.0.0.1,ssm.imperialacademy.edu.gh",
+    default="admin.localhost,master.localhost,127.0.0.1",
     cast=lambda v: [d.strip() for d in v.split(",") if d.strip()]
 )
 

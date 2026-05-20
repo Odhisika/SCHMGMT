@@ -1,16 +1,20 @@
-from django.test import TestCase
+from django.contrib.auth import get_user_model
+from django.test import TestCase, override_settings
 
+from school.models import School
 from superadmin.forms import SchoolCreationForm
+
+User = get_user_model()
 
 
 class SchoolCreationFormTests(TestCase):
     def test_form_does_not_expose_subdomain_and_generates_internal_identifiers(self):
         form = SchoolCreationForm(data={
-            "name": "Imperial Academy",
-            "email": "admin@imperialacademy.edu.gh",
+            "name": "Example Academy",
+            "email": "admin@school.test",
             "phone": "+233000000000",
             "address": "Accra",
-            "website": "https://imperialacademy.edu.gh",
+            "website": "https://school.test",
             "custom_domain": "",
             "primary_color": "#007bff",
             "secondary_color": "#6c757d",
@@ -22,5 +26,27 @@ class SchoolCreationFormTests(TestCase):
 
         school = form.save()
 
-        self.assertEqual(school.slug, "imperial-academy")
-        self.assertEqual(school.subdomain, "imperial-academy")
+        self.assertEqual(school.slug, "example-academy")
+        self.assertEqual(school.subdomain, "example-academy")
+
+
+class SuperadminAccessTests(TestCase):
+    @override_settings(
+        ALLOWED_HOSTS=["admin.example.test"],
+        PUBLIC_DOMAINS=["app.example.test"],
+        MASTER_DOMAINS=["admin.example.test"],
+    )
+    def test_non_superuser_redirects_to_login_page_not_root_loop(self):
+        school = School.objects.create(name="Example Academy")
+        user = User.objects.create_user(
+            username="school_admin",
+            password="password",
+            is_school_admin=True,
+            school=school,
+        )
+        self.client.force_login(user)
+
+        response = self.client.get("/", HTTP_HOST="admin.example.test")
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "/accounts/login/?next=/")
