@@ -28,7 +28,7 @@
 
             <div class="login-form-container">
                 <div class="login-form-title">
-                    <h2><span class="logo-highlight">LuckyTech</span> Innovation Ground</h2>
+                    <h2><span class="logo-highlight">SMART</span> SCHOOL MANAGER</h2>
                     <p class="text-muted small">{% trans 'Educational Management Portal' %}</p>
                 </div>
 
@@ -77,11 +77,56 @@
 
     <!-- Footer Links -->
     <div class="login-footer">
-        <a href="#">{% trans 'Terms of Services' %}</a>
-        <a href="#">{% trans 'Privacy Policy' %}</a>
-        <a href="#">{% trans 'Contact Us' %}</a>
+        <a href="javascript:void(0)" onclick="openModal('terms-modal')">{% trans 'Terms of Services' %}</a>
+        <a href="javascript:void(0)" onclick="openModal('privacy-modal')">{% trans 'Privacy Policy' %}</a>
+        <a href="https://lig.com.gh" target="_blank">{% trans 'Contact Us' %}</a>
         <a href="#">{% trans 'Help' %}</a>
         <span>&copy; {{ now|date:"Y" }} LuckyTech. All Rights Reserved.</span>
+        <span class="powered-by">{% trans 'Powered by LiG' %}</span>
+    </div>
+</div>
+
+<!-- Terms of Service Modal -->
+<div id="terms-modal" class="modal-overlay" onclick="closeModalOutside(event, 'terms-modal')">
+    <div class="modal-card">
+        <button class="modal-close" onclick="closeModal('terms-modal')">&times;</button>
+        <div class="modal-icon"><i class="fas fa-file-contract"></i></div>
+        <h2>{% trans 'Terms of Service' %}</h2>
+        <div class="modal-body">
+            <p>{% trans 'Welcome to LiG School Management System. By using our platform, you agree to the following terms and conditions.' %}</p>
+            <h4>1. {% trans 'Acceptance of Terms' %}</h4>
+            <p>{% trans 'By accessing and using this platform, you accept and agree to be bound by the terms of this agreement.' %}</p>
+            <h4>2. {% trans 'User Responsibilities' %}</h4>
+            <p>{% trans 'Users are responsible for maintaining the confidentiality of their login credentials and for all activities under their account.' %}</p>
+            <h4>3. {% trans 'Data Privacy' %}</h4>
+            <p>{% trans 'We are committed to protecting your personal data. Please refer to our Privacy Policy for detailed information.' %}</p>
+            <h4>4. {% trans 'Service Availability' %}</h4>
+            <p>{% trans 'We strive to ensure uninterrupted service but cannot guarantee that the platform will be available at all times.' %}</p>
+            <h4>5. {% trans 'Modifications' %}</h4>
+            <p>{% trans 'We reserve the right to modify these terms at any time. Users will be notified of significant changes.' %}</p>
+        </div>
+    </div>
+</div>
+
+<!-- Privacy Policy Modal -->
+<div id="privacy-modal" class="modal-overlay" onclick="closeModalOutside(event, 'privacy-modal')">
+    <div class="modal-card">
+        <button class="modal-close" onclick="closeModal('privacy-modal')">&times;</button>
+        <div class="modal-icon"><i class="fas fa-shield-alt"></i></div>
+        <h2>{% trans 'Privacy Policy' %}</h2>
+        <div class="modal-body">
+            <p>{% trans 'Your privacy is important to us. This policy outlines how we collect, use, and protect your personal information.' %}</p>
+            <h4>1. {% trans 'Information We Collect' %}</h4>
+            <p>{% trans 'We collect information you provide directly, such as your name, email address, phone number, and academic records.' %}</p>
+            <h4>2. {% trans 'How We Use Your Information' %}</h4>
+            <p>{% trans 'Your information is used to manage your academic profile, process payments, and communicate important updates.' %}</p>
+            <h4>3. {% trans 'Data Security' %}</h4>
+            <p>{% trans 'We implement appropriate security measures to protect your personal data from unauthorized access or disclosure.' %}</p>
+            <h4>4. {% trans 'Third-Party Sharing' %}</h4>
+            <p>{% trans 'We do not sell or share your personal information with third parties except as required by law or with your consent.' %}</p>
+            <h4>5. {% trans 'Contact Us' %}</h4>
+            <p>{% trans 'If you have questions about this policy, please contact us at support@lig.com.gh.' %}</p>
+        </div>
     </div>
 </div>
 {% endblock content %}
@@ -93,10 +138,8 @@
     const password = document.querySelector('#password_id');
 
     togglePassword.addEventListener('click', function (e) {
-        // toggle the type attribute
         const type = password.getAttribute('type') === 'password' ? 'text' : 'password';
         password.setAttribute('type', type);
-        // toggle the eye / eye slash icon
         this.classList.toggle('fa-eye');
         this.classList.toggle('fa-eye-slash');
     });
@@ -105,6 +148,29 @@
         const btn = document.getElementById('login-btn');
         btn.classList.add('disabled');
         btn.innerHTML = `{% trans 'Signing you in...' %}`;
+    });
+
+    function openModal(id) {
+        document.getElementById(id).classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeModal(id) {
+        document.getElementById(id).classList.remove('active');
+        document.body.style.overflow = '';
+    }
+
+    function closeModalOutside(e, id) {
+        if (e.target === e.currentTarget) closeModal(id);
+    }
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            document.querySelectorAll('.modal-overlay.active').forEach(function(m) {
+                m.classList.remove('active');
+            });
+            document.body.style.overflow = '';
+        }
     });
 </script>
 {% endblock %}

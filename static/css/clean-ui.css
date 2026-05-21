@@ -488,7 +488,7 @@ body.clean-ui {
     width: 100%;
     border: none;
     border-bottom: 2px solid #f1f3f4;
-    padding: 10px 0 10px 30px;
+    padding: 10px 0 10px 36px;
     font-size: 15px;
     color: #202124;
     transition: all 0.3s ease;
@@ -535,12 +535,310 @@ body.clean-ui {
     text-decoration: none;
 }
 
+.powered-by {
+    color: #666;
+    font-size: 11px;
+    border-left: 1px solid #444;
+    padding-left: 20px;
+    letter-spacing: 0.5px;
+}
+
+/* Password Reset Pages - Centered Professional Layout */
+.reset-page-body {
+    background: linear-gradient(135deg, #589B83 0%, #3E7260 100%) !important;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    font-family: 'Poppins', sans-serif;
+    width: 100%;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 9999;
+}
+
+.reset-card {
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+    max-width: 460px;
+    width: 100% !important;
+    padding: 50px 45px;
+    z-index: 10000;
+    text-align: center;
+}
+
+.reset-card .login-form-title {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.reset-card .login-form-title h2 {
+    font-weight: 700;
+    color: #202124;
+    margin-bottom: 8px;
+    font-size: 24px;
+}
+
+.reset-card .form-group {
+    text-align: left;
+    margin-bottom: 24px;
+}
+
+.reset-card .form-group label {
+    display: block;
+    font-size: 13px;
+    color: #5f6368;
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.reset-card .form-group input,
+.reset-card .form-control {
+    width: 100%;
+    border: none !important;
+    border-bottom: 2px solid #dadce0 !important;
+    border-radius: 0 !important;
+    padding: 10px 0 !important;
+    font-size: 15px !important;
+    color: #202124 !important;
+    transition: all 0.3s ease !important;
+    background: transparent !important;
+    outline: none !important;
+    font-family: 'Poppins', sans-serif !important;
+    box-shadow: none !important;
+}
+
+.reset-card .form-group input:focus,
+.reset-card .form-control:focus {
+    border-bottom-color: #1a73e8 !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+}
+
+.reset-card .form-group .errorlist {
+    list-style: none;
+    padding: 0;
+    margin: 5px 0 0;
+    color: #d93025;
+    font-size: 12px;
+}
+
+.reset-card .login-btn-pill {
+    width: 100%;
+    background: #1a73e8;
+    color: white;
+    border: none;
+    padding: 14px;
+    border-radius: 50px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(26, 115, 232, 0.3);
+    transition: all 0.3s ease;
+    margin-top: 10px;
+    font-family: 'Poppins', sans-serif;
+}
+
+.reset-card .login-btn-pill:hover {
+    background: #1557b0;
+    box-shadow: 0 6px 20px rgba(26, 115, 232, 0.4);
+    transform: translateY(-1px);
+}
+
+.reset-card .alert-success {
+    background: #e6f4ea;
+    color: #137333;
+    border-radius: 12px;
+    padding: 16px 20px;
+    border: none;
+    font-size: 14px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.reset-card .alert-success i {
+    margin-right: 8px;
+}
+
+.reset-card .btn-back {
+    display: inline-block;
+    background: white;
+    color: #1a73e8;
+    border: 2px solid #dadce0;
+    padding: 12px 28px;
+    border-radius: 50px;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    font-family: 'Poppins', sans-serif;
+}
+
+.reset-card .btn-back:hover {
+    background: #f8f9fa;
+    border-color: #1a73e8;
+    transform: translateY(-1px);
+}
+
+.reset-card .reset-icon {
+    width: 64px;
+    height: 64px;
+    background: #e8f0fe;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+}
+
+.reset-card .reset-icon i {
+    font-size: 28px;
+    color: #1a73e8;
+}
+
+.reset-card .reset-desc {
+    font-size: 14px;
+    color: #5f6368;
+    margin-bottom: 30px;
+    line-height: 1.6;
+}
+
+.reset-card .helptext {
+    font-size: 12px;
+    color: #9aa0a6;
+    display: block;
+    margin-top: 6px;
+}
+
+.reset-card .form-group ul {
+    list-style: none;
+    padding: 0;
+    margin: 8px 0 0;
+    font-size: 12px;
+    color: #5f6368;
+}
+
+.reset-card .form-group ul li {
+    margin-bottom: 2px;
+}
+
+/* Modal Overlay for TOS / Privacy Popups */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(4px);
+    z-index: 99999;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.modal-overlay.active {
+    display: flex;
+}
+
+.modal-card {
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 25px 50px rgba(0,0,0,0.25);
+    max-width: 580px;
+    width: 100%;
+    max-height: 80vh;
+    padding: 40px 35px;
+    position: relative;
+    animation: modalFadeIn 0.25s ease;
+    overflow-y: auto;
+}
+
+@keyframes modalFadeIn {
+    from { opacity: 0; transform: scale(0.95) translateY(10px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.modal-close {
+    position: absolute;
+    top: 16px;
+    right: 20px;
+    background: none;
+    border: none;
+    font-size: 28px;
+    color: #9aa0a6;
+    cursor: pointer;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s;
+}
+
+.modal-close:hover {
+    background: #f1f3f4;
+    color: #202124;
+}
+
+.modal-icon {
+    width: 56px;
+    height: 56px;
+    background: #e8f0fe;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 16px;
+}
+
+.modal-icon i {
+    font-size: 24px;
+    color: #1a73e8;
+}
+
+.modal-card h2 {
+    font-weight: 700;
+    color: #202124;
+    text-align: center;
+    margin-bottom: 20px;
+    font-size: 22px;
+}
+
+.modal-body {
+    text-align: left;
+    color: #5f6368;
+    font-size: 14px;
+    line-height: 1.8;
+}
+
+.modal-body h4 {
+    color: #202124;
+    margin-top: 20px;
+    margin-bottom: 6px;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.modal-body p {
+    margin-bottom: 8px;
+}
+
 @media (max-width: 768px) {
     .login-left {
         display: none !important;
     }
     .login-card {
         max-width: 400px;
+    }
+    .reset-card {
+        max-width: 380px;
+        padding: 35px 25px;
     }
 }
 /* Payment Page Specific Enhancements */
