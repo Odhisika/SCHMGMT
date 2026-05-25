@@ -454,7 +454,8 @@ video {
     }
 
     #top-navbar {
-        left: 0
+        left: 0;
+        padding-left: 55px;
     }
 
     .manage-wrap {
