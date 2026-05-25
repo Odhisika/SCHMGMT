@@ -4,7 +4,6 @@
 
 {% block content %}
 
-
 <nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
     <ol class="breadcrumb">
       <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
@@ -12,61 +11,45 @@
     </ol>
 </nav>
 
-<!-- <div id="input-nav"><a href="{% url 'home' %}" class="primary1">Home</a> Students</div> -->
-
 {% if request.user.is_superuser or request.user.is_school_admin %}
 <div class="manage-wrap">
-    <a class="btn btn-sm btn-primary" href="{% url 'add_student' %}"><i class="fas fa-plus"></i>{% trans 'Add Student' %}</a>
-    <a class="btn btn-sm btn-primary" target="_blank" href="{% url 'student_list_pdf' %}"><i class="fas fa-download"></i>{% trans 'Download pdf' %}</a> <!--new-->
+    <a class="btn btn-primary" href="{% url 'add_student' %}"><i class="fas fa-plus"></i>{% trans 'Add Student' %}</a>
+    <a class="btn btn-primary" target="_blank" href="{% url 'student_list_pdf' %}"><i class="fas fa-download"></i> {% trans 'Download pdf' %}</a>
 </div>
 {% endif %}
 
-<div class="title-1"><i class="fas fa-user-graduate"></i>{% trans 'Students' %}</div>
-<br>
-<br>
+<p class="title-1"><i class="fas fa-user-graduate"></i>{% trans 'Students' %}</p>
 
 {% include 'snippets/messages.html' %}
 {% include 'snippets/filter_form.html' %}
 
-<div class="card-clean mb-4">
-    <div class="card-header-clean">
-        <h3>{% trans 'All Students' %}</h3>
+<ul class="nav nav-tabs mt-4" id="studentTab" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="nursery-tab" data-bs-toggle="tab" data-bs-target="#nursery" type="button" role="tab" aria-controls="nursery" aria-selected="true">
+        <i class="fas fa-baby me-2"></i>{% trans 'Nursery/Pre-School' %}
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="primary-tab" data-bs-toggle="tab" data-bs-target="#primary" type="button" role="tab" aria-controls="primary" aria-selected="false">
+        <i class="fas fa-child me-2"></i>{% trans 'Primary School' %}
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="jhs-tab" data-bs-toggle="tab" data-bs-target="#jhs" type="button" role="tab" aria-controls="jhs" aria-selected="false">
+        <i class="fas fa-user-graduate me-2"></i>{% trans 'JHS' %}
+      </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="studentTabContent">
+    <div class="tab-pane fade show active" id="nursery" role="tabpanel">
+        {% include 'accounts/snippets/student_table.html' with students=nursery_students %}
     </div>
-    <div class="card-body-clean">
-        {% if filter.qs %}
-        <div class="row">
-            {% for student in filter.qs %}
-            <div class="col-6 col-md-3 mb-3">
-                <a href="{% url 'profile_single' student.student.id %}" style="text-decoration: none;">
-                    <div class="card-clean p-3 text-center h-100 d-flex flex-column align-items-center justify-content-center shadow-sm" style="margin-bottom: 0; min-height: 100px; transition: transform 0.2s; border: 1px solid #f1f3f4;">
-                        {% if student.student.picture %}
-                        <img src="{{ student.student.picture.url }}" class="rounded-circle mb-2" width="40" height="40" alt="" style="object-fit: cover; border: 2px solid #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                        {% else %}
-                        <div class="rounded-circle mb-2 bg-light d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; border: 2px solid #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                            <i class="fas fa-user text-muted"></i>
-                        </div>
-                        {% endif %}
-                        <h6 class="m-0 text-dark fw-bold">{{ student.student.get_full_name }}</h6>
-                        <small class="text-muted d-block mt-1">{{ student.program|truncatechars:20 }}</small>
-                        <small class="badge bg-light text-muted mt-2">{{ student.student.username }}</small>
-                    </div>
-                </a>
-            </div>
-            {% endfor %}
-        </div>
-        {% else %}
-        <div class="empty-state">
-            <div class="empty-state-icon"><i class="fas fa-user-graduate"></i></div>
-            <p class="empty-state-text">
-                {% trans 'No students found.' %}
-                {% if request.user.is_superuser or request.user.is_school_admin %}
-                <a href="{% url 'add_student' %}" class="btn-outline-clean mt-2 d-inline-block">
-                    {% trans 'Add Student Now' %}
-                </a>
-                {% endif %}
-            </p>
-        </div>
-        {% endif %}
+    <div class="tab-pane fade" id="primary" role="tabpanel">
+        {% include 'accounts/snippets/student_table.html' with students=primary_students %}
+    </div>
+    <div class="tab-pane fade" id="jhs" role="tabpanel">
+        {% include 'accounts/snippets/student_table.html' with students=jhs_students %}
     </div>
 </div>
 {% endblock content %}

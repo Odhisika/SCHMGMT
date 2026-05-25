@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% block title %}{% trans 'Term Weeks' %} | {% trans 'Learning management system' %}{% endblock title %}
+
+{% block content %}
+
+<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'semester_list' %}">{% trans 'Term List' %}</a></li>
+      <li class="breadcrumb-item active" aria-current="page">{{ term }} - {% trans 'Weeks' %}</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <p class="title-1 mb-0"><i class="fas fa-calendar-week"></i>{{ term }} - {% trans 'Weekly Activities' %}</p>
+    <div>
+        {% if term.start_date and term.end_date %}
+        <a href="{% url 'term_week_init' term_pk=term.pk %}" class="btn btn-outline-primary me-2" onclick="return confirm('{% trans 'Generate weeks from term dates? This will only work if no weeks exist yet.' %}')">
+            <i class="fas fa-magic"></i> {% trans 'Auto-Generate Weeks' %}
+        </a>
+        {% endif %}
+        <a href="{% url 'term_week_add' term_pk=term.pk %}" class="btn btn-primary"><i class="fas fa-plus"></i>{% trans 'Add Week' %}</a>
+    </div>
+</div>
+
+{% include 'snippets/messages.html' %}
+
+{% if weeks %}
+<div class="table-responsive table-shadow p-0 mt-3">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>{% trans 'Week' %}</th>
+                <th>{% trans 'Activity Type' %}</th>
+                <th>{% trans 'Title' %}</th>
+                <th>{% trans 'Description' %}</th>
+                <th>{% trans 'Active' %}</th>
+                <th>{% trans 'Actions' %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for week in weeks %}
+            <tr>
+                <td>{{ forloop.counter }}.</td>
+                <td><strong>{% trans 'Week' %} {{ week.week_number }}</strong></td>
+                <td>
+                    {% if week.activity_type == "normal_lesson" %}
+                        <span class="badge bg-primary"><i class="fas fa-book me-1"></i>{% trans 'Normal Lesson' %}</span>
+                    {% elif week.activity_type == "sports" %}
+                        <span class="badge bg-success"><i class="fas fa-running me-1"></i>{% trans 'Sports' %}</span>
+                    {% elif week.activity_type == "src" %}
+                        <span class="badge bg-warning text-dark"><i class="fas fa-users me-1"></i>{% trans 'SRC' %}</span>
+                    {% elif week.activity_type == "mid_term" %}
+                        <span class="badge bg-info text-dark"><i class="fas fa-pause-circle me-1"></i>{% trans 'Mid-Term Break' %}</span>
+                    {% elif week.activity_type == "holiday" %}
+                        <span class="badge bg-secondary"><i class="fas fa-sun me-1"></i>{% trans 'Holiday' %}</span>
+                    {% endif %}
+                </td>
+                <td>{{ week.title|default:"-" }}</td>
+                <td>{{ week.description|truncatewords:10|default:"-" }}</td>
+                <td>
+                    {% if week.is_active %}
+                        <i class="fas fa-check-circle text-success"></i>
+                    {% else %}
+                        <i class="fas fa-times-circle text-danger"></i>
+                    {% endif %}
+                </td>
+                <td>
+                    <div class="update-delete">
+                        <a href="{% url 'term_week_edit' term_pk=term.pk pk=week.pk %}" class="update" title="{% trans 'Edit' %}"><i class="fas fa-pencil-alt"></i></a>
+                        <a href="{% url 'term_week_delete' term_pk=term.pk pk=week.pk %}" class="delete" title="{% trans 'Delete' %}" onclick="return confirm('{% trans 'Delete this week?' %}')"><i class="fas fa-trash-alt"></i></a>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="empty-state text-center py-5">
+    <div class="empty-state-icon"><i class="fas fa-calendar-week fa-3x text-muted"></i></div>
+    <p class="empty-state-text text-muted mt-3">{% trans 'No weeks defined for this term yet.' %}</p>
+    {% if term.start_date and term.end_date %}
+    <a href="{% url 'term_week_init' term_pk=term.pk %}" class="btn btn-primary mt-2">
+        <i class="fas fa-magic"></i> {% trans 'Auto-Generate from Term Dates' %}
+    </a>
+    {% endif %}
+</div>
+{% endif %}
+
+{% endblock content %}

@@ -10,8 +10,8 @@ import json
 from accounts.decorators import admin_required, lecturer_required
 from accounts.models import User, Student
 from course.models import Program, Course
-from .forms import SemesterForm, NewsAndEventsForm
-from .models import NewsAndEvents, ActivityLog, Semester
+from .forms import SemesterForm, NewsAndEventsForm, TermWeekForm
+from .models import NewsAndEvents, ActivityLog, Semester, TermWeek
 
 
 # ########################################################
@@ -56,9 +56,29 @@ def home_view(request):
         items = items.filter(specific_q | general_q).distinct()
 
     items = items.order_by("-updated_date")
+
+    current_term = Semester.objects.filter(is_current_term=True, school=request.school).first()
+    term_weeks = TermWeek.objects.filter(term=current_term, is_active=True).order_by("week_number") if current_term else []
+
+    current_week = None
+    if current_term and current_term.start_date:
+        today = timezone.now().date()
+        days_since_start = (today - current_term.start_date).days
+        if days_since_start >= 0:
+            week_num = (days_since_start // 7) + 1
+            current_week = term_weeks.filter(week_number=week_num).first() if term_weeks else None
+    if not current_week and term_weeks:
+        current_week = term_weeks.first()
+
+    show_all = request.GET.get("show_all") == "1"
+
     context = {
         "title": "News & Events",
         "items": items,
+        "current_term": current_term,
+        "term_weeks": term_weeks,
+        "current_week": current_week,
+        "show_all": show_all,
     }
     return render(request, "core/index.html", context)
 
@@ -163,6 +183,9 @@ def dashboard_view(request):
         teacher_growth.append(t_c)
 
     
+    current_term = Semester.objects.filter(is_current_term=True, school=request.school).first()
+    term_weeks = TermWeek.objects.filter(term=current_term, is_active=True).order_by("week_number") if current_term else []
+
     context = {
         "student_count": student_count,
         "lecturer_count": teacher_count,
@@ -171,6 +194,8 @@ def dashboard_view(request):
         "females_count": females_count,
         "logs": logs,
         "selected_division": division,
+        "current_term": current_term,
+        "term_weeks": term_weeks,
         
         # Chart JSON
         "traffic_data": json.dumps({
@@ -305,6 +330,89 @@ def unset_current_semester(school):
     if current_semester:
         current_semester.is_current_term = False
         current_semester.save()
+
+
+# ########################################################
+# Term Weeks
+# ########################################################
+@login_required
+@lecturer_required
+def term_week_list_view(request, term_pk):
+    term = get_object_or_404(Semester, pk=term_pk, school=request.school)
+    weeks = TermWeek.objects.filter(term=term).order_by("week_number")
+    return render(request, "core/term_week_list.html", {"term": term, "weeks": weeks})
+
+
+@login_required
+@lecturer_required
+def term_week_add_view(request, term_pk):
+    term = get_object_or_404(Semester, pk=term_pk, school=request.school)
+    if request.method == "POST":
+        form = TermWeekForm(request.POST)
+        if form.is_valid():
+            week = form.save(commit=False)
+            week.term = term
+            week.save()
+            messages.success(request, f"Week {week.week_number} added successfully.")
+            return redirect("term_week_list", term_pk=term.pk)
+    else:
+        form = TermWeekForm()
+    return render(request, "core/term_week_form.html", {"form": form, "term": term})
+
+
+@login_required
+@lecturer_required
+def term_week_edit_view(request, term_pk, pk):
+    term = get_object_or_404(Semester, pk=term_pk, school=request.school)
+    week = get_object_or_404(TermWeek, pk=pk, term=term)
+    if request.method == "POST":
+        form = TermWeekForm(request.POST, instance=week)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"Week {week.week_number} updated.")
+            return redirect("term_week_list", term_pk=term.pk)
+    else:
+        form = TermWeekForm(instance=week)
+    return render(request, "core/term_week_form.html", {"form": form, "term": term, "week": week})
+
+
+@login_required
+@lecturer_required
+def term_week_delete_view(request, term_pk, pk):
+    term = get_object_or_404(Semester, pk=term_pk, school=request.school)
+    week = get_object_or_404(TermWeek, pk=pk, term=term)
+    week.delete()
+    messages.success(request, f"Week {week.week_number} deleted.")
+    return redirect("term_week_list", term_pk=term.pk)
+
+
+@login_required
+@lecturer_required
+def term_week_init_view(request, term_pk):
+    """Auto-generate weeks from term start_date to end_date (one week per 7 days)"""
+    term = get_object_or_404(Semester, pk=term_pk, school=request.school)
+    if not term.start_date or not term.end_date:
+        messages.error(request, "Set start and end dates for this term first.")
+        return redirect("term_week_list", term_pk=term.pk)
+
+    existing = TermWeek.objects.filter(term=term).count()
+    if existing > 0:
+        messages.warning(request, f"{existing} week(s) already exist. Delete them first to re-initialize.")
+        return redirect("term_week_list", term_pk=term.pk)
+
+    delta = (term.end_date - term.start_date).days
+    num_weeks = max(1, (delta // 7) + 1)
+
+    for w in range(1, num_weeks + 1):
+        TermWeek.objects.create(
+            term=term,
+            week_number=w,
+            activity_type="normal_lesson",
+            title=f"Week {w}",
+        )
+
+    messages.success(request, f"{num_weeks} week(s) generated from term dates.")
+    return redirect("term_week_list", term_pk=term.pk)
 
 
 from django.http import JsonResponse

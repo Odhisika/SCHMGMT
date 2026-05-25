@@ -39,32 +39,17 @@
         <i class="fas fa-user-graduate me-2"></i>{% trans 'JHS' %}
       </button>
     </li>
-    <li class="nav-item" role="presentation">
-      <button class="nav-link" id="unassigned-tab" data-bs-toggle="tab" data-bs-target="#unassigned" type="button" role="tab" aria-controls="unassigned" aria-selected="false">
-        <i class="fas fa-users me-2"></i>{% trans 'Others' %}
-      </button>
-    </li>
 </ul>
 
 <div class="tab-content" id="teacherTabContent">
-    <!-- Nursery Tab -->
     <div class="tab-pane fade show active" id="nursery" role="tabpanel" aria-labelledby="nursery-tab">
         {% include 'accounts/snippets/teacher_table.html' with lecturers=nursery_teachers %}
     </div>
-
-    <!-- Primary Tab -->
     <div class="tab-pane fade" id="primary" role="tabpanel" aria-labelledby="primary-tab">
         {% include 'accounts/snippets/teacher_table.html' with lecturers=primary_teachers %}
     </div>
-
-    <!-- JHS Tab -->
     <div class="tab-pane fade" id="jhs" role="tabpanel" aria-labelledby="jhs-tab">
         {% include 'accounts/snippets/teacher_table.html' with lecturers=jhs_teachers %}
-    </div>
-
-    <!-- Others Tab -->
-    <div class="tab-pane fade" id="unassigned" role="tabpanel" aria-labelledby="unassigned-tab">
-        {% include 'accounts/snippets/teacher_table.html' with lecturers=other_teachers %}
     </div>
 </div>
 {% endblock content %}

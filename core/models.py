@@ -134,6 +134,31 @@ class House(models.Model):
         return f"{self.name}"
 
 
+WEEK_ACTIVITY_TYPES = (
+    ("normal_lesson", _("Normal Lesson")),
+    ("sports", _("Sports")),
+    ("src", _("SRC")),
+    ("mid_term", _("Mid-Term Break")),
+    ("holiday", _("Holiday")),
+)
+
+
+class TermWeek(models.Model):
+    term = models.ForeignKey(Term, on_delete=models.CASCADE, related_name="weeks")
+    week_number = models.PositiveIntegerField(verbose_name=_("Week Number"))
+    activity_type = models.CharField(max_length=20, choices=WEEK_ACTIVITY_TYPES, default="normal_lesson", verbose_name=_("Activity Type"))
+    title = models.CharField(max_length=100, blank=True, verbose_name=_("Custom Title"))
+    description = models.TextField(blank=True, verbose_name=_("Description"))
+    is_active = models.BooleanField(default=True, verbose_name=_("Active"))
+
+    class Meta:
+        ordering = ["week_number"]
+        unique_together = ["term", "week_number"]
+
+    def __str__(self):
+        return f"{self.term} - Week {self.week_number}: {self.get_activity_type_display()}"
+
+
 class ActivityLog(models.Model):
     message = models.TextField()
     created_at = models.DateTimeField(auto_now=True)

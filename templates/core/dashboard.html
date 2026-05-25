@@ -126,6 +126,34 @@
 		</div>
 	</div>
 	<div class="col-md-6 p-2">
+		{% if current_term and term_weeks %}
+		<div class="card w-100 h-100 p-3">
+			<h5><i class="fas fa-calendar-alt me-2 text-primary"></i>{% trans 'Term Activities' %} — {{ current_term }}</h5>
+			<div class="row mt-2">
+				{% for week in term_weeks %}
+				<div class="col-4 col-md-3 mb-2">
+					<div class="text-center p-2 border rounded-3 bg-light" style="border-radius: 12px !important;">
+						<div class="mb-1">
+							{% if week.activity_type == "normal_lesson" %}
+								<span class="badge bg-primary rounded-circle p-2"><i class="fas fa-book text-white small"></i></span>
+							{% elif week.activity_type == "sports" %}
+								<span class="badge bg-success rounded-circle p-2"><i class="fas fa-running text-white small"></i></span>
+							{% elif week.activity_type == "src" %}
+								<span class="badge bg-warning rounded-circle p-2"><i class="fas fa-users text-dark small"></i></span>
+							{% elif week.activity_type == "mid_term" %}
+								<span class="badge bg-info rounded-circle p-2"><i class="fas fa-pause-circle text-dark small"></i></span>
+							{% elif week.activity_type == "holiday" %}
+								<span class="badge bg-secondary rounded-circle p-2"><i class="fas fa-sun text-white small"></i></span>
+							{% endif %}
+						</div>
+						<div class="fw-bold small">{% trans 'W' %}{{ week.week_number }}</div>
+						<small class="text-muted" style="font-size: 10px;">{{ week.get_activity_type_display }}</small>
+					</div>
+				</div>
+				{% endfor %}
+			</div>
+		</div>
+		{% else %}
 		<div class="card w-100 h-100 p-3">
 			<h5>{% trans 'Latest activities' %}</h5>
 			<ul class="ps-2 small">
@@ -136,6 +164,7 @@
 				{% endfor %}
 			</ul>
 		</div>
+		{% endif %}
 	</div>
 </div>
 <br>

@@ -11,6 +11,11 @@ from .views import (
     semester_delete_view,
     dashboard_view,
     get_users_for_targeting,
+    term_week_list_view,
+    term_week_add_view,
+    term_week_edit_view,
+    term_week_delete_view,
+    term_week_init_view,
 )
 
 
@@ -25,6 +30,13 @@ urlpatterns = [
     path("semester/<int:pk>/edit/", semester_update_view, name="edit_semester"),
     path("semester/<int:pk>/delete/", semester_delete_view, name="delete_semester"),
     path("dashboard/", dashboard_view, name="dashboard"),
+    
+    # Term Weeks
+    path("semester/<int:term_pk>/weeks/", term_week_list_view, name="term_week_list"),
+    path("semester/<int:term_pk>/weeks/add/", term_week_add_view, name="term_week_add"),
+    path("semester/<int:term_pk>/weeks/<int:pk>/edit/", term_week_edit_view, name="term_week_edit"),
+    path("semester/<int:term_pk>/weeks/<int:pk>/delete/", term_week_delete_view, name="term_week_delete"),
+    path("semester/<int:term_pk>/weeks/init/", term_week_init_view, name="term_week_init"),
     
     # AJAX
     path("api/users/", get_users_for_targeting, name="get_users_for_targeting"),

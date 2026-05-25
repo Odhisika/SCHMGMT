@@ -28,10 +28,8 @@
 		{% url 'course_registration' as cr %} {% url 'edit_profile' as ep %} {% url 'change_password' as cp %}
 		{% url 'quiz_progress' as qpr %} {% url 'quiz_marking' as qce %} {% url 'user_course_list' as ucl %}
 		{% url 'admin_panel' as admin_p %}
-		
 
-
-		<ul hx-target="#main-content" hx-select="#main-content" hx-swap="innerHTML show:window:top" hx-push-url="true">
+		<ul class="sidebar-top-items" hx-target="#main-content" hx-select="#main-content" hx-swap="innerHTML show:window:top" hx-push-url="true">
 			{% if request.user.is_superuser or request.user.is_school_admin %}
 			<li class="{% if request.path == dash %}active{% endif %}">
 				<a href="{% url 'dashboard' %}"><i class="fas fa-tachometer-alt"></i>{% trans 'Dashboard' %}</a>
@@ -40,163 +38,187 @@
 			<li class="{% if request.path == hom %}active{% endif %}">
 				<a href="{% url 'home' %}"><i class="fas fa-home"></i>{% trans 'Home' %}</a>
 			</li>
-			<li class="{% if request.path == prof %}active{% endif %}">
-				<a href="{% url 'profile' %}"><i class="fas fa-user"></i>{% trans 'Profile' %}</a>
-			</li>
-
-			{% if request.user.is_superuser and superadmin_urls_available %}
-			<li class="{% if '/superadmin/' == request.path %}active{% endif %}">
-				<a href="{% url 'superadmin:dashboard' %}"><i class="fas fa-user-shield"></i>{% trans 'Super Admin Dashboard' %}</a>
-			</li>
-			<li class="{% if '/superadmin/schools/' in request.path %}active{% endif %}">
-				<a href="{% url 'superadmin:school_list' %}"><i class="fas fa-university"></i>{% trans 'Manage Schools' %}</a>
-			</li>
-			{% endif %}
-			
-			{% if request.user.is_superuser or request.user.is_school_admin %}
-			<li class="{% if request.path == lec %}active{% endif %}">
-				<a href="{% url 'lecturer_list' %}"><i class="fas fa-chalkboard-teacher"></i>{% trans 'Teachers' %}</a>
-			</li>
-			{% endif %}
-
-			{% if request.user.is_superuser or request.user.is_school_admin or request.user.is_lecturer or request.user.is_teacher %}
-			<li class="{% if '/accounts/classes/' in request.path %}active{% endif %}">
-				<a href="{% url 'class_list' %}"><i class="fas fa-layer-group"></i>{% trans 'Classes & Students' %}</a>
-			</li>
-			{% endif %}
-
-			{% if request.user.is_lecturer or request.user.is_teacher or request.user.is_student %}
-			<li class="{% if request.path == ucl %}active{% endif %}">
-				<a href="{% url 'user_course_list' %}"><i class="fas fa-book"></i>{% trans 'My Subjects' %}</a>
-			</li>
-			<li class="{% if '/resources/' in request.path %}active{% endif %}">
-				<a href="{% url 'resources:overview' %}"><i class="fas fa-folder-open"></i>{% trans 'Learning Resources' %}</a>
-			</li>
-			<li class="{% if request.path == ttable %}active{% endif %}">
-				<a href="{% url 'timetable:timetable_dashboard' %}"><i class="fas fa-calendar-alt"></i>{% trans 'Timetable' %}</a>
-			</li>
-			{% endif %}
-
-			{% if request.user.is_superuser or request.user.is_school_admin or request.user.is_lecturer or request.user.is_teacher %}
-			<li class="{% if '/attendance/' in request.path %}active{% endif %}">
-				<a href="{% url 'attendance:dashboard' %}"><i class="fas fa-clipboard-check"></i>{% trans 'Attendance' %}</a>
-			</li>
-			{% endif %}
-
-			{% if request.user.is_student or request.user.is_superuser or request.user.is_school_admin %}
-			<li class="{% if '/fees/' in request.path %}active{% endif %}">
-				<a href="{% url 'fees:dashboard' %}"><i class="fas fa-money-bill-wave"></i>{% trans 'Payments' %}</a>
-			</li>
-			{% endif %}
-
-			{% if request.user.is_superuser or request.user.is_school_admin or request.user.is_lecturer or request.user.is_teacher %}
-			<li class="{% if request.path == pro %}active{% endif %}">
-				<a href="{% url 'programs' %}"><i class="fas fa-book-open"></i>{% trans 'Classes & Subjects' %}</a>
-			</li>
-			{% endif %}
-
-			{% if request.user.is_superuser or request.user.is_school_admin or request.user.is_lecturer or request.user.is_teacher %}
-			<li class="{% if request.path == qce %}active{% endif %}">
-				<a href="{% url 'quiz_marking' %}"><i class="fas fa-check-double"></i>{% trans 'Complete Exams' %}</a>
-			</li>
-			{% endif %}
-
-			{% if request.user.is_superuser or request.user.is_school_admin %}
-			<li class="{% if request.path == qpr %}active{% endif %}">
-				<a href="{% url 'quiz_progress' %}"><i class="fas fa-record-vinyl"></i>{% trans 'Quiz Progress Rec' %}</a>
-			</li>
-			<li class="{% if request.path == cav %}active{% endif %}">
-				<a href="{% url 'course_allocation_view' %}"><i class="fas fa-tasks"></i>{% trans 'Subject Allocation' %}</a>
-			</li>
-
-			<li class="{% if request.path == sem %}active{% endif %}">
-				<a href="{% url 'semester_list' %}"><i class="fas fa-calendar-alt"></i>{% trans 'Manage Terms' %}</a>
-			</li>
-			<li class="{% if '/result/report-cards/' in request.path %}active{% endif %}">
-				<a href="{% url 'report_cards' %}"><i class="fas fa-file-invoice"></i>{% trans 'Report Cards' %}</a>
-			</li>
-			<li class="{% if '/result/promotion/' in request.path %}active{% endif %}">
-				<a href="{% url 'create_promotion' %}"><i class="fas fa-graduation-cap"></i>{% trans 'Promote Students' %}</a>
-			</li>
-			<li class="{% if '/result/manage-score/requests/' in request.path %}active{% endif %}">
-				<a href="{% url 'result_amendment_requests' %}"><i class="fas fa-clipboard-check"></i>{% trans 'Result Requests' %}</a>
-			</li>
-			<li class="{% if request.path == ttable %}active{% endif %}">
-				<a href="{% url 'timetable:timetable_dashboard' %}"><i class="fas fa-calendar-alt"></i>{% trans 'Timetable' %}</a>
-			</li>
-			{% endif %}
-
-			{% if request.user.is_superuser or request.user.is_school_admin %}
-			<li class="{% if '/admin/lesson-notes/' in request.path %}active{% endif %}">
-				<a href="{% url 'lesson_note_admin_list' %}"><i class="fas fa-clipboard-list"></i>{% trans 'Review Lesson Notes' %}</a>
-			</li>
-
-			{% endif %}
-
-			{% if request.user.is_lecturer or request.user.is_teacher %}
-			<li class="{% if request.path == ascore %}active{% endif %}">
-				<a href="{% url 'manage_scores' %}"><i class="fas fa-table"></i>{% trans 'Manage Scores' %}</a>
-			</li>
-			<li class="{% if '/lesson-notes/' in request.path and '/admin/' not in request.path %}active{% endif %}">
-				<a href="{% url 'lesson_note_list' %}"><i class="fas fa-book-reader"></i>{% trans 'Lesson Notes' %}</a>
-			</li>
-			<li class="{% if '/result/manage-score/requests/' in request.path %}active{% endif %}">
-				<a href="{% url 'result_amendment_requests' %}"><i class="fas fa-clipboard-check"></i>{% trans 'Result Requests' %}</a>
-			</li>
-			<li class="{% if request.path == ucl %}active{% endif %}">
-				<a href="{% url 'user_course_list' %}"><i class="fas fa-list-alt"></i>{% trans 'Quizzes' %}</a>
-			</li>
-			{% endif %}
-
-			{% if request.user.is_student %}
-			<li class="{% if request.path == qpr %}active{% endif %}">
-				<a href="{% url 'quiz_progress' %}"><i class="fas fa-record-vinyl"></i>{% trans 'Quiz Progress Rec' %}</a>
-			</li>
-			<li class="{% if request.path == ucl %}active{% endif %}">
-				<a href="{% url 'user_course_list' %}"><i class="fas fa-list-alt"></i>{% trans 'Quizzes' %}</a>
-			</li>
-			<li class="{% if request.path == vr %}active{% endif %}">
-				<a href="{% url 'grade_results' %}"><i class="fa fa-spell-check"></i>{% trans 'Report Card' %}</a>
-			</li>
-			<li class="{% if request.path == ar %}active{% endif %}">
-				<a href="{% url 'ass_results' %}"><i class="fa fa-list-ol"></i> {% trans 'Assessment Results' %}</a>
-			</li>
-			<li class="{% if '/attendance/my-attendance/' in request.path %}active{% endif %}">
-				<a href="{% url 'attendance:student_view' %}"><i class="fas fa-user-check"></i>{% trans 'My Attendance' %}</a>
-			</li>
-			{% endif %}
-
-			{% if request.user.is_parent %}
-			<li class="{% if '/attendance/parent-attendance/' in request.path %}active{% endif %}">
-				<a href="{% url 'attendance:parent_view' %}"><i class="fas fa-child"></i>{% trans 'Ward Attendance' %}</a>
-			</li>
-			<li class="{% if '/fees/history/' in request.path %}active{% endif %}">
-				<!-- Parents might want to see payment history too, keeping it simple for now as requested -->
-			</li>
-			{% endif %}
-			<br />
-			<p class="ms-3 text-secondary">&RightArrow; Others</p>
-			<li class="{% if request.path == ep %}active{% endif %}">
-				<a href="{% url 'edit_profile' %}"><i class="fas fa-cogs"></i>{% trans 'Account Setting' %}</a>
-			</li>
-			<li class="{% if request.path == cp %}active{% endif %}">
-				<a href="{% url 'change_password' %}"><i class="fas fa-key"></i>{% trans 'Change Password' %}</a>
-			</li>
-			{% if request.user.is_superuser or request.user.is_school_admin %}
-			<li class="{% if '/school/settings/' in request.path %}active{% endif %}">
-				<a href="{% url 'school_settings' %}"><i class="fas fa-school-flag"></i>{% trans 'School Settings' %}</a>
-			</li>
-			{% endif %}
 		</ul>
+
+		<!-- Home & Profile -->
+		<div class="menu-group">
+			<div class="menu-group-header" data-group="home-profile" onclick="toggleMenuGroup(this)">
+				<span><i class="fas fa-user-circle group-icon"></i>{% trans 'Home & Profile' %}</span>
+				<i class="fas fa-chevron-right chevron-icon"></i>
+			</div>
+			<ul class="menu-group-items" hx-target="#main-content" hx-select="#main-content" hx-swap="innerHTML show:window:top" hx-push-url="true">
+				<li class="{% if request.path == prof %}active{% endif %}">
+					<a href="{% url 'profile' %}"><i class="fas fa-user"></i>{% trans 'Profile' %}</a>
+				</li>
+				<li class="{% if request.path == ep %}active{% endif %}">
+					<a href="{% url 'edit_profile' %}"><i class="fas fa-cogs"></i>{% trans 'Account Setting' %}</a>
+				</li>
+				<li class="{% if request.path == cp %}active{% endif %}">
+					<a href="{% url 'change_password' %}"><i class="fas fa-key"></i>{% trans 'Change Password' %}</a>
+				</li>
+			</ul>
+		</div>
+
+		<!-- Academics -->
+		<div class="menu-group">
+			<div class="menu-group-header" data-group="academics" onclick="toggleMenuGroup(this)">
+				<span><i class="fas fa-graduation-cap group-icon"></i>{% trans 'Academics' %}</span>
+				<i class="fas fa-chevron-right chevron-icon"></i>
+			</div>
+			<ul class="menu-group-items" hx-target="#main-content" hx-select="#main-content" hx-swap="innerHTML show:window:top" hx-push-url="true">
+				{% if request.user.is_lecturer or request.user.is_teacher or request.user.is_student %}
+				<li class="{% if request.path == ucl %}active{% endif %}">
+					<a href="{% url 'user_course_list' %}"><i class="fas fa-book"></i>{% trans 'My Subjects' %}</a>
+				</li>
+				<li class="{% if '/resources/' in request.path %}active{% endif %}">
+					<a href="{% url 'resources:overview' %}"><i class="fas fa-folder-open"></i>{% trans 'Learning Resources' %}</a>
+				</li>
+				{% endif %}
+				{% if request.user.is_superuser or request.user.is_school_admin or request.user.is_lecturer or request.user.is_teacher or request.user.is_student %}
+				<li class="{% if request.path == ttable %}active{% endif %}">
+					<a href="{% url 'timetable:timetable_dashboard' %}"><i class="fas fa-calendar-alt"></i>{% trans 'Timetable' %}</a>
+				</li>
+				{% endif %}
+				{% if request.user.is_superuser or request.user.is_school_admin or request.user.is_lecturer or request.user.is_teacher %}
+				<li class="{% if request.path == pro %}active{% endif %}">
+					<a href="{% url 'programs' %}"><i class="fas fa-book-open"></i>{% trans 'Classes & Subjects' %}</a>
+				</li>
+				<li class="{% if '/accounts/classes/' in request.path %}active{% endif %}">
+					<a href="{% url 'class_list' %}"><i class="fas fa-layer-group"></i>{% trans 'Classes & Students' %}</a>
+				</li>
+				{% endif %}
+				{% if request.user.is_superuser or request.user.is_school_admin %}
+				<li class="{% if request.path == cav %}active{% endif %}">
+					<a href="{% url 'course_allocation_view' %}"><i class="fas fa-tasks"></i>{% trans 'Subject Allocation' %}</a>
+				</li>
+				<li class="{% if request.path == sem %}active{% endif %}">
+					<a href="{% url 'semester_list' %}"><i class="fas fa-calendar-alt"></i>{% trans 'Manage Terms' %}</a>
+				</li>
+				{% endif %}
+				{% if request.user.is_lecturer or request.user.is_teacher %}
+				<li class="{% if '/lesson-notes/' in request.path and '/admin/' not in request.path %}active{% endif %}">
+					<a href="{% url 'lesson_note_list' %}"><i class="fas fa-book-reader"></i>{% trans 'Lesson Notes' %}</a>
+				</li>
+				{% endif %}
+				{% if request.user.is_superuser or request.user.is_school_admin %}
+				<li class="{% if '/admin/lesson-notes/' in request.path %}active{% endif %}">
+					<a href="{% url 'lesson_note_admin_list' %}"><i class="fas fa-clipboard-list"></i>{% trans 'Review Lesson Notes' %}</a>
+				</li>
+				{% endif %}
+			</ul>
+		</div>
+
+		<!-- Exams & Results -->
+		<div class="menu-group">
+			<div class="menu-group-header" data-group="exams-results" onclick="toggleMenuGroup(this)">
+				<span><i class="fas fa-file-invoice-dollar group-icon"></i>{% trans 'Exams & Results' %}</span>
+				<i class="fas fa-chevron-right chevron-icon"></i>
+			</div>
+			<ul class="menu-group-items" hx-target="#main-content" hx-select="#main-content" hx-swap="innerHTML show:window:top" hx-push-url="true">
+				{% if request.user.is_lecturer or request.user.is_teacher or request.user.is_student %}
+				<li class="{% if request.path == ucl %}active{% endif %}">
+					<a href="{% url 'user_course_list' %}"><i class="fas fa-list-alt"></i>{% trans 'Quizzes' %}</a>
+				</li>
+				{% endif %}
+				{% if request.user.is_superuser or request.user.is_school_admin or request.user.is_lecturer or request.user.is_teacher %}
+				<li class="{% if request.path == qce %}active{% endif %}">
+					<a href="{% url 'quiz_marking' %}"><i class="fas fa-check-double"></i>{% trans 'Complete Exams' %}</a>
+				</li>
+				{% endif %}
+				{% if request.user.is_superuser or request.user.is_school_admin or request.user.is_student %}
+				<li class="{% if request.path == qpr %}active{% endif %}">
+					<a href="{% url 'quiz_progress' %}"><i class="fas fa-record-vinyl"></i>{% trans 'Quiz Progress Rec' %}</a>
+				</li>
+				{% endif %}
+				{% if request.user.is_lecturer or request.user.is_teacher %}
+				<li class="{% if request.path == ascore %}active{% endif %}">
+					<a href="{% url 'manage_scores' %}"><i class="fas fa-table"></i>{% trans 'Manage Scores' %}</a>
+				</li>
+				{% endif %}
+				{% if request.user.is_superuser or request.user.is_school_admin %}
+				<li class="{% if '/result/report-cards/' in request.path %}active{% endif %}">
+					<a href="{% url 'report_cards' %}"><i class="fas fa-file-invoice"></i>{% trans 'Report Cards' %}</a>
+				</li>
+				{% endif %}
+				{% if request.user.is_student %}
+				<li class="{% if request.path == vr %}active{% endif %}">
+					<a href="{% url 'grade_results' %}"><i class="fa fa-spell-check"></i>{% trans 'Report Card' %}</a>
+				</li>
+				<li class="{% if request.path == ar %}active{% endif %}">
+					<a href="{% url 'ass_results' %}"><i class="fa fa-list-ol"></i>{% trans 'Assessment Results' %}</a>
+				</li>
+				{% endif %}
+				{% if request.user.is_superuser or request.user.is_school_admin or request.user.is_lecturer or request.user.is_teacher %}
+				<li class="{% if '/result/manage-score/requests/' in request.path %}active{% endif %}">
+					<a href="{% url 'result_amendment_requests' %}"><i class="fas fa-clipboard-check"></i>{% trans 'Result Requests' %}</a>
+				</li>
+				{% endif %}
+				{% if request.user.is_superuser or request.user.is_school_admin %}
+				<li class="{% if '/result/promotion/' in request.path %}active{% endif %}">
+					<a href="{% url 'create_promotion' %}"><i class="fas fa-graduation-cap"></i>{% trans 'Promote Students' %}</a>
+				</li>
+				{% endif %}
+			</ul>
+		</div>
+
+		<!-- Administration -->
+		<div class="menu-group">
+			<div class="menu-group-header" data-group="administration" onclick="toggleMenuGroup(this)">
+				<span><i class="fas fa-sliders-h group-icon"></i>{% trans 'Administration' %}</span>
+				<i class="fas fa-chevron-right chevron-icon"></i>
+			</div>
+			<ul class="menu-group-items" hx-target="#main-content" hx-select="#main-content" hx-swap="innerHTML show:window:top" hx-push-url="true">
+				{% if request.user.is_superuser and superadmin_urls_available %}
+				<li class="{% if '/superadmin/' == request.path %}active{% endif %}">
+					<a href="{% url 'superadmin:dashboard' %}"><i class="fas fa-user-shield"></i>{% trans 'Super Admin Dashboard' %}</a>
+				</li>
+				<li class="{% if '/superadmin/schools/' in request.path %}active{% endif %}">
+					<a href="{% url 'superadmin:school_list' %}"><i class="fas fa-university"></i>{% trans 'Manage Schools' %}</a>
+				</li>
+				{% endif %}
+				{% if request.user.is_superuser or request.user.is_school_admin %}
+				<li class="{% if request.path == lec %}active{% endif %}">
+					<a href="{% url 'lecturer_list' %}"><i class="fas fa-chalkboard-teacher"></i>{% trans 'Teachers' %}</a>
+				</li>
+				<li class="{% if request.path == stu %}active{% endif %}">
+					<a href="{% url 'student_list' %}"><i class="fas fa-user-graduate"></i>{% trans 'Students' %}</a>
+				</li>
+				{% endif %}
+				{% if request.user.is_superuser or request.user.is_school_admin or request.user.is_lecturer or request.user.is_teacher %}
+				<li class="{% if '/attendance/' in request.path %}active{% endif %}">
+					<a href="{% url 'attendance:dashboard' %}"><i class="fas fa-clipboard-check"></i>{% trans 'Attendance' %}</a>
+				</li>
+				{% endif %}
+				{% if request.user.is_student %}
+				<li class="{% if '/attendance/my-attendance/' in request.path %}active{% endif %}">
+					<a href="{% url 'attendance:student_view' %}"><i class="fas fa-user-check"></i>{% trans 'My Attendance' %}</a>
+				</li>
+				{% endif %}
+				{% if request.user.is_parent %}
+				<li class="{% if '/attendance/parent-attendance/' in request.path %}active{% endif %}">
+					<a href="{% url 'attendance:parent_view' %}"><i class="fas fa-child"></i>{% trans 'Ward Attendance' %}</a>
+				</li>
+				{% endif %}
+				{% if request.user.is_student or request.user.is_superuser or request.user.is_school_admin %}
+				<li class="{% if '/fees/' in request.path %}active{% endif %}">
+					<a href="{% url 'fees:dashboard' %}"><i class="fas fa-money-bill-wave"></i>{% trans 'Payments' %}</a>
+				</li>
+				{% endif %}
+				{% if request.user.is_superuser or request.user.is_school_admin %}
+				<li class="{% if '/school/settings/' in request.path %}active{% endif %}">
+					<a href="{% url 'school_settings' %}"><i class="fas fa-school-flag"></i>{% trans 'School Settings' %}</a>
+				</li>
+				{% endif %}
+			</ul>
+		</div>
 	</div>
 
 	<footer class="card-footer mt-5 pt-3 pb-5 px-2"></footer>
-	<!-- #All right reserver lig dev team  -->
-	 <p>
+	<p>
 		All right reserved &copy; <script>document.write(new Date().getFullYear());</script> lig dev team
 		<br />
 		<a href="#">ligdevteam</a>
-	 </p>
+	</p>
 </div>
 
 {% block js %}
@@ -205,15 +227,27 @@
 	if (langSelect) {
 		langSelect.addEventListener("change", function() {
 			console.log("Changed!")
-			document.getElementById("lang-form").submit();  // Submit the form programmatically
+			document.getElementById("lang-form").submit();
 		});
+	}
+
+	// Toggle collapse groups
+	function toggleMenuGroup(header) {
+	    header.classList.toggle("expanded");
+
+	    const groupName = header.getAttribute("data-group");
+	    if (header.classList.contains("expanded")) {
+	        sessionStorage.setItem(`sidebar_group_${groupName}`, "open");
+	    } else {
+	        sessionStorage.removeItem(`sidebar_group_${groupName}`);
+	    }
 	}
 
 	// Sidebar Scroll and State Management
 	document.addEventListener("DOMContentLoaded", function() {
 		const sidebar = document.getElementById('side-nav');
 		const key = 'schmgmt_sidebar_pos';
-		const DEBUG = false; // Set to true for debugging
+		const DEBUG = false;
 
 		if (!sidebar) return;
 
@@ -227,11 +261,10 @@
 			if (!activeItem) {
 				const currentPath = window.location.pathname;
 				log("No server-side active item found. Checking Path: " + currentPath);
-				
+
 				const links = sidebar.querySelectorAll('a');
 				for (const link of links) {
 					const href = link.getAttribute('href');
-					// Check exact match or sub-path match
 					if (href === currentPath || (href !== '/' && currentPath.startsWith(href))) {
 						activeItem = link.parentElement;
 						activeItem.classList.add('active');
@@ -245,33 +278,47 @@
 			return activeItem;
 		}
 
-		// 2. Restore Scroll Position
+		// 2. Restore Sidebar State (scroll + expanded groups)
 		function restoreSidebarState() {
 			const activeItem = markActiveItem();
-			const savedPos = sessionStorage.getItem(key);
 
+			// Restore previously expanded states from sessionStorage
+			const headers = sidebar.querySelectorAll(".menu-group-header");
+			headers.forEach(header => {
+				const groupName = header.getAttribute("data-group");
+				if (sessionStorage.getItem(`sidebar_group_${groupName}`) === "open") {
+					header.classList.add("expanded");
+				}
+			});
+
+			// Ensure the group containing the active item is expanded
+			if (activeItem) {
+				const parentGroup = activeItem.closest(".menu-group-items");
+				if (parentGroup) {
+					const header = parentGroup.previousElementSibling;
+					if (header && header.classList.contains("menu-group-header")) {
+						header.classList.add("expanded");
+					}
+				}
+			}
+
+			const savedPos = sessionStorage.getItem(key);
 			if (savedPos && parseInt(savedPos) > 0) {
 				sidebar.scrollTop = parseInt(savedPos);
 				log("Restored scroll position: " + savedPos);
 			}
-			
-			// 3. Force Active Item into View
+
 			if (activeItem) {
 				log("Scrolling active item into view");
-				// Use timeout to ensure layout is done
 				setTimeout(() => {
 					activeItem.scrollIntoView({ block: 'center', behavior: 'auto' });
 				}, 100);
 			}
 		}
 
-		// Run logic
 		restoreSidebarState();
-		
-		// Run again after a delay to handle layout shifts (images, etc)
 		setTimeout(restoreSidebarState, 500);
 
-		// Save position on scroll
 		sidebar.addEventListener('scroll', function() {
 			sessionStorage.setItem(key, sidebar.scrollTop);
 		});

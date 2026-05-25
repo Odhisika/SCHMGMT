@@ -19,6 +19,75 @@
 
 {% include 'snippets/messages.html' %}
 
+{% if current_term and current_week %}
+<div class="card mb-4">
+    <div class="card-header bg-primary text-white d-flex align-items-center justify-content-between">
+        <div>
+            <i class="fas fa-calendar-alt me-2"></i>
+            <strong>{{ current_term }} — {% trans 'This Week' %}</strong>
+        </div>
+        <a href="{% if show_all %}?{% else %}?show_all=1{% endif %}" class="btn btn-sm btn-light">
+            {% if show_all %}<i class="fas fa-compress me-1"></i>{% trans 'Show Less' %}{% else %}<i class="fas fa-expand me-1"></i>{% trans 'View All Weeks' %}{% endif %}
+        </a>
+    </div>
+    <div class="card-body p-3">
+        <div class="row">
+            {% if show_all %}
+                {% for week in term_weeks %}
+                <div class="col-6 col-md-3 col-lg-2 mb-3">
+                    <div class="card h-100 text-center border-0 shadow-sm {% if week == current_week %}border border-primary{% endif %}" style="border-radius: 12px;">
+                        <div class="card-body py-3 px-2">
+                            <div class="mb-2">
+                                {% if week.activity_type == "normal_lesson" %}
+                                    <span class="badge bg-primary rounded-circle p-3" style="font-size: 1.2rem;"><i class="fas fa-book text-white"></i></span>
+                                {% elif week.activity_type == "sports" %}
+                                    <span class="badge bg-success rounded-circle p-3" style="font-size: 1.2rem;"><i class="fas fa-running text-white"></i></span>
+                                {% elif week.activity_type == "src" %}
+                                    <span class="badge bg-warning rounded-circle p-3" style="font-size: 1.2rem;"><i class="fas fa-users text-dark"></i></span>
+                                {% elif week.activity_type == "mid_term" %}
+                                    <span class="badge bg-info rounded-circle p-3" style="font-size: 1.2rem;"><i class="fas fa-pause-circle text-dark"></i></span>
+                                {% elif week.activity_type == "holiday" %}
+                                    <span class="badge bg-secondary rounded-circle p-3" style="font-size: 1.2rem;"><i class="fas fa-sun text-white"></i></span>
+                                {% endif %}
+                            </div>
+                            <h6 class="fw-bold mb-0 small">{% trans 'Week' %} {{ week.week_number }}</h6>
+                            <small class="text-muted d-block">
+                                {% if week.title %}{{ week.title }}{% else %}{{ week.get_activity_type_display }}{% endif %}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="col-6 col-md-3 col-lg-2 mb-3 mx-auto">
+                    <div class="card h-100 text-center border-0 shadow-sm border border-primary" style="border-radius: 12px;">
+                        <div class="card-body py-3 px-2">
+                            <div class="mb-2">
+                                {% if current_week.activity_type == "normal_lesson" %}
+                                    <span class="badge bg-primary rounded-circle p-3" style="font-size: 1.2rem;"><i class="fas fa-book text-white"></i></span>
+                                {% elif current_week.activity_type == "sports" %}
+                                    <span class="badge bg-success rounded-circle p-3" style="font-size: 1.2rem;"><i class="fas fa-running text-white"></i></span>
+                                {% elif current_week.activity_type == "src" %}
+                                    <span class="badge bg-warning rounded-circle p-3" style="font-size: 1.2rem;"><i class="fas fa-users text-dark"></i></span>
+                                {% elif current_week.activity_type == "mid_term" %}
+                                    <span class="badge bg-info rounded-circle p-3" style="font-size: 1.2rem;"><i class="fas fa-pause-circle text-dark"></i></span>
+                                {% elif current_week.activity_type == "holiday" %}
+                                    <span class="badge bg-secondary rounded-circle p-3" style="font-size: 1.2rem;"><i class="fas fa-sun text-white"></i></span>
+                                {% endif %}
+                            </div>
+                            <h6 class="fw-bold mb-0 small">{% trans 'Week' %} {{ current_week.week_number }}</h6>
+                            <small class="text-muted d-block">
+                                {% if current_week.title %}{{ current_week.title }}{% else %}{{ current_week.get_activity_type_display }}{% endif %}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <div>
     <div class="title-1">{% trans 'News' %} &amp; {% trans 'Events' %}</div>
 </div>

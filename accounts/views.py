@@ -410,11 +410,20 @@ class StudentListView(FilterView):
     paginate_by = 10
 
     def get_queryset(self):
-        return Student.objects.filter(student__school=self.request.school)
+        return Student.objects.filter(student__school=self.request.school).select_related("student", "program")
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["title"] = "Students"
+
+        qs = self.get_queryset()
+        filtered_qs = self.filterset_class(self.request.GET, queryset=qs).qs
+
+        context["nursery_students"] = filtered_qs.filter(student__division=settings.DIVISION_NURSERY)
+        context["primary_students"] = filtered_qs.filter(student__division=settings.DIVISION_PRIMARY)
+        context["jhs_students"] = filtered_qs.filter(student__division=settings.DIVISION_JHS)
+        context["other_students"] = filtered_qs.filter(student__division__isnull=True)
+
         return context
 
 

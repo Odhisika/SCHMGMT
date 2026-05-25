@@ -1,5 +1,5 @@
 from django import forms
-from .models import NewsAndEvents, Term, TERM
+from .models import NewsAndEvents, Term, TERM, TermWeek, WEEK_ACTIVITY_TYPES
 
 # Keep Semester as alias for backward compatibility
 Semester = Term
@@ -132,6 +132,19 @@ class TermForm(forms.ModelForm):
     class Meta:
         model = Term
         fields = ["term", "year", "is_current_term", "start_date", "end_date", "next_term_begins", "result_released"]
+
+
+class TermWeekForm(forms.ModelForm):
+    class Meta:
+        model = TermWeek
+        fields = ["week_number", "activity_type", "title", "description", "is_active"]
+        widgets = {
+            "week_number": forms.NumberInput(attrs={"class": "form-control", "min": 1}),
+            "activity_type": forms.Select(attrs={"class": "form-control"}),
+            "title": forms.TextInput(attrs={"class": "form-control", "placeholder": "Optional custom title"}),
+            "description": forms.Textarea(attrs={"class": "form-control", "rows": 3, "placeholder": "Optional description"}),
+            "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        }
 
 
 # Keep SemesterForm as alias for backward compatibility

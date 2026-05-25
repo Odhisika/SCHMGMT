@@ -404,18 +404,47 @@ video {
     display: flex;
     align-items: center;
     padding: .8rem 1rem;
-    color: #666;
+    color: #222;
+    font-weight: 500;
     border-radius: 0 2em 2em 0;
     transition: .25s
 }
 
+#side-nav ul li a i,
+#side-nav ul li a .fas,
+#side-nav ul li a .fa {
+    width: 36px;
+    height: 36px;
+    background-color: rgba(0, 0, 0, .06);
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 12px;
+    font-size: 15px;
+    flex-shrink: 0
+}
+
 #side-nav ul li a:hover {
     color: #007bff;
-    background: rgba(0, 111, 255, .1)
+    background: rgba(0, 111, 255, .08)
+}
+
+#side-nav ul li a:hover i,
+#side-nav ul li a:hover .fas,
+#side-nav ul li a:hover .fa {
+    background-color: rgba(0, 111, 255, .12)
 }
 
 #side-nav ul li.active a {
     background: var(--bs-primary);
+    color: #fff
+}
+
+#side-nav ul li.active a i,
+#side-nav ul li.active a .fas,
+#side-nav ul li.active a .fa {
+    background-color: rgba(255, 255, 255, .2);
     color: #fff
 }
 
@@ -1290,3 +1319,15 @@ video {
         left: 250px;
     }
 }
+
+.menu-group{margin-bottom:5px}
+.menu-group-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;color:#444;cursor:pointer;font-size:14px;font-weight:700;border-radius:6px;margin:4px 8px;transition:all .2s ease;user-select:none}
+.menu-group-header:hover{background-color:rgba(0,0,0,.04);color:#222}
+.menu-group-header:hover i.group-icon{background-color:rgba(0,111,255,.12);color:#fff}
+.menu-group-header i.group-icon{width:34px;height:34px;margin-right:12px;font-size:16px;background-color:rgba(0,0,0,.06);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.menu-group-header .chevron-icon{font-size:11px;transition:transform .2s ease;color:#888;background-color:unset;border-radius:unset;width:auto;height:auto}
+.menu-group-header.expanded{color:#222;background-color:rgba(0,0,0,.04)}
+.menu-group-header.expanded i.group-icon{background-color:rgba(255,255,255,.2);color:#fff}
+.menu-group-header.expanded .chevron-icon{transform:rotate(90deg);color:#fff}
+.menu-group-items{max-height:0;overflow:hidden;transition:max-height .3s cubic-bezier(0,1,0,1);list-style:none;padding-left:20px;margin:0}
+.menu-group-header.expanded + .menu-group-items{max-height:1000px;transition:max-height .3s ease-in-out}
