@@ -165,3 +165,6 @@ arms_cache/
 
 # OS files
 Thumbs.db
+
+# Local credentials (never commit)
+login.md

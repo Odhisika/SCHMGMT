@@ -5,64 +5,79 @@
 {% block content %}
 <nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
     <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="/superadmin/">{% trans 'Super Admin' %}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'superadmin:dashboard' %}">{% trans 'Super Admin' %}</a></li>
         <li class="breadcrumb-item active" aria-current="page">{% trans 'Dashboard' %}</li>
     </ol>
 </nav>
 
 <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
-    <h1 class="title-1 mb-0"><i class="fas fa-tachometer-alt"></i> {% trans 'Super Admin Dashboard' %}</h1>
-    <a href="{% url 'superadmin:school_create' %}" class="btn btn-primary d-md-none">
-        <i class="fas fa-plus"></i> {% trans 'Create School' %}
-    </a>
-</div>
-
-{% include 'snippets/messages.html' %}
-
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card text-white bg-primary">
-            <div class="card-body">
-                <h5 class="card-title"><i class="fas fa-school"></i> {% trans 'Total Schools' %}</h5>
-                <h2>{{ total_schools }}</h2>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-white bg-success">
-            <div class="card-body">
-                <h5 class="card-title"><i class="fas fa-check-circle"></i> {% trans 'Active Schools' %}</h5>
-                <h2>{{ active_schools }}</h2>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-white bg-info">
-            <div class="card-body">
-                <h5 class="card-title"><i class="fas fa-users"></i> {% trans 'Total Users' %}</h5>
-                <h2>{{ total_users }}</h2>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-white bg-warning">
-            <div class="card-body">
-                <h5 class="card-title"><i class="fas fa-user-shield"></i> {% trans 'Total Admins' %}</h5>
-                <h2>{{ schools|length }}</h2>
-            </div>
-        </div>
+    <h1 class="sa-page-title mb-0"><i class="fas fa-tachometer-alt"></i> {% trans 'Super Admin Dashboard' %}</h1>
+    <div class="sa-page-actions">
+        <a href="{% url 'superadmin:school_create' %}" class="btn btn-primary">
+            <i class="fas fa-plus me-1"></i> {% trans 'Create School' %}
+        </a>
     </div>
 </div>
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h3>{% trans 'Recent Schools' %}</h3>
-    <a href="{% url 'superadmin:school_create' %}" class="btn btn-primary">
-        <i class="fas fa-plus"></i> {% trans 'Create New School' %}
-    </a>
+<div class="row g-3 mb-2">
+    <div class="col-6 col-xl-3">
+        <div class="sa-stat-card sa-stat-primary">
+            <span class="sa-stat-icon"><i class="fas fa-school"></i></span>
+            <div class="sa-stat-body">
+                <div class="sa-stat-label">{% trans 'Total Schools' %}</div>
+                <div class="sa-stat-value">{{ total_schools }}</div>
+                <div class="sa-stat-meta">{{ active_schools }} {% trans 'active' %}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="sa-stat-card sa-stat-success">
+            <span class="sa-stat-icon"><i class="fas fa-check-circle"></i></span>
+            <div class="sa-stat-body">
+                <div class="sa-stat-label">{% trans 'Active Schools' %}</div>
+                <div class="sa-stat-value">{{ active_schools }}</div>
+                <div class="sa-stat-meta">{{ inactive_schools }} {% trans 'inactive' %}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="sa-stat-card sa-stat-info">
+            <span class="sa-stat-icon"><i class="fas fa-users"></i></span>
+            <div class="sa-stat-body">
+                <div class="sa-stat-label">{% trans 'Total Users' %}</div>
+                <div class="sa-stat-value">{{ total_users }}</div>
+                <div class="sa-stat-meta">
+                    {{ total_students }} {% trans 'students' %} &middot; {{ total_teachers }} {% trans 'teachers' %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="sa-stat-card sa-stat-warning">
+            <span class="sa-stat-icon"><i class="fas fa-user-shield"></i></span>
+            <div class="sa-stat-body">
+                <div class="sa-stat-label">{% trans 'School Admins' %}</div>
+                <div class="sa-stat-value">{{ total_admins }}</div>
+                <div class="sa-stat-meta">{% trans 'Active administrators' %}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="sa-section-header">
+    <h2><i class="fas fa-clock-rotate-left me-1 text-primary"></i> {% trans 'Recent Schools' %}</h2>
+    <div class="sa-page-actions">
+        <a href="{% url 'superadmin:school_create' %}" class="btn btn-sm btn-primary">
+            <i class="fas fa-plus me-1"></i> {% trans 'Create New School' %}
+        </a>
+        <a href="{% url 'superadmin:school_list' %}" class="btn btn-sm btn-outline-secondary">
+            {% trans 'View All' %} <i class="fas fa-arrow-right ms-1"></i>
+        </a>
+    </div>
 </div>
 
 <div class="table-responsive table-shadow">
-    <table class="table table-hover">
+    <table class="table table-hover sa-table-stack align-middle">
         <thead>
             <tr>
                 <th>{% trans 'Name' %}</th>
@@ -71,42 +86,44 @@
                 <th>{% trans 'Teachers' %}</th>
                 <th>{% trans 'Status' %}</th>
                 <th>{% trans 'Created' %}</th>
-                <th>{% trans 'Actions' %}</th>
+                <th class="text-end">{% trans 'Actions' %}</th>
             </tr>
         </thead>
         <tbody>
             {% for school in schools|slice:":10" %}
             <tr>
-                <td><strong>{{ school.name }}</strong></td>
-                <td>
+                <td data-label="{% trans 'Name' %}"><strong>{{ school.name }}</strong></td>
+                <td data-label="{% trans 'Domain' %}">
                     {% if school.custom_domain %}
                     <code>{{ school.custom_domain }}</code>
                     {% else %}
                     <span class="text-muted">{% trans 'Main portal' %}</span>
                     {% endif %}
                 </td>
-                <td>{{ school.get_student_count }}</td>
-                <td>{{ school.get_teacher_count }}</td>
-                <td>
+                <td data-label="{% trans 'Students' %}">{{ school.get_student_count }}</td>
+                <td data-label="{% trans 'Teachers' %}">{{ school.get_teacher_count }}</td>
+                <td data-label="{% trans 'Status' %}">
                     {% if school.is_active %}
-                    <span class="badge bg-success">{% trans 'Active' %}</span>
+                    <span class="sa-status sa-status-active">{% trans 'Active' %}</span>
                     {% else %}
-                    <span class="badge bg-danger">{% trans 'Inactive' %}</span>
+                    <span class="sa-status sa-status-inactive">{% trans 'Inactive' %}</span>
                     {% endif %}
                 </td>
-                <td>{{ school.created_at|date:"M d, Y" }}</td>
-                <td>
-                    <a href="{% url 'superadmin:school_detail' school.pk %}" class="btn btn-sm btn-info" title="{% trans 'View Details' %}">
-                        <i class="fas fa-eye"></i>
-                    </a>
-                    <a href="{% url 'superadmin:school_edit' school.pk %}" class="btn btn-sm btn-warning" title="{% trans 'Edit' %}">
-                        <i class="fas fa-edit"></i>
-                    </a>
+                <td data-label="{% trans 'Created' %}">{{ school.created_at|date:"M d, Y" }}</td>
+                <td data-label="{% trans 'Actions' %}" class="text-end">
+                    <div class="btn-group" role="group" aria-label="{% trans 'School actions' %}">
+                        <a href="{% url 'superadmin:school_detail' school.pk %}" class="btn btn-sm btn-outline-info" title="{% trans 'View Details' %}">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                        <a href="{% url 'superadmin:school_edit' school.pk %}" class="btn btn-sm btn-outline-warning" title="{% trans 'Edit' %}">
+                            <i class="fas fa-edit"></i>
+                        </a>
+                    </div>
                 </td>
             </tr>
             {% empty %}
             <tr>
-                <td colspan="7" class="text-center text-muted">
+                <td colspan="7" class="text-center text-muted py-4">
                     {% trans 'No schools found.' %}
                     <a href="{% url 'superadmin:school_create' %}">{% trans 'Create your first school' %}</a>
                 </td>
@@ -115,11 +132,4 @@
         </tbody>
     </table>
 </div>
-
-<div class="mt-3">
-    <a href="{% url 'superadmin:school_list' %}" class="btn btn-outline-primary">
-        {% trans 'View All Schools' %} <i class="fas fa-arrow-right"></i>
-    </a>
-</div>
-
 {% endblock %}

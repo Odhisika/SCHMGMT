@@ -61,6 +61,14 @@ class SchoolMiddleware(MiddlewareMixin):
                     if new_host and new_host != request.get_host():
                         current_scheme = 'https' if request.is_secure() else 'http'
                         return redirect(f"{current_scheme}://{new_host}{request.get_full_path()}")
+
+            # In local development the master host is 127.0.0.1, which has
+            # no school subdomain to redirect to. Keep school users on this
+            # host (and therefore their session), but resolve routes with the
+            # public URLconf. Real admin domains keep their existing flow.
+            local_master_hosts = getattr(settings, 'LOCAL_MASTER_SCHOOL_HOSTS', ['127.0.0.1'])
+            if host in local_master_hosts:
+                request.urlconf = 'config.urls_public'
         
         # Special handling for superadmin routes - no school required
         if request.path.startswith('/superadmin/') or request.path.startswith('/admin/'):

@@ -11,16 +11,16 @@
 </nav>
 
 <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
-    <div class="title-1 mb-0"><i class="fas fa-school"></i> {% trans 'All Schools' %}</div>
-    <a href="{% url 'superadmin:school_create' %}" class="btn btn-primary">
-        <i class="fas fa-plus"></i> {% trans 'Create New School' %}
-    </a>
+    <h1 class="sa-page-title mb-0"><i class="fas fa-school"></i> {% trans 'All Schools' %}</h1>
+    <div class="sa-page-actions">
+        <a href="{% url 'superadmin:school_create' %}" class="btn btn-primary">
+            <i class="fas fa-plus me-1"></i> {% trans 'Create New School' %}
+        </a>
+    </div>
 </div>
 
-{% include 'snippets/messages.html' %}
-
 <div class="table-responsive table-shadow">
-    <table class="table table-hover align-middle">
+    <table class="table table-hover sa-table-stack align-middle">
         <thead>
             <tr>
                 <th>#</th>
@@ -35,46 +35,46 @@
         <tbody>
             {% for school in schools %}
             <tr>
-                <td>{{ forloop.counter }}</td>
-                <td><strong>{{ school.name }}</strong></td>
-                <td>
+                <td data-label="#">{{ forloop.counter }}</td>
+                <td data-label="{% trans 'Name' %}"><strong>{{ school.name }}</strong></td>
+                <td data-label="{% trans 'Domain' %}">
                     {% if school.custom_domain %}
                     <code>{{ school.custom_domain }}</code>
                     {% else %}
                     <span class="text-muted">{% trans 'Main portal' %}</span>
                     {% endif %}
                 </td>
-                <td>
+                <td data-label="{% trans 'Stats (S/T)' %}">
                     <span class="badge bg-light text-dark">{{ school.get_student_count }} / {{ school.get_teacher_count }}</span>
                 </td>
-                <td>
+                <td data-label="{% trans 'Status' %}">
                     {% if school.is_active %}
-                    <span class="badge bg-success-soft text-success">{% trans 'Active' %}</span>
+                    <span class="sa-status sa-status-active">{% trans 'Active' %}</span>
                     {% else %}
-                    <span class="badge bg-danger-soft text-danger">{% trans 'Inactive' %}</span>
+                    <span class="sa-status sa-status-inactive">{% trans 'Inactive' %}</span>
                     {% endif %}
                 </td>
-                <td>{{ school.created_at|date:"M d, Y" }}</td>
-                <td class="text-end">
-                    <div class="btn-group" role="group">
+                <td data-label="{% trans 'Created' %}">{{ school.created_at|date:"M d, Y" }}</td>
+                <td data-label="{% trans 'Actions' %}" class="text-end">
+                    <div class="btn-group" role="group" aria-label="{% trans 'School actions' %}">
                         <a href="{% url 'superadmin:school_detail' school.pk %}" class="btn btn-sm btn-outline-info" title="{% trans 'View' %}">
-                            <i class="fas fa-eye"></i>
+                            <i class="fas fa-eye"></i><span class="visually-hidden">{% trans 'View' %}</span>
                         </a>
                         <a href="{% url 'superadmin:school_edit' school.pk %}" class="btn btn-sm btn-outline-warning" title="{% trans 'Edit' %}">
-                            <i class="fas fa-edit"></i>
+                            <i class="fas fa-edit"></i><span class="visually-hidden">{% trans 'Edit' %}</span>
                         </a>
                         <a href="{% url 'superadmin:school_reset_admin_password' school.pk %}" class="btn btn-sm btn-outline-secondary" title="{% trans 'Reset Pass' %}">
-                            <i class="fas fa-key"></i>
+                            <i class="fas fa-key"></i><span class="visually-hidden">{% trans 'Reset password' %}</span>
                         </a>
                         <a href="{% url 'superadmin:school_delete' school.pk %}" class="btn btn-sm btn-outline-danger" title="{% trans 'Delete' %}">
-                            <i class="fas fa-trash-alt"></i>
+                            <i class="fas fa-trash-alt"></i><span class="visually-hidden">{% trans 'Delete' %}</span>
                         </a>
                     </div>
                 </td>
             </tr>
             {% empty %}
             <tr>
-                <td colspan="9" class="text-center text-muted">
+                <td colspan="7" class="text-center text-muted py-4">
                     {% trans 'No schools found.' %}
                     <a href="{% url 'superadmin:school_create' %}">{% trans 'Create your first school' %}</a>
                 </td>
@@ -83,5 +83,4 @@
         </tbody>
     </table>
 </div>
-
 {% endblock %}

@@ -11,16 +11,16 @@
     </ol>
 </nav>
 
-<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
-    <div class="title-1 mb-0"><i class="fas fa-school"></i> {{ school.name }}</div>
-    <div class="d-flex flex-wrap gap-2">
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-start mb-4 gap-3">
+    <h1 class="sa-page-title mb-0"><i class="fas fa-school"></i> {{ school.name }}</h1>
+    <div class="sa-page-actions">
         <a href="{% url 'superadmin:school_edit' school.pk %}" class="btn btn-warning">
             <i class="fas fa-edit"></i> {% trans 'Edit' %}
         </a>
         <a href="{% url 'superadmin:school_reset_admin_password' school.pk %}" class="btn btn-info text-white">
             <i class="fas fa-key"></i> {% trans 'Reset Admin Pass' %}
         </a>
-        <form method="post" action="{% url 'superadmin:school_toggle_active' school.pk %}" style="display: inline;">
+        <form method="post" action="{% url 'superadmin:school_toggle_active' school.pk %}" class="d-inline">
             {% csrf_token %}
             {% if school.is_active %}
             <button type="submit" class="btn btn-secondary">
@@ -38,16 +38,15 @@
     </div>
 </div>
 
-{% include 'snippets/messages.html' %}
-
-<div class="row">
-    <div class="col-md-8">
+<div class="row g-3">
+    <div class="col-12 col-lg-8">
         <div class="card mb-4">
             <div class="card-header">
-                <h5><i class="fas fa-info-circle"></i> {% trans 'School Details' %}</h5>
+                <h5><i class="fas fa-info-circle me-1"></i> {% trans 'School Details' %}</h5>
             </div>
             <div class="card-body">
-                <table class="table table-borderless">
+                <div class="table-responsive">
+                <table class="table table-borderless align-middle">
                     <tr>
                         <th width="30%">{% trans 'Name' %}:</th>
                         <td>{{ school.name }}</td>
@@ -86,9 +85,9 @@
                         <th>{% trans 'Status' %}:</th>
                         <td>
                             {% if school.is_active %}
-                            <span class="badge bg-success">{% trans 'Active' %}</span>
+                            <span class="sa-status sa-status-active">{% trans 'Active' %}</span>
                             {% else %}
-                            <span class="badge bg-danger">{% trans 'Inactive' %}</span>
+                            <span class="sa-status sa-status-inactive">{% trans 'Inactive' %}</span>
                             {% endif %}
                         </td>
                     </tr>
@@ -97,12 +96,13 @@
                         <td>{{ school.created_at|date:"F j, Y, g:i a" }}</td>
                     </tr>
                 </table>
+                </div>
             </div>
         </div>
 
         <div class="card mb-4">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5><i class="fas fa-user-shield"></i> {% trans 'School Administrators' %}</h5>
+            <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <h5><i class="fas fa-user-shield me-1"></i> {% trans 'School Administrators' %}</h5>
                 <a href="{% url 'superadmin:school_add_admin' school.pk %}" class="btn btn-sm btn-primary">
                     <i class="fas fa-plus"></i> {% trans 'Add Admin' %}
                 </a>
@@ -110,7 +110,7 @@
             <div class="card-body">
                 {% if admins %}
                 <div class="table-responsive">
-                    <table class="table table-hover">
+                    <table class="table table-hover sa-table-stack align-middle">
                         <thead>
                             <tr>
                                 <th>{% trans 'Username' %}</th>
@@ -122,14 +122,14 @@
                         <tbody>
                             {% for admin in admins %}
                             <tr>
-                                <td>{{ admin.username }}</td>
-                                <td>{{ admin.get_full_name }}</td>
-                                <td>{{ admin.email }}</td>
-                                <td>
+                                <td data-label="{% trans 'Username' %}">{{ admin.username }}</td>
+                                <td data-label="{% trans 'Name' %}">{{ admin.get_full_name }}</td>
+                                <td data-label="{% trans 'Email' %}">{{ admin.email }}</td>
+                                <td data-label="{% trans 'Status' %}">
                                     {% if admin.is_active %}
-                                    <span class="badge bg-success">{% trans 'Active' %}</span>
+                                    <span class="sa-status sa-status-active">{% trans 'Active' %}</span>
                                     {% else %}
-                                    <span class="badge bg-danger">{% trans 'Inactive' %}</span>
+                                    <span class="sa-status sa-status-inactive">{% trans 'Inactive' %}</span>
                                     {% endif %}
                                 </td>
                             </tr>
@@ -138,7 +138,7 @@
                     </table>
                 </div>
                 {% else %}
-                <p class="text-muted text-center">
+                <p class="text-muted text-center mb-0">
                     {% trans 'No administrators found.' %}
                     <a href="{% url 'superadmin:school_add_admin' school.pk %}">{% trans 'Add one now' %}</a>
                 </p>
@@ -147,7 +147,7 @@
         </div>
     </div>
 
-    <div class="col-md-4">
+    <div class="col-12 col-lg-4">
         <div class="card mb-4">
             <div class="card-header bg-primary text-white">
                 <h5><i class="fas fa-chart-bar"></i> {% trans 'Statistics' %}</h5>

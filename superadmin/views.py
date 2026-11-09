@@ -1,6 +1,8 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth.password_validation import validate_password
 from django.contrib import messages
+from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from django.db import transaction
 from django.contrib.auth import get_user_model
@@ -22,13 +24,20 @@ def is_superuser(user):
 def dashboard(request):
     """Super admin dashboard"""
     schools = School.objects.all().order_by('-created_at')
-    
+    total_schools = schools.count()
+    active_schools = schools.filter(is_active=True).count()
+    school_users = User.objects.filter(is_superuser=False)
+
     context = {
         'title': _('Super Admin Dashboard'),
         'schools': schools,
-        'total_schools': schools.count(),
-        'active_schools': schools.filter(is_active=True).count(),
-        'total_users': User.objects.exclude(is_superuser=True).count(),
+        'total_schools': total_schools,
+        'active_schools': active_schools,
+        'inactive_schools': total_schools - active_schools,
+        'total_users': school_users.count(),
+        'total_admins': school_users.filter(is_school_admin=True, is_active=True).count(),
+        'total_students': school_users.filter(is_student=True, is_active=True).count(),
+        'total_teachers': school_users.filter(is_lecturer=True, is_active=True).count(),
     }
     return render(request, 'superadmin/dashboard.html', context)
 
@@ -209,15 +218,21 @@ def school_reset_admin_password(request, pk):
     admins = school.users.filter(is_school_admin=True)
     
     if request.method == 'POST':
-        new_password = request.POST.get('new_password')
+        new_password = request.POST.get('new_password', '').strip()
         if not new_password:
             messages.error(request, _('Please provide a new password.'))
         else:
-            for admin in admins:
-                admin.set_password(new_password)
-                admin.save()
-            messages.success(request, _(f'Password reset successfully for all admins of "{school.name}"'))
-            return redirect('superadmin:school_detail', pk=school.pk)
+            try:
+                validate_password(new_password, user=admins.first())
+            except ValidationError as exc:
+                for error in exc.messages:
+                    messages.error(request, error)
+            else:
+                for admin in admins:
+                    admin.set_password(new_password)
+                    admin.save(update_fields=['password'])
+                messages.success(request, _(f'Password reset successfully for all admins of "{school.name}"'))
+                return redirect('superadmin:school_detail', pk=school.pk)
             
     context = {
         'title': _(f'Reset Admin Password: {school.name}'),
