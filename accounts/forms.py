@@ -1,6 +1,7 @@
 from django import forms
 from django.utils.translation import gettext_lazy as _
 from django.db import transaction
+from django.db.models import Q
 from django.contrib.auth.forms import (
     UserCreationForm,
     UserChangeForm,
@@ -22,8 +23,8 @@ class StaffAddForm(UserCreationForm):
         super(StaffAddForm, self).__init__(*args, **kwargs)
         if self.school:
             self.fields["department"].queryset = Program.objects.filter(
-                school=self.school
-            )
+                Q(school=self.school) | Q(school__isnull=True)
+            ).order_by("title")
 
     username = forms.CharField(
         max_length=30,
