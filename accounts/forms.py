@@ -1,7 +1,6 @@
 from django import forms
 from django.utils.translation import gettext_lazy as _
 from django.db import transaction
-from django.db.models import Q
 from django.contrib.auth.forms import (
     UserCreationForm,
     UserChangeForm,
@@ -21,10 +20,6 @@ class StaffAddForm(UserCreationForm):
     def __init__(self, *args, **kwargs):
         self.school = kwargs.pop("school", None)
         super(StaffAddForm, self).__init__(*args, **kwargs)
-        if self.school:
-            self.fields["department"].queryset = Program.objects.filter(
-                Q(school=self.school) | Q(school__isnull=True)
-            ).order_by("title")
 
     username = forms.CharField(
         max_length=30,
@@ -69,13 +64,12 @@ class StaffAddForm(UserCreationForm):
         ),
     )
 
-    department = forms.ModelChoiceField(
-        queryset=Program.objects.all(),
+    department = forms.ChoiceField(
+        choices=[('', 'Select Department / Section')] + list(settings.DIVISION_CHOICES),
         widget=forms.Select(
             attrs={"class": "browser-default custom-select form-control"}
         ),
         label="Department / Section (e.g. Primary, JHS)",
-        required=False,
     )
 
     division = forms.ChoiceField(
@@ -158,7 +152,17 @@ class StaffAddForm(UserCreationForm):
         user.phone = self.cleaned_data.get("phone")
         user.address = self.cleaned_data.get("address")
         user.email = self.cleaned_data.get("email")
-        user.department = self.cleaned_data.get("department")
+        department_division = self.cleaned_data.get("department")
+        department_name = dict(settings.DIVISION_CHOICES).get(department_division)
+        if department_name and self.school:
+            user.department, _ = Program.objects.get_or_create(
+                school=self.school,
+                division=department_division,
+                is_academic_block=True,
+                defaults={"title": department_name},
+            )
+        else:
+            user.department = None
         user.division = self.cleaned_data.get("division")  # Save division
 
         # Generate credentials if username is missing (which implies new user via this form)
