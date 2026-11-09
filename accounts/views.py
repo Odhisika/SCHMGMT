@@ -5,7 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordChangeForm
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 from django.template.loader import get_template, render_to_string
 from django.utils.decorators import method_decorator
 from django.views.generic import CreateView
@@ -59,7 +59,16 @@ class RoleAwareLoginView(auth_views.LoginView):
         if self.request.user.is_superuser:
             return reverse("superadmin:dashboard")
 
-        return reverse("home")
+        if self.request.user.is_school_admin:
+            return reverse("dashboard")
+
+        try:
+            return reverse("home")
+        except NoReverseMatch:
+            # The master domain does not mount the school app. The middleware
+            # switches non-superusers to the public URLconf on the next
+            # request, so send them to the shared root path.
+            return "/"
 
 
 def validate_username(request):
