@@ -75,6 +75,7 @@ class StaffAddForm(UserCreationForm):
             attrs={"class": "browser-default custom-select form-control"}
         ),
         label="Department / Section (e.g. Primary, JHS)",
+        required=False,
     )
 
     division = forms.ChoiceField(
