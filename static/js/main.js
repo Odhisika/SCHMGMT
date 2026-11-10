@@ -121,3 +121,79 @@ document.body.addEventListener('htmx:afterOnLoad', function (evt) {
     }
   });
 });
+
+// ##################################
+// Sidebar resize sync
+// The sidebar is resizable via the native handle (resize: horizontal).
+// The main content, top navbar, bottom action bar and the hamburger toggle
+// all offset by the sidebar width, so they read the --sidebar-width CSS
+// variable and this keeps it in sync while the handle is dragged.
+(function () {
+  var STORAGE_KEY = 'schmgmt_sidebar_width';
+  var MIN_WIDTH = 230; // must match #side-nav { min-width } in style.min.css
+  var MAX_WIDTH = 520; // must match #side-nav { max-width } in style.min.css
+  var observer = null;
+  var observedSidebar = null;
+  var freezeTimer = null;
+
+  function readSavedWidth() {
+    try {
+      return parseInt(sessionStorage.getItem(STORAGE_KEY), 10);
+    } catch (e) {
+      return NaN;
+    }
+  }
+
+  function saveWidth(width) {
+    try {
+      sessionStorage.setItem(STORAGE_KEY, String(width));
+    } catch (e) {
+      /* storage unavailable */
+    }
+  }
+
+  function applyWidth(width) {
+    document.documentElement.style.setProperty('--sidebar-width', width + 'px');
+  }
+
+  function initSidebarResizeSync() {
+    var sidebar = document.getElementById('side-nav');
+    if (!sidebar || typeof ResizeObserver === 'undefined') return;
+
+    // A fresh page load loses the inline width written by the native resize
+    // handle, so restore the width chosen earlier in this session.
+    if (!sidebar.style.width) {
+      var saved = readSavedWidth();
+      if (saved >= MIN_WIDTH && saved <= MAX_WIDTH) {
+        sidebar.style.width = saved + 'px';
+      }
+    }
+    applyWidth(sidebar.offsetWidth);
+
+    // Nothing to do if this exact node is already observed. HTMX swaps and
+    // history restores can replace the sidebar node, in which case the new
+    // node needs a fresh observer.
+    if (observedSidebar === sidebar) return;
+    if (observer) observer.disconnect();
+
+    observedSidebar = sidebar;
+    observer = new ResizeObserver(function () {
+      // Freeze transitions while the handle is being dragged so the layout
+      // tracks the pointer directly instead of lagging behind.
+      document.documentElement.classList.add('sidebar-resizing');
+      applyWidth(sidebar.offsetWidth);
+      saveWidth(sidebar.offsetWidth);
+      clearTimeout(freezeTimer);
+      freezeTimer = setTimeout(function () {
+        document.documentElement.classList.remove('sidebar-resizing');
+      }, 150);
+    });
+    observer.observe(sidebar);
+  }
+
+  initSidebarResizeSync();
+  // Re-attach after HTMX swaps content or restores a history snapshot,
+  // which can replace the #side-nav node.
+  document.body.addEventListener('htmx:afterSwap', initSidebarResizeSync);
+  document.body.addEventListener('htmx:historyRestore', initSidebarResizeSync);
+})();

@@ -129,11 +129,15 @@ video {
     color: #2196f3
 }
 
+:root {
+    --sidebar-width: 300px
+}
+
 #main {
     padding-top: 65px;
     padding-bottom: 3rem;
-    padding-left: 300px;
-    transition: .5s
+    padding-left: var(--sidebar-width, 300px);
+    transition: padding-left .5s, box-shadow .5s
 }
 
 @media(max-width: 800px) {
@@ -146,12 +150,12 @@ video {
     position: fixed;
     top: 0;
     right: 0;
-    left: 300px;
+    left: var(--sidebar-width, 300px);
     -webkit-margin-start: -10px;
     z-index: 90;
     background: #f5f5f5;
     box-shadow: 0px 2px 5px 0px rgba(0, 0, 0, .1);
-    transition: .3s
+    transition: left .3s, box-shadow .3s
 }
 
 #top-navbar .nav-wrapper {
@@ -206,12 +210,12 @@ video {
     position: fixed;
     bottom: 0;
     right: 0;
-    left: 300px;
+    left: var(--sidebar-width, 300px);
     padding: .5rem;
     z-index: 10;
     background-color: rgba(255, 255, 255, .8);
     border-top: 1px solid #6c757d;
-    transition: .3s
+    transition: left .3s, box-shadow .3s
 }
 
 .manage-wrap.toggle-active {
@@ -325,7 +329,9 @@ video {
 }
 
 #side-nav {
-    width: 300px;
+    width: var(--sidebar-width, 300px);
+    min-width: 230px;
+    max-width: 520px;
     position: fixed;
     left: 0;
     top: 0;
@@ -338,7 +344,7 @@ video {
     resize: horizontal;
     background-color: #fff;
     box-shadow: 0px 2px 5px 0px rgba(0, 0, 0, .16), 0px 2px 10px 0px rgba(0, 0, 0, .12);
-    transition: .3s
+    transition: left .3s, box-shadow .3s
 }
 
 #side-nav i {
@@ -450,7 +456,7 @@ video {
 
 #side-nav.toggle-active {
     box-shadow: 0px 0px 0px 0px #dbdbdb;
-    left: -300px
+    left: calc(-1 * var(--sidebar-width, 300px))
 }
 
 @media screen and (max-width: 1150px) {
@@ -470,7 +476,7 @@ video {
 
 @media screen and (max-width: 1150px) {
     #side-nav {
-        left: -300px
+        left: calc(-1 * var(--sidebar-width, 300px))
     }
 
     #side-nav.toggle-active {
@@ -1284,7 +1290,7 @@ video {
 .sidebar-tab-toggle {
     position: fixed;
     top: 15px;
-    left: 250px;
+    left: calc(var(--sidebar-width, 300px) - 50px);
     z-index: 10001;
     width: 36px;
     height: 36px;
@@ -1316,8 +1322,18 @@ video {
     }
 
     .sidebar-tab-toggle.toggle-active {
-        left: 250px;
+        left: calc(var(--sidebar-width, 300px) - 50px);
     }
+}
+
+/* While the sidebar resize handle is being dragged the layout must track the
+   pointer 1:1, so transitions are frozen (main.js toggles this class). */
+html.sidebar-resizing #side-nav,
+html.sidebar-resizing #main,
+html.sidebar-resizing #top-navbar,
+html.sidebar-resizing .manage-wrap,
+html.sidebar-resizing .sidebar-tab-toggle {
+    transition: none !important
 }
 
 .menu-group{margin-bottom:5px}
