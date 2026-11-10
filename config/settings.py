@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/2.2/ref/settings/
 """
 
 import os
+import sys
 
 # Dynamic patch for os.utime to prevent PermissionError [Errno 1] during collectstatic on some hosting environments
 _original_utime = os.utime
@@ -229,7 +230,7 @@ LANGUAGES = (
 LOCALE_PATHS = (os.path.join(BASE_DIR, "locale"),)
 
 MODELTRANSLATION_DEFAULT_LANGUAGE = "en"
-LANGUAGE_CODE = "en-us"
+LANGUAGE_CODE = "en"
 
 TIME_ZONE = "Africa/Accra"
 
@@ -317,6 +318,11 @@ LOGGING = {
 
 # WhiteNoise configuration
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
+# The manifest storage needs ``collectstatic`` to have run. Use the plain
+# storage for the automated test-suite so views can be rendered without it.
+if "test" in sys.argv:
+    STATICFILES_STORAGE = "django.contrib.staticfiles.storage.StaticFilesStorage"
 
 STUDENT_ID_PREFIX = config("STUDENT_ID_PREFIX", "STU")
 TEACHER_ID_PREFIX = config("TEACHER_ID_PREFIX", "TCH")

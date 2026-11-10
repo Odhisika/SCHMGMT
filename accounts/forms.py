@@ -145,6 +145,8 @@ class StaffAddForm(UserCreationForm):
     @transaction.atomic()
     def save(self, commit=True):
         user = super().save(commit=False)
+        if self.school:
+            user.school = self.school
         user.is_lecturer = True
         user.is_teacher = True  # Set both for backward compatibility
         user.first_name = self.cleaned_data.get("first_name")
@@ -311,6 +313,8 @@ class StudentAddForm(UserCreationForm):
     @transaction.atomic()
     def save(self, commit=True):
         user = super().save(commit=False)
+        if self.school:
+            user.school = self.school
         user.is_student = True
         user.first_name = self.cleaned_data.get("first_name")
         user.last_name = self.cleaned_data.get("last_name")
@@ -371,6 +375,10 @@ class ProfileUpdateForm(UserChangeForm):
             for field_name in restricted_fields:
                 if field_name in self.fields:
                     self.fields[field_name].disabled = True
+                    # Disabled fields are re-populated from the instance. They
+                    # must not stay required when the instance value is blank,
+                    # otherwise the form can never validate for such users.
+                    self.fields[field_name].required = False
                     self.fields[field_name].help_text = _("This field can only be updated by an administrator.")
 
     email = forms.EmailField(
@@ -605,6 +613,8 @@ class ParentAddForm(UserCreationForm):
     @transaction.atomic()
     def save(self):
         user = super().save(commit=False)
+        if self.school:
+            user.school = self.school
         user.is_parent = True
         user.first_name = self.cleaned_data.get("first_name")
         user.last_name = self.cleaned_data.get("last_name")
@@ -617,5 +627,5 @@ class ParentAddForm(UserCreationForm):
             student=self.cleaned_data.get("student"),
             relation_ship=self.cleaned_data.get("relation_ship"),
         )
-        parent.save()
+        return parent
         return user

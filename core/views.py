@@ -274,6 +274,11 @@ def semester_list_view(request):
     return render(request, "core/semester_list.html", {"semesters": semesters})
 
 
+def _is_truthy(value):
+    """Interpret values submitted by ``TermForm``'s Yes/No field."""
+    return str(value).strip().lower() in ("true", "1", "yes", "on")
+
+
 @login_required
 @lecturer_required
 def semester_add_view(request):
@@ -281,7 +286,7 @@ def semester_add_view(request):
         form = SemesterForm(request.POST)
         if form.is_valid():
             # Use 'is_current_term' as defined in Term/TermForm model
-            if form.cleaned_data.get("is_current_term"):
+            if _is_truthy(form.cleaned_data.get("is_current_term")):
                 unset_current_semester(request.school)
             
             term = form.save(commit=False)
@@ -302,7 +307,7 @@ def semester_update_view(request, pk):
     if request.method == "POST":
         form = SemesterForm(request.POST, instance=semester)
         if form.is_valid():
-            if form.cleaned_data.get("is_current_term"):
+            if _is_truthy(form.cleaned_data.get("is_current_term")):
                 unset_current_semester(request.school)
             form.save()
             messages.success(request, "Semester updated successfully!")

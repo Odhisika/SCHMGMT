@@ -39,7 +39,7 @@ class FeeStructure(models.Model):
         ordering = ['name']
     
     def __str__(self):
-        return f"{self.name} - {self.school.name} - {settings.CURRENCY}{self.amount}"
+        return f"{self.name} - {self.school.name} - {settings.CURRENCY_SYMBOL}{self.amount}"
 
     def update_total_amount(self):
         """Recalculate total amount from items"""
@@ -160,7 +160,7 @@ class Payment(models.Model):
         ]
     
     def __str__(self):
-        return f"{self.student} - {settings.CURRENCY}{self.amount} - {self.get_status_display()}"
+        return f"{self.student} - {settings.CURRENCY_SYMBOL}{self.amount} - {self.get_status_display()}"
 
 
 class SchoolBankAccount(models.Model):

@@ -453,7 +453,7 @@ def verify_payment(request, payment_id):
             payment.save()
             messages.info(request, _("Payment marked as failed."))
         
-        return redirect('fees:admin_dashboard')
+        return redirect('fees:dashboard')
     
     context = {
         'title': _('Verify Payment'),

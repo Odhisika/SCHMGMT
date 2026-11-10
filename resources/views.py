@@ -181,6 +181,7 @@ def video_detail(request, course_slug, video_slug):
         'title': video.title,
         'course': course,
         'video': video,
+        'other_videos': course.resource_videos.exclude(pk=video.pk)[:5],
         'can_manage': request.user.is_superuser or request.user.is_school_admin or course.allocated_course.filter(teacher=request.user).exists()
     }
     

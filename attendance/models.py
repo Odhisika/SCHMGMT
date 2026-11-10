@@ -122,22 +122,31 @@ class AttendanceSummary(models.Model):
         return 0.0
     
     def update_summary(self):
-        """Update summary from attendance records"""
-        from django.db.models import Count, Q
-        
-        # Get attendance records for this term
-        records = Attendance.objects.filter(
-            student=self.student,
-            date__gte=self.term.start_date if hasattr(self.term, 'start_date') else self.term.year
-        )
-        
-        # Count by status
+        """Update summary from attendance records for this student's term."""
+        from django.db.models import Count
+
+        filters = {'student': self.student}
+        if self.school_id:
+            filters['school'] = self.school
+        if getattr(self.term, 'start_date', None):
+            filters['date__gte'] = self.term.start_date
+        if getattr(self.term, 'end_date', None):
+            filters['date__lte'] = self.term.end_date
+
+        records = Attendance.objects.filter(**filters)
+
+        # Reset all counters before recalculating so removed/changed records
+        # do not leave stale values behind.
+        self.days_present = 0
+        self.days_absent = 0
+        self.days_late = 0
+        self.days_excused = 0
+
         status_counts = records.values('status').annotate(count=Count('id'))
-        
         for item in status_counts:
             status = item['status']
             count = item['count']
-            
+
             if status == PRESENT:
                 self.days_present = count
             elif status == ABSENT:
@@ -146,5 +155,6 @@ class AttendanceSummary(models.Model):
                 self.days_late = count
             elif status == EXCUSED:
                 self.days_excused = count
-        
+
+        self.total_school_days = records.count()
         self.save()

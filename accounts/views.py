@@ -494,6 +494,11 @@ class ParentAdd(CreateView):
         kwargs['school'] = self.request.school
         return kwargs
 
+    def get_success_url(self):
+        return reverse(
+            "profile_single", kwargs={"user_id": self.object.user_id}
+        )
+
     def form_valid(self, form):
         # We implicitly assume parent is adding for a student in their school,
         # logic handled in form or implicit relations.

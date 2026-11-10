@@ -95,7 +95,6 @@
                 <h6 class="mb-0">{% trans 'Related Videos' %}</h6>
             </div>
             <div class="card-body p-0">
-                {% with other_videos=course.resource_videos.exclude(slug=video.slug)|slice:":5" %}
                 {% if other_videos %}
                 <div class="list-group list-group-flush">
                     {% for other_video in other_videos %}
@@ -123,7 +122,6 @@
                     {% trans 'No other videos yet.' %}
                 </p>
                 {% endif %}
-                {% endwith %}
             </div>
         </div>
     </div>

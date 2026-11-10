@@ -118,7 +118,7 @@ def mark_attendance(request, level=None):
     current_term = Term.objects.filter(is_current_term=True, school=request.school).first()
     if not current_term:
         messages.error(request, _("No active term found."))
-        return redirect('attendance_dashboard')
+        return redirect('attendance:dashboard')
     
     attendance_date_str = request.GET.get('date')
     attendance_date = parse_date(attendance_date_str) if attendance_date_str else date.today()
@@ -173,7 +173,7 @@ def mark_attendance(request, level=None):
                 )
         
         messages.success(request, _("Attendance saved successfully!"))
-        return redirect('attendance_dashboard')
+        return redirect('attendance:dashboard')
     
     # Load existing attendance if already marked
     existing_attendance = {}

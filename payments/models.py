@@ -116,7 +116,6 @@ class StudentPayment(models.Model):
         payments = StudentPayment.objects.filter(
             student=self.student,
             term=self.term,
-            session=self.session
         )
         return sum(payment.amount_paid for payment in payments)
     
