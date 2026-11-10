@@ -232,6 +232,26 @@ class Student(models.Model):
     def get_absolute_url(self):
         return reverse("profile_single", kwargs={"user_id": self.student_id})
 
+    def get_division(self):
+        """Derive the school division (Nursery/Primary/JHS) from the level."""
+        if not self.level:
+            return None
+        for division, levels in settings.DIVISION_LEVEL_MAPPING.items():
+            if self.level in levels:
+                return division
+        return None
+
+    def save(self, *args, **kwargs):
+        # Keep the linked user's division in sync with the student's level.
+        # Views group students by the user's division (e.g. the student list
+        # tabs), so a missing division makes students invisible there.
+        division = self.get_division()
+        user = self.student
+        if division and user.division != division:
+            user.division = division
+            user.save(update_fields=["division"])
+        return super().save(*args, **kwargs)
+
     def delete(self, *args, **kwargs):
         self.student.delete()
         super().delete(*args, **kwargs)

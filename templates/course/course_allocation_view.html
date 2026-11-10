@@ -35,39 +35,6 @@
     {% endfor %}
 </ul>
 
-<!-- Filter Toolbar -->
-<div class="card p-3 shadow-sm border-0 bg-light mb-4">
-    <form method="get" class="row g-2 align-items-center">
-        <!-- Preserve current division -->
-        <input type="hidden" name="division" value="{{ current_division }}">
-        
-        <!-- Original filters from django-filters -->
-        {% for field in filter.form %}
-        <div class="col-md-3">
-            {{ field }}
-        </div>
-        {% endfor %}
-        
-        <!-- New Level Filter -->
-        <div class="col-md-3">
-            <select name="level" class="form-select au-input" onchange="this.form.submit()">
-                <option value="">{% trans 'All Levels' %}</option>
-                {% for code, name in division_levels %}
-                <option value="{{ code }}" {% if selected_level == code %}selected{% endif %}>
-                    {{ name }}
-                </option>
-                {% endfor %}
-            </select>
-        </div>
-        
-        <div class="col-md-3">
-            <button class="btn btn-primary w-100" type="submit">
-                <i class="fas fa-filter"></i> {% trans 'Apply Filters' %}
-            </button>
-        </div>
-    </form>
-</div>
-
 <div class="table-responsive table-shadow p-0 mt-4">
     <table class="table table-light table-striped">
         <thead>

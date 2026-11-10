@@ -392,6 +392,7 @@ def build_demo_data(
                 username,
                 school=school,
                 is_student=True,
+                division=division,
                 first_name=first_name,
                 last_name=last_name,
                 gender="M" if i % 2 == 0 else "F",
