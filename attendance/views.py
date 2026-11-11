@@ -6,7 +6,7 @@ from django.conf import settings
 from django.utils.dateparse import parse_date
 from datetime import date, timedelta
 from decimal import Decimal
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponseForbidden
 from django.db.models import Sum
 from django.utils import timezone
 
@@ -15,6 +15,27 @@ from accounts.models import Student, Parent
 from core.models import Term
 from .models import Attendance, AttendanceSession, AttendanceSummary, PRESENT, ABSENT
 
+
+def _attendance_levels_for_user(user):
+    """Return attendance levels visible to this user; class teachers get one class."""
+    all_levels = settings.LEVEL_CHOICES
+    valid_level_codes = {code for code, _ in all_levels}
+
+    if user.is_superuser or user.is_school_admin:
+        return list(all_levels)
+
+    if user.is_class_teacher:
+        assigned_level = user.assigned_level
+        if assigned_level in valid_level_codes:
+            return [(assigned_level, dict(all_levels)[assigned_level])]
+        return []
+
+    if user.is_teacher or user.is_lecturer:
+        division_levels = set(user.get_division_levels())
+        return [(code, name) for code, name in all_levels if code in division_levels]
+
+    return []
+
 @login_required
 @lecturer_required
 def attendance_dashboard(request):
@@ -22,14 +43,7 @@ def attendance_dashboard(request):
     current_term = Term.objects.filter(is_current_term=True, school=request.school).first()
     today = date.today()
     
-    # Filter levels by teacher's division
-    if request.user.is_superuser or request.user.is_school_admin:
-        accessible_levels = settings.LEVEL_CHOICES
-    elif request.user.division:
-        division_levels = request.user.get_division_levels()
-        accessible_levels = [(code, name) for code, name in settings.LEVEL_CHOICES if code in division_levels]
-    else:
-        accessible_levels = []
+    accessible_levels = _attendance_levels_for_user(request.user)
     
     accessible_level_codes = [code for code, name in accessible_levels]
     
@@ -79,13 +93,27 @@ def save_attendance_ajax(request):
         if not current_term:
             return JsonResponse({'status': 'error', 'message': _("No active term found.")}, status=400)
             
-        student = get_object_or_404(Student, id=student_id, student__school=request.school)
+        student = get_object_or_404(
+            Student.objects.select_related('student'),
+            id=student_id,
+            student__school=request.school,
+        )
+        allowed_levels = {code for code, _ in _attendance_levels_for_user(request.user)}
+        if student.level not in allowed_levels or level_code != student.level:
+            return JsonResponse(
+                {'status': 'error', 'message': _("You can only mark attendance for your assigned class.")},
+                status=403,
+            )
+
+        valid_statuses = {choice[0] for choice in Attendance._meta.get_field('status').choices}
+        if status not in valid_statuses:
+            return JsonResponse({'status': 'error', 'message': _("Invalid attendance status.")}, status=400)
         
         # Create or update session for this date/level if it doesn't exist
         session, created = AttendanceSession.objects.get_or_create(
             school=request.school,
             term=current_term,
-            level=level_code,
+            level=student.level,
             date=attendance_date,
             defaults={'marked_by': request.user}
         )
@@ -115,6 +143,10 @@ def save_attendance_ajax(request):
 @lecturer_required  
 def mark_attendance(request, level=None):
     """Mark attendance for a class - updated to facilitate AJAX workflow"""
+    allowed_levels = {code for code, _ in _attendance_levels_for_user(request.user)}
+    if level not in allowed_levels:
+        return HttpResponseForbidden(_("You can only access attendance for your assigned class."))
+
     current_term = Term.objects.filter(is_current_term=True, school=request.school).first()
     if not current_term:
         messages.error(request, _("No active term found."))
@@ -203,6 +235,8 @@ def mark_attendance(request, level=None):
 @login_required
 def attendance_reports(request):
     """View attendance reports with filters"""
+    accessible_levels = _attendance_levels_for_user(request.user)
+    accessible_level_codes = [code for code, _ in accessible_levels]
     # Default: last 30 days
     end_date = date.today()
     start_date = end_date - timedelta(days=30)
@@ -224,7 +258,8 @@ def attendance_reports(request):
     # Build query
     records = Attendance.objects.filter(
         school=request.school,
-        date__range=[filter_start, filter_end]
+        date__range=[filter_start, filter_end],
+        student__level__in=accessible_level_codes,
     ).select_related('student', 'student__student')
     
     if filter_level:
@@ -248,7 +283,7 @@ def attendance_reports(request):
         'total_records': total_records,
         'present_count': present_count,
         'absent_count': absent_count,
-        'levels': settings.LEVEL_CHOICES,
+        'levels': accessible_levels,
     }
     return render(request, 'attendance/reports.html', context)
 

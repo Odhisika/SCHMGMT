@@ -33,6 +33,7 @@
             <tr>
                 <th>#</th>
                 <th>{% trans 'Week' %}</th>
+                <th>{% trans 'Date Range' %}</th>
                 <th>{% trans 'Activity Type' %}</th>
                 <th>{% trans 'Title' %}</th>
                 <th>{% trans 'Description' %}</th>
@@ -45,6 +46,13 @@
             <tr>
                 <td>{{ forloop.counter }}.</td>
                 <td><strong>{% trans 'Week' %} {{ week.week_number }}</strong></td>
+                <td>
+                    {% if week.start_date and week.end_date %}
+                        {{ week.start_date|date:"j F Y" }} – {{ week.end_date|date:"j F Y" }}
+                    {% else %}
+                        <span class="text-muted">{% trans 'Dates not set' %}</span>
+                    {% endif %}
+                </td>
                 <td>
                     {% if week.activity_type == "normal_lesson" %}
                         <span class="badge bg-primary"><i class="fas fa-book me-1"></i>{% trans 'Normal Lesson' %}</span>

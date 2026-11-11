@@ -1,6 +1,6 @@
 from django.shortcuts import render, get_object_or_404
 from django.contrib import messages
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, JsonResponse
 from django.urls import reverse_lazy
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
@@ -8,6 +8,8 @@ from django.core.files.storage import FileSystemStorage
 from django.http import HttpResponse
 from django.template.loader import get_template
 from django.db import models
+from django.db import transaction
+from decimal import Decimal, InvalidOperation
 from xhtml2pdf import pisa
 
 from reportlab.platypus import (
@@ -32,6 +34,7 @@ from accounts.decorators import lecturer_required, student_required, admin_requi
 from django.utils.translation import gettext as _
 from django.db.models import Count
 from .models import TakenCourse, Result
+from school.models import GradeWeightConfig
 
 
 CM = 2.54
@@ -1052,6 +1055,57 @@ def report_cards(request):
 # Teacher Score Entry System
 # ============================================================================
 
+_GRADE_COMPONENTS = (
+    ("classwork", "Classwork", "classwork_score", "classwork_weight", "use_classwork"),
+    ("class_test", "Class Test / Mid-Sem", "midsem_score", "class_test_weight", "use_class_test"),
+    ("assignment", "Assignment", "assignment_score", "assignment_weight", "use_assignment"),
+    ("attendance", "Attendance", "attendance_score", "attendance_weight", "use_attendance"),
+    ("project", "Project / Lab", "project_score", "project_weight", "use_project"),
+    ("exam", "Exam", "exam_score", "exam_weight", None),
+)
+
+
+def _score_configuration(school):
+    """Return the school's active teacher-entry components and config version."""
+    config = GradeWeightConfig.objects.filter(school=school).first()
+    version = config.updated_at.isoformat() if config else ""
+
+    if config and config.is_valid_config():
+        components = [
+            {
+                "key": key,
+                "label": label,
+                "field": field,
+                "weight": getattr(config, weight_field),
+                "weighted": True,
+            }
+            for key, label, field, weight_field, toggle in _GRADE_COMPONENTS
+            if toggle is None or getattr(config, toggle)
+        ]
+        return {"components": components, "version": version, "valid": True}
+
+    # Keep legacy score entry available until a valid grading setup is saved.
+    components = [
+        {"key": "midsem", "label": "Mid-Sem", "field": "midsem_score", "weight": 100, "weighted": False},
+        {"key": "quiz", "label": "Quiz", "field": "quiz_score", "weight": 100, "weighted": False},
+        {"key": "assignment", "label": "Assignment", "field": "assignment_score", "weight": 100, "weighted": False},
+        {"key": "exam", "label": "Exam", "field": "exam_score", "weight": 100, "weighted": False},
+    ]
+    return {"components": components, "version": version, "valid": False}
+
+
+def _score_rows(taken_courses, components):
+    rows = []
+    for taken_course in taken_courses:
+        inputs = []
+        for component in components:
+            value = getattr(taken_course, component["field"])
+            if component["key"] == "class_test" and not value and taken_course.quiz_score:
+                value = taken_course.quiz_score
+            inputs.append({"key": component["key"], "value": value})
+        rows.append({"taken_course": taken_course, "inputs": inputs})
+    return rows
+
 @login_required
 @lecturer_required
 def manage_scores_dashboard(request):
@@ -1096,7 +1150,7 @@ def enter_scores(request, level):
         messages.error(request, "Please select a subject.")
         return HttpResponseRedirect(reverse_lazy('manage_scores'))
         
-    course = get_object_or_404(Course, pk=subject_id)
+    course = get_object_or_404(Course, pk=subject_id, school=request.school)
     
     # Authorization Check: Ensure teacher is allocated to this course
     if not (request.user.is_superuser or request.user.is_school_admin):
@@ -1115,10 +1169,13 @@ def enter_scores(request, level):
     
     current_term = Semester.objects.filter(is_current_term=True, school=request.school).first()
     
+    score_configuration = _score_configuration(request.school)
     context = {
         "course": course,
         "level": level,
         "taken_courses": taken_courses,
+        "score_rows": _score_rows(taken_courses, score_configuration["components"]),
+        "score_configuration": score_configuration,
         "current_term": current_term,
         "title": f"Enter Scores - {course.title} ({level})",
     }
@@ -1127,43 +1184,101 @@ def enter_scores(request, level):
 
 @login_required
 @lecturer_required
+def score_weights(request):
+    """Small polling endpoint so open teacher pages pick up admin weight edits."""
+    return JsonResponse(_score_configuration(request.school))
+
+
+@login_required
+@lecturer_required
 def save_scores(request):
     """
     AJAX handler to save scores in bulk.
     """
-    from django.http import JsonResponse
     import json
-    
-    if request.method == "POST":
-        try:
-            data = json.loads(request.body)
-            scores = data.get('scores', [])
-            
-            updated_count = 0
-            errors = []
-            
-            for item in scores:
-                tc_id = item.get('id')
-                try:
-                    tc = TakenCourse.objects.get(pk=tc_id, school=request.school)
-                    
-                    # Update fields (handling empty strings as 0)
-                    tc.midsem_score = float(item.get('midsem') or 0)
-                    tc.quiz_score = float(item.get('quiz') or 0)
-                    tc.assignment_score = float(item.get('assignment') or 0)
-                    tc.exam_score = float(item.get('exam') or 0)
-                    
-                    tc.save()
-                    updated_count += 1
-                except Exception as e:
-                    errors.append(f"Error updating record {tc_id}: {str(e)}")
-            
-            if errors:
-                 return JsonResponse({'status': 'warning', 'message': f'Saved {updated_count} records with some errors.', 'errors': errors})
-            
-            return JsonResponse({'status': 'success', 'message': f'Successfully saved {updated_count} student records.'})
-            
-        except Exception as e:
-            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
-            
-    return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
+
+    if request.method != "POST":
+        return JsonResponse({"status": "error", "message": "Invalid method"}, status=405)
+
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({"status": "error", "message": "Invalid JSON request."}, status=400)
+    if not isinstance(data, dict):
+        return JsonResponse({"status": "error", "message": "Invalid score payload."}, status=400)
+
+    configuration = _score_configuration(request.school)
+    if data.get("config_version", "") != configuration["version"]:
+        return JsonResponse({
+            "status": "error",
+            "message": "The grading weights changed. The page is refreshing its weights; try saving again.",
+            "configuration": configuration,
+        }, status=409)
+
+    scores = data.get("scores")
+    if not isinstance(scores, list):
+        return JsonResponse({"status": "error", "message": "Scores must be a list."}, status=400)
+
+    components = configuration["components"]
+    allowed_keys = {component["key"] for component in components}
+    parsed_rows = []
+    errors = []
+    is_admin = request.user.is_superuser or request.user.is_school_admin
+
+    for item in scores:
+        if not isinstance(item, dict):
+            errors.append("A score row is malformed.")
+            continue
+
+        tc_id = item.get("id")
+        taken_course = TakenCourse.objects.select_related("course").filter(
+            pk=tc_id, school=request.school
+        ).first()
+        if not taken_course:
+            errors.append(f"Student score row {tc_id} was not found.")
+            continue
+        if not is_admin and not taken_course.course.allocated_course.filter(teacher=request.user).exists():
+            errors.append(f"You are not authorized to edit scores for {taken_course.course}.")
+            continue
+
+        row_values = {}
+        row_invalid = False
+        submitted = item.get("values", {})
+        if not isinstance(submitted, dict) or set(submitted) != allowed_keys:
+            errors.append(f"The score fields for {taken_course.student} are out of date. Reload the page.")
+            continue
+
+        for key, raw_value in submitted.items():
+            try:
+                value = Decimal(str(raw_value if raw_value not in (None, "") else "0"))
+                if not value.is_finite() or value < 0 or value > 100:
+                    raise InvalidOperation
+            except (InvalidOperation, ValueError, TypeError):
+                errors.append(f"{taken_course.student}: {key} must be between 0 and 100.")
+                row_invalid = True
+                continue
+            row_values[key] = value
+
+        if not row_invalid:
+            parsed_rows.append((taken_course, row_values))
+
+    if errors:
+        return JsonResponse({"status": "error", "message": "Please correct the invalid scores.", "errors": errors}, status=400)
+
+    try:
+        with transaction.atomic():
+            for taken_course, row_values in parsed_rows:
+                for component in components:
+                    key = component["key"]
+                    setattr(taken_course, component["field"], row_values[key])
+                    if key == "class_test":
+                        # Keep the legacy quiz field synchronized with its modern class-test field.
+                        taken_course.quiz_score = row_values[key]
+                taken_course.save()
+    except Exception as exc:
+        return JsonResponse({"status": "error", "message": f"Scores could not be saved: {exc}"}, status=400)
+
+    return JsonResponse({
+        "status": "success",
+        "message": f"Successfully saved {len(parsed_rows)} student records.",
+    })

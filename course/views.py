@@ -4,6 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Sum
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.utils.translation import gettext_lazy as _
 from django.views.generic import CreateView
@@ -293,12 +294,19 @@ class CourseAllocationFormView(CreateView):
     def form_valid(self, form):
         teacher = form.cleaned_data["teacher"]
         selected_courses = form.cleaned_data["courses"]
-        allocation, created = CourseAllocation.objects.get_or_create(teacher=teacher)
-        allocation.courses.set(selected_courses)
+        allocation = CourseAllocation.objects.filter(teacher=teacher).first()
+        if allocation is None:
+            allocation = CourseAllocation.objects.create(teacher=teacher)
+        # New allocation adds subjects to this teacher's current set; replacing
+        # the set here silently removed subjects already assigned to them.
+        allocation.courses.add(*selected_courses)
         messages.success(
             self.request, f"Courses allocated to {teacher.get_full_name} successfully."
         )
-        return redirect("course_allocation_view")
+        listing_url = reverse("course_allocation_view")
+        if teacher.division:
+            listing_url = f"{listing_url}?division={teacher.division}"
+        return redirect(listing_url)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

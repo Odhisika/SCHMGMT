@@ -280,7 +280,8 @@ def edit_staff(request, pk):
             request.POST, request.FILES, 
             instance=lecturer, 
             school=request.school,
-            is_admin=True
+            is_admin=True,
+            is_staff_admin=True,
         )
         if form.is_valid():
             form.save()
@@ -289,7 +290,12 @@ def edit_staff(request, pk):
             return redirect("lecturer_list")
         messages.error(request, "Please correct the error below.")
     else:
-        form = ProfileUpdateForm(instance=lecturer, school=request.school, is_admin=True)
+        form = ProfileUpdateForm(
+            instance=lecturer,
+            school=request.school,
+            is_admin=True,
+            is_staff_admin=True,
+        )
     return render(
         request, "accounts/edit_lecturer.html", {"title": "Edit Lecturer", "form": form}
     )

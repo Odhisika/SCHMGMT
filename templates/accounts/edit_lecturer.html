@@ -39,8 +39,16 @@
         </div>
         <div class="col-md-6">
             <div class="card">
-                <p class="form-title">{% trans 'Others' %}</p>
+                <p class="form-title">{% trans 'Teaching Assignment' %}</p>
                 <div class="card-body">
+                    {{ form.department|as_crispy_field }}
+                    {{ form.division|as_crispy_field }}
+                    {{ form.assigned_level|as_crispy_field }}
+                    <div class="form-check mb-3">
+                        {{ form.is_class_teacher }}
+                        <label class="form-check-label" for="id_is_class_teacher">{{ form.is_class_teacher.label }}</label>
+                    </div>
+                    <p class="form-title">{% trans 'Profile Picture' %}</p>
                     {{ form.picture|as_crispy_field }}
                 </div>
             </div>

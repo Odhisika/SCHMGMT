@@ -146,6 +146,8 @@ WEEK_ACTIVITY_TYPES = (
 class TermWeek(models.Model):
     term = models.ForeignKey(Term, on_delete=models.CASCADE, related_name="weeks")
     week_number = models.PositiveIntegerField(verbose_name=_("Week Number"))
+    start_date = models.DateField(null=True, blank=True, verbose_name=_("Activity Start Date"))
+    end_date = models.DateField(null=True, blank=True, verbose_name=_("Activity End Date"))
     activity_type = models.CharField(max_length=20, choices=WEEK_ACTIVITY_TYPES, default="normal_lesson", verbose_name=_("Activity Type"))
     title = models.CharField(max_length=100, blank=True, verbose_name=_("Custom Title"))
     description = models.TextField(blank=True, verbose_name=_("Description"))

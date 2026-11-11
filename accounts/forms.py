@@ -359,7 +359,12 @@ class ProfileUpdateForm(UserChangeForm):
     def __init__(self, *args, **kwargs):
         self.school = kwargs.pop("school", None)
         self.is_admin = kwargs.pop("is_admin", False)
+        self.is_staff_admin = kwargs.pop("is_staff_admin", False)
         super(ProfileUpdateForm, self).__init__(*args, **kwargs)
+
+        if not self.is_staff_admin:
+            for field_name in ("division", "assigned_level", "is_class_teacher"):
+                self.fields.pop(field_name, None)
         
         if self.school:
             self.fields["department"].queryset = Program.objects.filter(
@@ -370,7 +375,8 @@ class ProfileUpdateForm(UserChangeForm):
         if not self.is_admin:
             restricted_fields = [
                 "first_name", "last_name", "gender", "email", 
-                "phone", "address", "department"
+                "phone", "address", "department", "division",
+                "assigned_level", "is_class_teacher",
             ]
             for field_name in restricted_fields:
                 if field_name in self.fields:
@@ -449,6 +455,48 @@ class ProfileUpdateForm(UserChangeForm):
         required=False,
     )
 
+    division = forms.ChoiceField(
+        choices=[("", _("Select Division"))] + list(settings.DIVISION_CHOICES),
+        widget=forms.Select(attrs={"class": "form-control"}),
+        required=False,
+        label=_("Division"),
+    )
+
+    assigned_level = forms.ChoiceField(
+        choices=[("", _("No class assigned"))] + list(LEVEL),
+        widget=forms.Select(attrs={"class": "form-control"}),
+        required=False,
+        label=_("Assigned Class"),
+        help_text=_("Set the class this teacher is responsible for."),
+    )
+
+    is_class_teacher = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        label=_("Class Teacher"),
+    )
+
+    def clean(self):
+        cleaned = super().clean()
+        division = cleaned.get("division")
+        assigned_level = cleaned.get("assigned_level")
+        department = cleaned.get("department")
+
+        if self.is_admin and self.is_staff_admin:
+            if assigned_level and not division:
+                self.add_error("division", _("Choose a division for the assigned class."))
+            if assigned_level and division:
+                valid_levels = settings.DIVISION_LEVEL_MAPPING.get(division, [])
+                if assigned_level not in valid_levels:
+                    self.add_error("assigned_level", _("Choose a class within the selected division."))
+
+            if cleaned.get("is_class_teacher") and not assigned_level:
+                self.add_error("assigned_level", _("Assign a class before marking this teacher as a class teacher."))
+
+            if department and division and department.division and department.division != division:
+                self.add_error("department", _("The department must belong to the selected division."))
+        return cleaned
+
     class Meta:
         model = User
         fields = [
@@ -459,6 +507,9 @@ class ProfileUpdateForm(UserChangeForm):
             "phone",
             "address",
             "department",
+            "division",
+            "assigned_level",
+            "is_class_teacher",
             "picture",
         ]
 

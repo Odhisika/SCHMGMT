@@ -28,6 +28,17 @@
                 <label class="fw-bold mb-1">{% trans 'Week Number' %}</label>
                 {{ form.week_number }}
             </div>
+            <div class="row">
+                <div class="col-md-6 form-group mb-3">
+                    <label class="fw-bold mb-1">{% trans 'Start Date' %}</label>
+                    {{ form.start_date }}
+                </div>
+                <div class="col-md-6 form-group mb-3">
+                    <label class="fw-bold mb-1">{% trans 'End Date' %}</label>
+                    {{ form.end_date }}
+                </div>
+            </div>
+            <small class="text-muted d-block mb-3">{% trans 'Leave both dates blank to use this week’s dates from the term calendar.' %}</small>
             <div class="form-group mb-3">
                 <label class="fw-bold mb-1">{% trans 'Activity Type' %}</label>
                 {{ form.activity_type }}

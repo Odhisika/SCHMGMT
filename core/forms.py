@@ -1,4 +1,6 @@
 from django import forms
+from django.utils.translation import gettext_lazy as _
+from datetime import timedelta
 from .models import NewsAndEvents, Term, TERM, TermWeek, WEEK_ACTIVITY_TYPES
 
 # Keep Semester as alias for backward compatibility
@@ -135,16 +137,41 @@ class TermForm(forms.ModelForm):
 
 
 class TermWeekForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        self.term = kwargs.pop("term", None)
+        super().__init__(*args, **kwargs)
+
     class Meta:
         model = TermWeek
-        fields = ["week_number", "activity_type", "title", "description", "is_active"]
+        fields = ["week_number", "start_date", "end_date", "activity_type", "title", "description", "is_active"]
         widgets = {
             "week_number": forms.NumberInput(attrs={"class": "form-control", "min": 1}),
+            "start_date": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
+            "end_date": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
             "activity_type": forms.Select(attrs={"class": "form-control"}),
             "title": forms.TextInput(attrs={"class": "form-control", "placeholder": "Optional custom title"}),
             "description": forms.Textarea(attrs={"class": "form-control", "rows": 3, "placeholder": "Optional description"}),
             "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
+
+    def clean(self):
+        cleaned = super().clean()
+        start_date = cleaned.get("start_date")
+        end_date = cleaned.get("end_date")
+        week_number = cleaned.get("week_number")
+        if bool(start_date) != bool(end_date):
+            self.add_error("end_date", _("Enter both dates, or leave both blank to use the term's week dates."))
+        if start_date and end_date and end_date < start_date:
+            self.add_error("end_date", _("The end date must be on or after the start date."))
+        if self.term and self.term.start_date and self.term.end_date and week_number:
+            generated_start = self.term.start_date + timedelta(days=(week_number - 1) * 7)
+            if generated_start > self.term.end_date:
+                self.add_error("week_number", _("This week falls outside the term dates."))
+        if self.term and start_date and self.term.start_date and start_date < self.term.start_date:
+            self.add_error("start_date", _("The activity cannot start before the term."))
+        if self.term and end_date and self.term.end_date and end_date > self.term.end_date:
+            self.add_error("end_date", _("The activity cannot end after the term."))
+        return cleaned
 
 
 # Keep SemesterForm as alias for backward compatibility

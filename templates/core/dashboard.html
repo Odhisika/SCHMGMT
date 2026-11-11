@@ -148,6 +148,9 @@
 						</div>
 						<div class="fw-bold small">{% trans 'W' %}{{ week.week_number }}</div>
 						<small class="text-muted" style="font-size: 10px;">{{ week.get_activity_type_display }}</small>
+						{% if week.start_date and week.end_date %}
+						<small class="d-block text-muted" style="font-size: 10px;">{{ week.start_date|date:"j M" }}–{{ week.end_date|date:"j M" }}</small>
+						{% endif %}
 					</div>
 				</div>
 				{% endfor %}

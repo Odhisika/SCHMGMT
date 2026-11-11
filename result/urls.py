@@ -13,6 +13,7 @@ from .views import (
     # New views
     manage_scores_dashboard,
     enter_scores,
+    score_weights,
     save_scores,
 )
 
@@ -25,6 +26,7 @@ urlpatterns = [
     # New Teacher Score Entry System
     path("manage-scores/", manage_scores_dashboard, name="manage_scores"),
     path("enter-scores/<str:level>/", enter_scores, name="enter_scores"),
+    path("score-weights/", score_weights, name="score_weights"),
     path("save-scores/", save_scores, name="save_scores"),
 
     path("grade/", grade_result, name="grade_results"),

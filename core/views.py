@@ -340,6 +340,20 @@ def unset_current_semester(school):
 # ########################################################
 # Term Weeks
 # ########################################################
+def _fill_week_dates_from_term(week, term):
+    """Fill omitted activity dates from the term's calendar week boundaries."""
+    if not term.start_date:
+        return
+    generated_start = term.start_date + timedelta(days=(week.week_number - 1) * 7)
+    generated_end = generated_start + timedelta(days=6)
+    if term.end_date:
+        generated_end = min(generated_end, term.end_date)
+    if week.start_date is None:
+        week.start_date = generated_start
+    if week.end_date is None:
+        week.end_date = generated_end
+
+
 @login_required
 @lecturer_required
 def term_week_list_view(request, term_pk):
@@ -353,15 +367,16 @@ def term_week_list_view(request, term_pk):
 def term_week_add_view(request, term_pk):
     term = get_object_or_404(Semester, pk=term_pk, school=request.school)
     if request.method == "POST":
-        form = TermWeekForm(request.POST)
+        form = TermWeekForm(request.POST, term=term)
         if form.is_valid():
             week = form.save(commit=False)
             week.term = term
+            _fill_week_dates_from_term(week, term)
             week.save()
             messages.success(request, f"Week {week.week_number} added successfully.")
             return redirect("term_week_list", term_pk=term.pk)
     else:
-        form = TermWeekForm()
+        form = TermWeekForm(term=term)
     return render(request, "core/term_week_form.html", {"form": form, "term": term})
 
 
@@ -371,13 +386,15 @@ def term_week_edit_view(request, term_pk, pk):
     term = get_object_or_404(Semester, pk=term_pk, school=request.school)
     week = get_object_or_404(TermWeek, pk=pk, term=term)
     if request.method == "POST":
-        form = TermWeekForm(request.POST, instance=week)
+        form = TermWeekForm(request.POST, instance=week, term=term)
         if form.is_valid():
             form.save()
+            _fill_week_dates_from_term(week, term)
+            week.save(update_fields=["start_date", "end_date"])
             messages.success(request, f"Week {week.week_number} updated.")
             return redirect("term_week_list", term_pk=term.pk)
     else:
-        form = TermWeekForm(instance=week)
+        form = TermWeekForm(instance=week, term=term)
     return render(request, "core/term_week_form.html", {"form": form, "term": term, "week": week})
 
 
@@ -412,6 +429,8 @@ def term_week_init_view(request, term_pk):
         TermWeek.objects.create(
             term=term,
             week_number=w,
+            start_date=term.start_date + timedelta(days=(w - 1) * 7),
+            end_date=min(term.start_date + timedelta(days=(w * 7) - 1), term.end_date),
             activity_type="normal_lesson",
             title=f"Week {w}",
         )

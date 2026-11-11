@@ -1,12 +1,10 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% load static %}
 
 {% block title %}{{ title }} | {{ block.super }}{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
-    <!-- Page Heading -->
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
         <h1 class="h3 mb-0 text-gray-800">{{ title }}</h1>
         <a href="{% url 'manage_scores' %}" class="d-none d-sm-inline-block btn btn-sm btn-secondary shadow-sm">
@@ -14,96 +12,76 @@
         </a>
     </div>
 
-    <!-- Stats Cards -->
     <div class="row mb-4">
         <div class="col-xl-3 col-md-6 mb-4">
             <div class="card border-left-primary shadow h-100 py-2">
                 <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Subject</div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ course.title }}</div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-book fa-2x text-gray-300"></i>
-                        </div>
-                    </div>
+                    <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Subject</div>
+                    <div class="h5 mb-0 font-weight-bold text-gray-800">{{ course.title }}</div>
                 </div>
             </div>
         </div>
-        
         <div class="col-xl-3 col-md-6 mb-4">
             <div class="card border-left-success shadow h-100 py-2">
                 <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Students</div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ taken_courses.count }}</div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-users fa-2x text-gray-300"></i>
-                        </div>
-                    </div>
+                    <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Students</div>
+                    <div class="h5 mb-0 font-weight-bold text-gray-800">{{ taken_courses.count }}</div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Score Entry Table -->
+    {% if not score_configuration.valid %}
+    <div class="alert alert-warning" role="alert">
+        Grade weights are missing or do not add up to 100%. Legacy score totals are shown until an administrator saves a valid grading setup.
+    </div>
+    {% endif %}
+    <div id="weightChangeNotice" class="alert alert-info d-none" role="status"></div>
+
     <div class="card shadow mb-4">
         <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
             <h6 class="m-0 font-weight-bold text-primary">Student Scores</h6>
-            <button id="saveScoresBtn" class="btn btn-primary btn-sm">
+            <button id="saveScoresBtn" class="btn btn-primary btn-sm" type="button">
                 <i class="fas fa-save fa-sm text-white-50"></i> Save All Changes
             </button>
         </div>
         <div class="card-body">
+            <p class="text-muted small">Enter each mark out of 100. The contribution column shows how much it adds toward that assessment's configured weight.</p>
             <div class="table-responsive">
-                <table class="table table-bordered table-hover" id="scoresTable" width="100%" cellspacing="0">
+                <table class="table table-bordered table-hover" id="scoresTable" width="100%" cellspacing="0" data-weights-url="{% url 'score_weights' %}">
                     <thead class="table-light">
                         <tr>
                             <th style="width: 5%">#</th>
-                            <th style="width: 25%">Student Name</th>
-                            <th style="width: 15%">Midsem (10%)</th>
-                            <th style="width: 15%">Quiz (15%)</th>
-                            <th style="width: 15%">Assign (15%)</th>
-                            <th style="width: 15%">Exam (60%)</th>
-                            <th style="width: 10%">Total</th>
+                            <th style="min-width: 200px">Student Name</th>
+                            {% for component in score_configuration.components %}
+                            <th class="component-heading" data-component="{{ component.key }}" style="min-width: 150px">{{ component.label }} ({{ component.weight }}%)</th>
+                            {% endfor %}
+                            <th style="min-width: 100px">Weighted Total</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for tc in taken_courses %}
-                        <tr data-id="{{ tc.id }}">
+                        {% for row in score_rows %}
+                        <tr data-id="{{ row.taken_course.id }}">
                             <td>{{ forloop.counter }}</td>
                             <td class="align-middle">
-                                <span class="fw-bold">{{ tc.student.student.get_full_name }}</span>
-                                <br>
-                                <small class="text-muted">{{ tc.student.student.username }}</small>
+                                <span class="fw-bold">{{ row.taken_course.student.student.get_full_name }}</span><br>
+                                <small class="text-muted">{{ row.taken_course.student.student.username }}</small>
                             </td>
+                            {% for score_input in row.inputs %}
                             <td>
-                                <input type="number" class="form-control score-input midsem" 
-                                       value="{{ tc.midsem_score }}" min="0" max="100" step="0.01">
+                                <input type="number" class="form-control score-input" data-component="{{ score_input.key }}"
+                                       value="{{ score_input.value }}" min="0" max="100" step="0.01" inputmode="decimal"
+                                       aria-label="{{ score_input.key }} mark for {{ row.taken_course.student }}">
+                                <small class="text-muted contribution" data-contribution="{{ score_input.key }}"></small>
+                                <small class="text-danger score-error d-none" data-error="{{ score_input.key }}">Enter a mark from 0 to 100.</small>
                             </td>
-                            <td>
-                                <input type="number" class="form-control score-input quiz" 
-                                       value="{{ tc.quiz_score }}" min="0" max="100" step="0.01">
-                            </td>
-                            <td>
-                                <input type="number" class="form-control score-input assignment" 
-                                       value="{{ tc.assignment_score }}" min="0" max="100" step="0.01">
-                            </td>
-                            <td>
-                                <input type="number" class="form-control score-input exam" 
-                                       value="{{ tc.exam_score }}" min="0" max="100" step="0.01">
-                            </td>
+                            {% endfor %}
                             <td class="align-middle text-center">
-                                <span class="badge bg-secondary total-score">{{ tc.total }}</span>
+                                <span class="badge bg-secondary total-score">{{ row.taken_course.total }}</span>
                             </td>
                         </tr>
                         {% empty %}
-                        <tr>
-                            <td colspan="7" class="text-center py-4">No students found for this class and subject.</td>
-                        </tr>
+                        <tr><td colspan="{{ score_configuration.components|length|add:3 }}" class="text-center py-4">No students found for this class and subject.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -111,96 +89,147 @@
         </div>
     </div>
 </div>
+{{ score_configuration|json_script:"scoreConfiguration" }}
 {% endblock content %}
 
 {% block js %}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const table = document.getElementById('scoresTable');
-        const saveBtn = document.getElementById('saveScoresBtn');
-        
-        // Auto-calculate totals on input change
-        table.addEventListener('input', function(e) {
-            if (e.target.classList.contains('score-input')) {
-                const row = e.target.closest('tr');
-                calculateRowTotal(row);
-                // Mark row as modified visually
-                row.classList.add('table-warning');
-            }
-        });
+document.addEventListener('DOMContentLoaded', function () {
+    const table = document.getElementById('scoresTable');
+    const saveBtn = document.getElementById('saveScoresBtn');
+    const notice = document.getElementById('weightChangeNotice');
+    const csrfToken = '{{ csrf_token }}';
+    let configuration = JSON.parse(document.getElementById('scoreConfiguration').textContent);
+    let isSaving = false;
+    let componentSetChanged = false;
 
-        function calculateRowTotal(row) {
-            const midsem = parseFloat(row.querySelector('.midsem').value) || 0;
-            const quiz = parseFloat(row.querySelector('.quiz').value) || 0;
-            const assignment = parseFloat(row.querySelector('.assignment').value) || 0;
-            const exam = parseFloat(row.querySelector('.exam').value) || 0;
-            
-            const total = midsem + quiz + assignment + exam;
-            const badge = row.querySelector('.total-score');
-            
-            badge.textContent = total.toFixed(2);
-            
-            // Color coding based on total
-            badge.className = 'badge total-score ' + 
-                (total >= 50 ? 'bg-success' : 'bg-danger');
-            
-            // Validation warning
-            if (total > 100) {
-                badge.className += ' border border-danger text-danger bg-light';
-                alert('Warning: Total score exceeds 100% for ' + row.querySelector('td:nth-child(2)').innerText);
-            }
+    function inputsFor(row) {
+        return Array.from(row.querySelectorAll('.score-input'));
+    }
+
+    function inputIsValid(input) {
+        const value = input.value.trim();
+        const valid = value === '' || (Number.isFinite(Number(value)) && Number(value) >= 0 && Number(value) <= 100);
+        input.classList.toggle('is-invalid', !valid);
+        const error = input.parentElement.querySelector('.score-error');
+        error.classList.toggle('d-none', valid);
+        return valid;
+    }
+
+    function updateSaveState() {
+        const hasInvalidMark = Array.from(table.querySelectorAll('.score-input')).some(input => !inputIsValid(input));
+        saveBtn.disabled = isSaving || hasInvalidMark || componentSetChanged;
+    }
+
+    function calculateRowTotal(row) {
+        let total = 0;
+        for (const component of configuration.components) {
+            const input = row.querySelector(`[data-component="${component.key}"]`);
+            if (!input) continue;
+            const mark = input.value.trim() === '' ? 0 : Number(input.value);
+            const contribution = configuration.valid ? (mark / 100) * Number(component.weight) : mark;
+            total += contribution;
+            const contributionLabel = row.querySelector(`[data-contribution="${component.key}"]`);
+            contributionLabel.textContent = configuration.valid
+                ? `${contribution.toFixed(2)} / ${Number(component.weight).toFixed(2)}`
+                : `${contribution.toFixed(2)} / 100`;
         }
+        const badge = row.querySelector('.total-score');
+        badge.textContent = total.toFixed(2);
+        badge.className = 'badge total-score ' + (total >= 50 ? 'bg-success' : 'bg-danger');
+    }
 
-        // Save functionality
-        saveBtn.addEventListener('click', function() {
-            const scores = [];
-            const rows = table.querySelectorAll('tbody tr');
-            
-            rows.forEach(row => {
-                const id = row.getAttribute('data-id');
-                if (!id) return;
-                
-                scores.push({
-                    id: id,
-                    midsem: row.querySelector('.midsem').value,
-                    quiz: row.querySelector('.quiz').value,
-                    assignment: row.querySelector('.assignment').value,
-                    exam: row.querySelector('.exam').value
-                });
-            });
+    function calculateAllRows() {
+        table.querySelectorAll('tbody tr[data-id]').forEach(calculateRowTotal);
+    }
 
-            // Show loading state
-            const originalText = saveBtn.innerHTML;
-            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
-            saveBtn.disabled = true;
+    function componentKeys(components) {
+        return components.map(component => component.key).join('|');
+    }
 
-            fetch("{% url 'save_scores' %}", {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': '{{ csrf_token }}'
-                },
-                body: JSON.stringify({ scores: scores })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    // Remove warning classes
-                    rows.forEach(row => row.classList.remove('table-warning'));
-                    alert('Success: ' + data.message);
-                } else {
-                    alert('Error: ' + data.message);
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('An error occurred while saving scores.');
-            })
-            .finally(() => {
-                saveBtn.innerHTML = originalText;
-                saveBtn.disabled = false;
-            });
+    function refreshHeaders() {
+        configuration.components.forEach(component => {
+            const heading = table.querySelector(`.component-heading[data-component="${component.key}"]`);
+            if (heading) heading.textContent = `${component.label} (${component.weight}%)`;
         });
+    }
+
+    table.addEventListener('input', function (event) {
+        if (!event.target.matches('.score-input')) return;
+        inputIsValid(event.target);
+        const row = event.target.closest('tr');
+        calculateRowTotal(row);
+        row.classList.add('table-warning');
+        updateSaveState();
     });
+
+    saveBtn.addEventListener('click', async function () {
+        updateSaveState();
+        if (saveBtn.disabled) return;
+
+        const rows = Array.from(table.querySelectorAll('tbody tr[data-id]'));
+        const scores = rows.map(row => ({
+            id: row.dataset.id,
+            values: Object.fromEntries(inputsFor(row).map(input => [input.dataset.component, input.value]))
+        }));
+
+        isSaving = true;
+        const originalText = saveBtn.innerHTML;
+        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+        updateSaveState();
+        try {
+            const response = await fetch("{% url 'save_scores' %}", {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                body: JSON.stringify({scores, config_version: configuration.version})
+            });
+            const data = await response.json();
+            if (!response.ok || data.status !== 'success') {
+                const details = data.errors ? '\n' + data.errors.join('\n') : '';
+                alert((data.message || 'Scores could not be saved.') + details);
+                if (response.status === 409) refreshConfiguration();
+                return;
+            }
+            rows.forEach(row => row.classList.remove('table-warning'));
+            alert(data.message);
+        } catch (error) {
+            console.error(error);
+            alert('An error occurred while saving scores.');
+        } finally {
+            isSaving = false;
+            saveBtn.innerHTML = originalText;
+            updateSaveState();
+        }
+    });
+
+    async function refreshConfiguration() {
+        try {
+            const response = await fetch(table.dataset.weightsUrl, {headers: {'Accept': 'application/json'}, cache: 'no-store'});
+            if (!response.ok) return;
+            const latest = await response.json();
+            if (latest.version === configuration.version) return;
+
+            if (componentKeys(latest.components) !== componentKeys(configuration.components)) {
+                componentSetChanged = true;
+                notice.textContent = 'The administrator changed which score components are active. Reload this page to continue entering marks.';
+                notice.classList.remove('d-none');
+                updateSaveState();
+                return;
+            }
+
+            configuration = latest;
+            refreshHeaders();
+            calculateAllRows();
+            notice.textContent = 'Grading weights were updated by an administrator. The displayed totals now use the new weights.';
+            notice.classList.remove('d-none');
+        } catch (error) {
+            console.debug('Could not refresh grading weights.', error);
+        }
+    }
+
+    calculateAllRows();
+    updateSaveState();
+    window.setInterval(refreshConfiguration, 5000);
+});
 </script>
 {% endblock js %}
