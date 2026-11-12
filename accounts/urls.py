@@ -31,10 +31,15 @@ from .views import (
     render_student_pdf_list,  # new
     class_list_view,
     class_detail_view,
+    reset_user_password,
     non_teaching_staff_list,
     non_teaching_staff_add,
     non_teaching_staff_edit,
     non_teaching_staff_delete,
+    promote_non_teaching_staff,
+    export_staff,
+    import_staff,
+    download_staff_import_template,
 )
 
 
@@ -67,6 +72,7 @@ urlpatterns = [
     path("profile/<int:user_id>/detail/", profile_single, name="profile_single"),
     path("setting/", profile_update, name="edit_profile"),
     path("change_password/", change_password, name="change_password"),
+    path("users/<int:user_id>/reset-password/", reset_user_password, name="reset_user_password"),
     path("lecturers/", LecturerFilterView.as_view(), name="lecturer_list"),
     path("lecturer/add/", staff_add_view, name="add_lecturer"),
     path("staff/<int:pk>/edit/", edit_staff, name="staff_edit"),
@@ -75,6 +81,10 @@ urlpatterns = [
     path("non-teaching-staff/add/", non_teaching_staff_add, name="non_teaching_staff_add"),
     path("non-teaching-staff/<int:pk>/edit/", non_teaching_staff_edit, name="non_teaching_staff_edit"),
     path("non-teaching-staff/<int:pk>/delete/", non_teaching_staff_delete, name="non_teaching_staff_delete"),
+    path("non-teaching-staff/<int:pk>/promote/", promote_non_teaching_staff, name="staff_promote"),
+    path("staff/export/<str:staff_type>/<str:file_type>/", export_staff, name="staff_export"),
+    path("staff/import/", import_staff, name="staff_import"),
+    path("staff/import/template/", download_staff_import_template, name="staff_import_template"),
     path("students/", StudentListView.as_view(), name="student_list"),
     path("classes/", class_list_view, name="class_list"),
     path("classes/<str:level_code>/", class_detail_view, name="class_detail"),

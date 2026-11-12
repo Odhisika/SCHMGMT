@@ -6,9 +6,21 @@
 
 {% block content %}
 
-<form method="POST">{% csrf_token %}
-	{{ form.as_p }}
-	<input type="submit" name="" value="{% trans 'Save' %}">
+{% include 'snippets/messages.html' %}
+<form method="POST" class="card border-0 shadow-sm"><div class="card-body">{% csrf_token %}
+    <div class="row">
+        <div class="col-md-6">{{ form.first_name|as_crispy_field }}</div>
+        <div class="col-md-6">{{ form.last_name|as_crispy_field }}</div>
+        <div class="col-md-6">{{ form.username|as_crispy_field }}</div>
+        <div class="col-md-6">{{ form.email|as_crispy_field }}</div>
+        <div class="col-md-6">{{ form.phone|as_crispy_field }}</div>
+        <div class="col-md-6">{{ form.address|as_crispy_field }}</div>
+        <div class="col-md-6">{{ form.student|as_crispy_field }}</div>
+        <div class="col-md-6">{{ form.relation_ship|as_crispy_field }}</div>
+    </div>
+    <p class="small text-muted">{% trans 'Email is optional. Leave the username blank to generate a parent login ID. A temporary password will be issued after saving.' %}</p>
+    <button class="btn btn-primary" type="submit">{% trans 'Create parent account' %}</button>
+</div>
 </form>
 
 {% endblock %}

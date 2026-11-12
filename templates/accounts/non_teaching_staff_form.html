@@ -16,25 +16,22 @@
 
 {% include 'snippets/messages.html' %}
 
-<div class="card border-0 shadow-sm mx-auto" style="max-width: 900px;">
-    <div class="card-header bg-white border-0 pt-4 px-4">
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+    <div>
         <h1 class="h4 mb-1"><i class="fas fa-user-gear text-primary me-2"></i>{{ title }}</h1>
         <p class="text-muted mb-0">{% trans 'These accounts are for school employees who do not teach classes.' %}</p>
     </div>
-    <div class="card-body p-4">
-        <form method="post">
-            {% csrf_token %}
-            {{ form|crispy }}
-            {% if not is_edit %}
-            <p class="small text-muted">{% trans 'If you leave the username or password blank, the system will generate account credentials and send them to this email address.' %}</p>
-            {% endif %}
-            <div class="d-flex flex-wrap gap-2 mt-4">
-                <button class="btn btn-primary" type="submit">
-                    <i class="fas fa-floppy-disk me-1"></i>{% if is_edit %}{% trans 'Save changes' %}{% else %}{% trans 'Create account' %}{% endif %}
-                </button>
-                <a class="btn btn-light" href="{% url 'non_teaching_staff_list' %}">{% trans 'Cancel' %}</a>
-            </div>
-        </form>
-    </div>
 </div>
+
+<form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {% include 'accounts/snippets/staff_ges_form.html' %}
+
+    <div class="d-flex flex-wrap gap-2 mt-4">
+        <button class="btn btn-primary" type="submit">
+            <i class="fas fa-floppy-disk me-1"></i>{% if is_edit %}{% trans 'Save changes' %}{% else %}{% trans 'Create account' %}{% endif %}
+        </button>
+        <a class="btn btn-light" href="{% url 'non_teaching_staff_list' %}">{% trans 'Cancel' %}</a>
+    </div>
+</form>
 {% endblock %}

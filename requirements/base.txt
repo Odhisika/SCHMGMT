@@ -10,6 +10,8 @@ django-crispy-forms==1.14.0  # https://github.com/django-crispy-forms/django-cri
 crispy-bootstrap5==0.7  # https://github.com/django-crispy-forms/crispy-bootstrap5
 django-filter==23.5 # https://github.com/carltongibson/django-filter
 django-modeltranslation==0.18.11 # https://github.com/Buren/django-modeltranslation
+openpyxl==3.1.5
+python-docx==1.1.2
 
 # PDF generator
 reportlab==4.0.4

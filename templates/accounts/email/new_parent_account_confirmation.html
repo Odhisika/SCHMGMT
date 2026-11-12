@@ -1,0 +1,10 @@
+{% load i18n %}
+<p>{% blocktrans with name=user.get_full_name school_name=school.name %}Hello {{ name }}, your parent account for {{ school_name }} is ready.{% endblocktrans %}</p>
+<p>{% trans 'Login ID' %}: <strong>{{ user.username }}</strong></p>
+<p>{% trans 'Temporary password' %}: <strong>{{ password }}</strong></p>
+<p>{% trans 'You will be asked to change this password after signing in.' %}</p>
+<p><a href="{{ login_url }}">{% trans 'Sign in' %}</a></p>
+<hr>
+<p>{% trans 'For help, contact the school:' %}</p>
+{% if school.support_email or school.email %}<p>Email: <a href="mailto:{{ school.support_email|default:school.email }}">{{ school.support_email|default:school.email }}</a></p>{% endif %}
+{% if school.support_phone or school.phone %}<p>Phone: {{ school.support_phone|default:school.phone }}</p>{% endif %}

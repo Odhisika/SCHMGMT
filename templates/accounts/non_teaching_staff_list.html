@@ -22,6 +22,9 @@
     <a class="btn btn-primary" href="{% url 'non_teaching_staff_add' %}">
         <i class="fas fa-user-plus me-1"></i>{% trans 'Add staff member' %}
     </a>
+    <a class="btn btn-outline-primary" hx-boost="false" download="non_teaching_staff.xlsx" href="{% url 'staff_export' 'non-teaching' 'xlsx' %}"><i class="fas fa-file-excel me-1"></i>{% trans 'Export Excel' %}</a>
+    <a class="btn btn-outline-primary" hx-boost="false" download="non_teaching_staff.docx" href="{% url 'staff_export' 'non-teaching' 'docx' %}"><i class="fas fa-file-word me-1"></i>{% trans 'Export Word' %}</a>
+    <a class="btn btn-outline-secondary" hx-boost="false" href="{% url 'staff_import' %}"><i class="fas fa-file-import me-1"></i>{% trans 'Import Excel' %}</a>
 </div>
 
 <div class="card border-0 shadow-sm">
@@ -51,7 +54,7 @@
                 <tbody>
                     {% for staff_member in staff_members %}
                     <tr>
-                        <td class="fw-semibold">{{ staff_member.get_full_name }}</td>
+                        <td class="fw-semibold"><a href="{% url 'profile_single' staff_member.id %}">{{ staff_member.get_full_name }}</a></td>
                         <td><span class="badge rounded-pill text-bg-light border">{{ staff_member.get_non_teaching_position_display }}</span></td>
                         <td>{{ staff_member.username }}</td>
                         <td>{{ staff_member.phone|default:'—' }}</td>
@@ -59,6 +62,9 @@
                         <td class="text-end text-nowrap">
                             <a class="btn btn-sm btn-outline-secondary" href="{% url 'non_teaching_staff_edit' staff_member.pk %}" aria-label="{% trans 'Edit' %}">
                                 <i class="fas fa-pen"></i>
+                            </a>
+                            <a class="btn btn-sm btn-outline-primary" href="{% url 'staff_promote' staff_member.pk %}" aria-label="{% trans 'Promote to teacher' %}" title="{% trans 'Promote to teacher' %}">
+                                <i class="fas fa-chalkboard-teacher"></i>
                             </a>
                             <form method="post" action="{% url 'non_teaching_staff_delete' staff_member.pk %}" class="d-inline"
                                   data-confirm="{% trans 'This staff account will be permanently removed.' %}"

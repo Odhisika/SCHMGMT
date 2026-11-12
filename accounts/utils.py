@@ -4,7 +4,9 @@ from datetime import datetime
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from django.urls import reverse
+from django.utils import timezone
 
 from core.utils import send_html_email
 
@@ -13,22 +15,56 @@ logger = logging.getLogger(__name__)
 
 
 def generate_password():
-    return get_user_model().objects.make_random_password()
+    return get_user_model().objects.make_random_password(length=16)
 
 
-def generate_student_id():
-    # Generate a username based on first and last name and registration date
-    registered_year = datetime.now().strftime("%Y")
-    students_count = get_user_model().objects.filter(is_student=True).count()
-    username = f"{settings.STUDENT_ID_PREFIX}-{registered_year}-{students_count}"
-    
-    # Ensure uniqueness
-    counter = students_count
-    while get_user_model().objects.filter(username=username).exists():
-        counter += 1
+@transaction.atomic
+def generate_student_id(school=None, division=None):
+    """Allocate the next ID for a school's division, starting at 1."""
+    UserModel = get_user_model()
+    if school and division in ("Nursery", "Primary", "JHS"):
+        from school.models import StudentIDSequence
+
+        division_fields = {
+            "Nursery": ("student_id_nursery_prefix", "student_id_nursery_pattern"),
+            "Primary": ("student_id_primary_prefix", "student_id_primary_pattern"),
+            "JHS": ("student_id_jhs_prefix", "student_id_jhs_pattern"),
+        }
+        prefix_field, pattern_field = division_fields[division]
+        prefix = getattr(school, prefix_field).strip().upper()
+        pattern = getattr(school, pattern_field)
+        patterns = {
+            "DIVISION_SEQUENCE": "{division}-{seq:04d}",
+            "DIVISION_YEAR_SEQUENCE": "{division}-{year}-{seq:04d}",
+            "SCHOOL_DIVISION_SEQUENCE": "{school}-{division}-{seq:04d}",
+            "SCHOOL_DIVISION_YEAR_SEQUENCE": "{school}-{division}-{year}-{seq:04d}",
+        }
+        template = patterns[pattern]
+        sequence, _ = StudentIDSequence.objects.get_or_create(
+            school=school,
+            division=division,
+        )
+        sequence = StudentIDSequence.objects.select_for_update().get(pk=sequence.pk)
+        number = sequence.last_number
+        year = timezone.localdate().year
+        while True:
+            number += 1
+            username = template.format(
+                school=f"S{school.pk}", division=prefix, year=year, seq=number
+            )
+            if not UserModel.objects.filter(username=username).exists():
+                sequence.last_number = number
+                sequence.save(update_fields=["last_number"])
+                return username
+
+    # Legacy fallback for callers that do not have a school/division context.
+    registered_year = timezone.localdate().year
+    counter = UserModel.objects.filter(is_student=True).count() + 1
+    while True:
         username = f"{settings.STUDENT_ID_PREFIX}-{registered_year}-{counter}"
-    
-    return username
+        if not UserModel.objects.filter(username=username).exists():
+            return username
+        counter += 1
 
 
 def generate_lecturer_id():
@@ -44,12 +80,22 @@ def generate_lecturer_id():
         counter += 1
 
 
-def generate_student_credentials():
-    return generate_student_id(), generate_password()
+def generate_student_credentials(school=None, division=None):
+    return generate_student_id(school=school, division=division), generate_password()
 
 
 def generate_lecturer_credentials():
     return generate_lecturer_id(), generate_password()
+
+
+def generate_parent_credentials():
+    registered_year = datetime.now().strftime("%Y")
+    counter = 1
+    while True:
+        username = f"PAR-{registered_year}-{counter}"
+        if not get_user_model().objects.filter(username=username).exists():
+            return username, generate_password()
+        counter += 1
 
 
 class EmailThread(threading.Thread):
@@ -87,6 +133,8 @@ def send_new_account_email(user, password):
 
     if user.is_student:
         template_name = "accounts/email/new_student_account_confirmation.html"
+    elif user.is_parent:
+        template_name = "accounts/email/new_parent_account_confirmation.html"
     else:
         template_name = "accounts/email/new_lecturer_account_confirmation.html"
 

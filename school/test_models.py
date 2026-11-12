@@ -3,9 +3,11 @@
 from decimal import Decimal
 
 from django.test import TestCase
+from django.utils import timezone
 
 from accounts.models import User
-from school.models import GradeWeightConfig, PromotionPolicy, School
+from school.models import GradeWeightConfig, PromotionPolicy, School, StudentIDSequence
+from accounts.utils import generate_student_id
 
 
 class SchoolModelTests(TestCase):
@@ -56,6 +58,40 @@ class SchoolModelTests(TestCase):
         self.assertEqual(school.get_student_count(), 1)
         self.assertEqual(school.get_teacher_count(), 1)
         self.assertEqual(school.get_admin_count(), 1)
+
+
+class StudentIDSequenceTests(TestCase):
+    def test_each_school_division_starts_at_one_and_increments_independently(self):
+        first_school = School.objects.create(name="First ID School")
+        second_school = School.objects.create(name="Second ID School")
+        year = timezone.localdate().year
+
+        self.assertEqual(
+            generate_student_id(first_school, "Primary"),
+            f"S{first_school.pk}-PRI-{year}-0001",
+        )
+        self.assertEqual(
+            generate_student_id(first_school, "Primary"),
+            f"S{first_school.pk}-PRI-{year}-0002",
+        )
+        self.assertEqual(
+            generate_student_id(first_school, "JHS"),
+            f"S{first_school.pk}-JHS-{year}-0001",
+        )
+        self.assertEqual(
+            generate_student_id(second_school, "Primary"),
+            f"S{second_school.pk}-PRI-{year}-0001",
+        )
+        self.assertEqual(StudentIDSequence.objects.count(), 3)
+
+    def test_school_can_choose_prefix_and_id_pattern(self):
+        school = School.objects.create(
+            name="Custom ID School",
+            student_id_primary_prefix="PUPIL",
+            student_id_primary_pattern="DIVISION_SEQUENCE",
+        )
+
+        self.assertEqual(generate_student_id(school, "Primary"), "PUPIL-0001")
 
 
 class GradeWeightConfigTests(TestCase):

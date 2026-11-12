@@ -61,6 +61,71 @@ class CustomUserManager(UserManager):
 
 GENDERS = ((_("M"), _("Male")), (_("F"), _("Female")))
 
+GHANA_REGIONS = (
+    ("Ahafo", _("Ahafo")),
+    ("Ashanti", _("Ashanti")),
+    ("Bono", _("Bono")),
+    ("Bono East", _("Bono East")),
+    ("Central", _("Central")),
+    ("Eastern", _("Eastern")),
+    ("Greater Accra", _("Greater Accra")),
+    ("North East", _("North East")),
+    ("Northern", _("Northern")),
+    ("Oti", _("Oti")),
+    ("Savannah", _("Savannah")),
+    ("Upper East", _("Upper East")),
+    ("Upper West", _("Upper West")),
+    ("Volta", _("Volta")),
+    ("Western", _("Western")),
+    ("Western North", _("Western North")),
+)
+
+MARITAL_STATUS = (
+    ("SINGLE", _("Single")),
+    ("MARRIED", _("Married")),
+    ("DIVORCED", _("Divorced")),
+    ("WIDOWED", _("Widowed")),
+    ("SEPARATED", _("Separated")),
+)
+
+EMPLOYMENT_TYPES = (
+    ("PERMANENT", _("Permanent")),
+    ("CONTRACT", _("Contract")),
+    ("TEMPORARY", _("Temporary")),
+    ("NATIONAL_SERVICE", _("National Service")),
+    ("VOLUNTEER", _("Volunteer")),
+    ("PART_TIME", _("Part-time")),
+    ("INTERNSHIP", _("Internship")),
+)
+
+QUALIFICATIONS = (
+    ("WASSCE", _("WASSCE / SSCE")),
+    ("CERTIFICATE", _("Certificate")),
+    ("DIPLOMA", _("Diploma")),
+    ("HND", _("HND")),
+    ("BACHELOR", _("Bachelor's Degree")),
+    ("MASTER", _("Master's Degree")),
+    ("DOCTORATE", _("Doctorate")),
+    ("PROFESSIONAL", _("Professional Certificate")),
+    ("OTHER", _("Other")),
+)
+
+BLOOD_GROUPS = (
+    ("A+", "A+"),
+    ("A-", "A-"),
+    ("B+", "B+"),
+    ("B-", "B-"),
+    ("AB+", "AB+"),
+    ("AB-", "AB-"),
+    ("O+", "O+"),
+    ("O-", "O-"),
+)
+
+BOARDING_STATUS = (
+    ("DAY", _("Day")),
+    ("BOARDING", _("Boarding")),
+)
+
 NON_TEACHING_POSITIONS = (
     ("CLEANER", _("Cleaner")),
     ("DRIVER", _("Driver")),
@@ -73,6 +138,10 @@ NON_TEACHING_POSITIONS = (
 
 
 class User(AbstractUser):
+    must_change_password = models.BooleanField(
+        default=False,
+        help_text=_("Require the user to replace a temporary password at next login."),
+    )
     is_student = models.BooleanField(default=False)
     is_teacher = models.BooleanField(default=False)
     is_lecturer = models.BooleanField(default=False)  # Keep for backward compatibility
@@ -86,11 +155,143 @@ class User(AbstractUser):
     )
     gender = models.CharField(max_length=1, choices=GENDERS, blank=True, null=True)
     phone = models.CharField(max_length=60, blank=True, null=True)
-    address = models.CharField(max_length=60, blank=True, null=True)
+    address = models.CharField(max_length=255, blank=True, null=True)
     picture = models.ImageField(
         upload_to="profile_pictures/%y/%m/%d/", default="default.png", null=True
     )
     email = models.EmailField(blank=True, null=True)
+
+    # ------------------------------------------------------------------
+    # GES-aligned bio-data and contact details
+    # ------------------------------------------------------------------
+    other_names = models.CharField(
+        max_length=150, blank=True, default="", help_text=_("Other names / middle names")
+    )
+    date_of_birth = models.DateField(null=True, blank=True)
+    place_of_birth = models.CharField(max_length=120, blank=True, default="")
+    nationality = models.CharField(max_length=60, blank=True, default="Ghanaian")
+    hometown = models.CharField(max_length=120, blank=True, default="")
+    region = models.CharField(
+        max_length=50, choices=GHANA_REGIONS, blank=True, default=""
+    )
+    district = models.CharField(max_length=120, blank=True, default="")
+    religion = models.CharField(max_length=60, blank=True, default="")
+    marital_status = models.CharField(
+        max_length=20, choices=MARITAL_STATUS, blank=True, default=""
+    )
+    ghana_card_number = models.CharField(max_length=20, blank=True, default="")
+    nhis_number = models.CharField(max_length=30, blank=True, default="")
+    gps_address = models.CharField(
+        max_length=30,
+        blank=True,
+        default="",
+        help_text=_("GhanaPost GPS digital address, e.g. GA-123-4567"),
+    )
+    alternate_phone = models.CharField(max_length=30, blank=True, default="")
+
+    # ------------------------------------------------------------------
+    # Statutory / payroll details (teachers and non-teaching staff)
+    # ------------------------------------------------------------------
+    staff_id = models.CharField(
+        max_length=30,
+        blank=True,
+        default="",
+        help_text=_("GES staff ID or school employee number"),
+    )
+    ssnit_number = models.CharField(max_length=30, blank=True, default="")
+    tin_number = models.CharField(max_length=30, blank=True, default="")
+    payroll_number = models.CharField(max_length=30, blank=True, default="")
+    national_service_number = models.CharField(max_length=50, blank=True, default="")
+
+    # Employment details
+    date_of_first_appointment = models.DateField(null=True, blank=True)
+    date_of_current_appointment = models.DateField(null=True, blank=True)
+    date_employed = models.DateField(null=True, blank=True)
+    employment_type = models.CharField(
+        max_length=30, choices=EMPLOYMENT_TYPES, blank=True, default=""
+    )
+    designation = models.CharField(
+        max_length=120,
+        blank=True,
+        default="",
+        help_text=_("Rank, grade or job title"),
+    )
+    work_unit = models.CharField(
+        max_length=120,
+        blank=True,
+        default="",
+        help_text=_("Section, unit or department where the staff member works"),
+    )
+    subject_specialization = models.CharField(
+        max_length=200,
+        blank=True,
+        default="",
+        help_text=_("Subjects or areas the teacher is qualified to teach"),
+    )
+
+    # Qualifications and professional licence
+    highest_qualification = models.CharField(
+        max_length=30, choices=QUALIFICATIONS, blank=True, default=""
+    )
+    qualification_institution = models.CharField(max_length=200, blank=True, default="")
+    qualification_year = models.PositiveSmallIntegerField(null=True, blank=True)
+    professional_qualification = models.CharField(max_length=150, blank=True, default="")
+    ntc_license_number = models.CharField(max_length=50, blank=True, default="")
+    ntc_license_expiry = models.DateField(null=True, blank=True)
+
+    # Bank / payroll account
+    bank_name = models.CharField(max_length=120, blank=True, default="")
+    bank_branch = models.CharField(max_length=120, blank=True, default="")
+    bank_account_name = models.CharField(max_length=150, blank=True, default="")
+    bank_account_number = models.CharField(max_length=30, blank=True, default="")
+
+    # ------------------------------------------------------------------
+    # Student admission, guardian and health details
+    # ------------------------------------------------------------------
+    admission_number = models.CharField(max_length=30, blank=True, default="")
+    admission_date = models.DateField(null=True, blank=True)
+    previous_school = models.CharField(max_length=200, blank=True, default="")
+    previous_class = models.CharField(max_length=50, blank=True, default="")
+    bece_year = models.PositiveSmallIntegerField(null=True, blank=True)
+    bece_index_number = models.CharField(max_length=30, blank=True, default="")
+    bece_aggregate = models.CharField(max_length=10, blank=True, default="")
+    birth_certificate_number = models.CharField(max_length=30, blank=True, default="")
+    boarding_status = models.CharField(
+        max_length=10, choices=BOARDING_STATUS, blank=True, default=""
+    )
+
+    guardian_name = models.CharField(max_length=150, blank=True, default="")
+    guardian_relationship = models.CharField(
+        max_length=30, choices=RELATION_SHIP, blank=True, default=""
+    )
+    guardian_phone = models.CharField(max_length=30, blank=True, default="")
+    guardian_email = models.EmailField(blank=True, default="")
+    guardian_occupation = models.CharField(max_length=120, blank=True, default="")
+    guardian_address = models.CharField(max_length=255, blank=True, default="")
+    guardian_ghana_card = models.CharField(max_length=20, blank=True, default="")
+    second_guardian_name = models.CharField(max_length=150, blank=True, default="")
+    second_guardian_relationship = models.CharField(
+        max_length=30, choices=RELATION_SHIP, blank=True, default=""
+    )
+    second_guardian_phone = models.CharField(max_length=30, blank=True, default="")
+    second_guardian_occupation = models.CharField(max_length=120, blank=True, default="")
+
+    blood_group = models.CharField(
+        max_length=5, choices=BLOOD_GROUPS, blank=True, default=""
+    )
+    medical_conditions = models.TextField(blank=True, default="")
+    allergies = models.TextField(blank=True, default="")
+    special_needs = models.TextField(blank=True, default="")
+
+    # ------------------------------------------------------------------
+    # Next of kin / emergency contact (shared by all roles)
+    # ------------------------------------------------------------------
+    emergency_contact_name = models.CharField(max_length=150, blank=True, default="")
+    emergency_contact_relationship = models.CharField(
+        max_length=30, choices=RELATION_SHIP, blank=True, default=""
+    )
+    emergency_contact_phone = models.CharField(max_length=30, blank=True, default="")
+    emergency_contact_address = models.CharField(max_length=255, blank=True, default="")
 
     username_validator = ASCIIUsernameValidator()
 
@@ -126,8 +327,9 @@ class User(AbstractUser):
     @property
     def get_full_name(self):
         full_name = self.username
-        if self.first_name and self.last_name:
-            full_name = self.first_name + " " + self.last_name
+        name_parts = [part for part in (self.first_name, self.other_names, self.last_name) if part]
+        if name_parts:
+            full_name = " ".join(name_parts)
         return full_name
 
     def __str__(self):
@@ -305,6 +507,32 @@ class Parent(models.Model):
 
     def __str__(self):
         return self.user.username
+
+
+class PasswordResetAudit(models.Model):
+    """Record administrative password resets without retaining credentials."""
+
+    target_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="password_reset_events",
+    )
+    performed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="performed_password_resets",
+    )
+    school = models.ForeignKey(
+        "school.School", on_delete=models.SET_NULL, null=True, blank=True
+    )
+    target_username = models.CharField(max_length=150)
+    performed_by_username = models.CharField(max_length=150)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-created_at",)
 
 
 class DepartmentHead(models.Model):

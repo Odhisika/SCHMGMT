@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% block title %}{{ title }} | {{ block.super }}{% endblock %}
+{% block content %}
+<div class="container py-4" style="max-width: 760px">
+    <a href="{% url 'non_teaching_staff_list' %}" class="text-decoration-none">&larr; {% trans 'Back to non-teaching staff' %}</a>
+    <h1 class="h3 mt-3">{% trans 'Promote to teacher' %}</h1>
+    <p class="text-muted">{% blocktrans with name=staff_member.get_full_name %}Assign {{ name }} to a teaching division and, optionally, a class. Their existing account and sign-in details will remain the same.{% endblocktrans %}</p>
+    {% include 'snippets/messages.html' %}
+    <form method="post" class="card card-body shadow-sm">{% csrf_token %}
+        {% for field in form %}<div class="mb-3">{{ field.label_tag }}{{ field }}{% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}{% for error in field.errors %}<div class="text-danger">{{ error }}</div>{% endfor %}</div>{% endfor %}
+        <div class="d-flex gap-2"><button class="btn btn-primary" type="submit">{% trans 'Promote to teacher' %}</button><a class="btn btn-light" href="{% url 'non_teaching_staff_list' %}">{% trans 'Cancel' %}</a></div>
+    </form>
+</div>
+{% endblock %}

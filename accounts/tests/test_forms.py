@@ -32,13 +32,10 @@ class StaffAddFormTests(AccountFormTestBase):
                 "first_name": "New",
                 "last_name": "Teacher",
                 "gender": "M",
-                "department": "Primary",
                 "division": "Primary",
                 "address": "Accra",
                 "phone": "0240000000",
                 "email": "new.teacher@example.test",
-                "password1": PASSWORD,
-                "password2": PASSWORD,
             },
             school=self.school,
         )
@@ -52,7 +49,8 @@ class StaffAddFormTests(AccountFormTestBase):
         self.assertEqual(user.division, "Primary")
         self.assertEqual(user.department, self.program)
         self.assertEqual(user.department.school, self.school)
-        self.assertTrue(user.check_password(PASSWORD))
+        self.assertTrue(user.must_change_password)
+        self.assertTrue(user.check_password(form.temporary_password))
 
     def test_generates_credentials_when_username_is_blank(self):
         form = StaffAddForm(
@@ -60,11 +58,9 @@ class StaffAddFormTests(AccountFormTestBase):
                 "first_name": "Generated",
                 "last_name": "Teacher",
                 "gender": "F",
-                "department": "JHS",
                 "division": "JHS",
                 "address": "Kumasi",
                 "phone": "0240000001",
-                "email": "generated.teacher@example.test",
             },
             school=self.school,
         )
@@ -75,9 +71,12 @@ class StaffAddFormTests(AccountFormTestBase):
         self.assertTrue(user.username.startswith("TEA-"))
         self.assertTrue(user.has_usable_password())
         self.assertEqual(user.department.division, "JHS")
+        self.assertEqual(user.email, "")
+        self.assertTrue(user.must_change_password)
+        self.assertTrue(user.check_password(form.temporary_password))
 
     @patch("accounts.forms.send_new_account_email")
-    def test_sends_credentials_email_when_admin_supplies_username_and_password(
+    def test_sends_generated_credentials_by_email_when_available(
         self, send_email
     ):
         form = StaffAddForm(
@@ -86,7 +85,6 @@ class StaffAddFormTests(AccountFormTestBase):
                 "first_name": "New",
                 "last_name": "Teacher",
                 "gender": "M",
-                "department": "Primary",
                 "division": "Primary",
                 "address": "Accra",
                 "phone": "0240000000",
@@ -100,10 +98,54 @@ class StaffAddFormTests(AccountFormTestBase):
         self.assertTrue(form.is_valid(), form.errors)
         user = form.save()
 
-        send_email.assert_called_once_with(user, PASSWORD)
+        send_email.assert_called_once_with(user, form.temporary_password)
+        self.assertFalse(user.check_password(PASSWORD))
+        self.assertTrue(user.must_change_password)
 
 
 class StudentAddFormTests(AccountFormTestBase):
+    def test_generated_student_id_uses_school_and_division_format(self):
+        form = StudentAddForm(
+            data={
+                "first_name": "Generated",
+                "last_name": "Primary",
+                "gender": "F",
+                "level": "Primary 1",
+                "program": self.program.pk,
+                "address": "Tema",
+                "phone": "0240000002",
+            },
+            school=self.school,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        user = form.save()
+
+        self.assertEqual(user.username, f"S{self.school.pk}-PRI-{user.date_joined.year}-0001")
+        self.assertEqual(user.admission_number, user.username)
+
+    def test_student_can_be_created_without_email_with_temporary_password(self):
+        form = StudentAddForm(
+            data={
+                "username": "no.email.student",
+                "first_name": "No",
+                "last_name": "Email",
+                "gender": "F",
+                "level": "Primary 1",
+                "program": self.program.pk,
+                "address": "Tema",
+                "phone": "0240000002",
+            },
+            school=self.school,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        user = form.save()
+
+        self.assertEqual(user.email, "")
+        self.assertTrue(user.must_change_password)
+        self.assertTrue(user.check_password(form.temporary_password))
+
     def test_creates_student_profile_in_the_current_school(self):
         form = StudentAddForm(
             data={
@@ -116,8 +158,6 @@ class StudentAddFormTests(AccountFormTestBase):
                 "address": "Tema",
                 "phone": "0240000002",
                 "email": "new.student@example.test",
-                "password1": PASSWORD,
-                "password2": PASSWORD,
             },
             school=self.school,
         )
@@ -127,13 +167,14 @@ class StudentAddFormTests(AccountFormTestBase):
 
         self.assertEqual(user.school, self.school)
         self.assertTrue(user.is_student)
-        self.assertTrue(user.check_password(PASSWORD))
+        self.assertTrue(user.must_change_password)
+        self.assertTrue(user.check_password(form.temporary_password))
         student = Student.objects.get(student=user)
         self.assertEqual(student.level, "Primary 1")
         self.assertEqual(student.program, self.program)
 
     @patch("accounts.forms.send_new_account_email")
-    def test_sends_credentials_email_when_admin_supplies_username_and_password(
+    def test_sends_generated_credentials_by_email_when_available(
         self, send_email
     ):
         form = StudentAddForm(
@@ -147,8 +188,6 @@ class StudentAddFormTests(AccountFormTestBase):
                 "address": "Tema",
                 "phone": "0240000002",
                 "email": "new.student@example.test",
-                "password1": PASSWORD,
-                "password2": PASSWORD,
             },
             school=self.school,
         )
@@ -156,7 +195,7 @@ class StudentAddFormTests(AccountFormTestBase):
         self.assertTrue(form.is_valid(), form.errors)
         user = form.save()
 
-        send_email.assert_called_once_with(user, PASSWORD)
+        send_email.assert_called_once_with(user, form.temporary_password)
 
     def test_program_queryset_is_scoped_to_the_school(self):
         other_school = School.objects.create(name="Other Academy")
@@ -250,6 +289,28 @@ class ParentAddFormTests(AccountFormTestBase):
 
         self.assertIn(self.student, form.fields["student"].queryset)
         self.assertNotIn(other_student, form.fields["student"].queryset)
+
+    def test_creates_parent_without_email_or_password(self):
+        form = ParentAddForm(
+            data={
+                "first_name": "No",
+                "last_name": "Email",
+                "address": "Accra",
+                "phone": "0240000005",
+                "student": self.student.pk,
+                "relation_ship": "Mother",
+            },
+            school=self.school,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        parent = form.save()
+
+        self.assertTrue(parent.user.username.startswith("PAR-"))
+        self.assertFalse(parent.user.email)
+        self.assertTrue(parent.user.must_change_password)
+        self.assertTrue(parent.user.check_password(form.temporary_password))
+        self.assertEqual(parent.first_name, "No")
 
 
 class PasswordResetFormTests(AccountFormTestBase):

@@ -1,11 +1,36 @@
 from django.urls import reverse
+from io import BytesIO
+from openpyxl import Workbook
+from openpyxl import load_workbook
+from docx import Document
+from django.core.files.uploadedfile import SimpleUploadedFile
 
-from accounts.models import Parent, Student, User
+from accounts.models import Parent, PasswordResetAudit, Student, User
 from accounts.tests.test_forms import PASSWORD
 from core.testing import DemoDataTestCase
 
 
-class ProfileViewTests(DemoDataTestCase):
+class ProfileSecurityViewTests(DemoDataTestCase):
+    def test_admin_password_reset_issues_one_time_temporary_credential(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse("reset_user_password", args=[self.student_user.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Cache-Control"], "no-store, no-cache, must-revalidate, max-age=0")
+        self.student_user.refresh_from_db()
+        temporary_password = response.context["temporary_password"]
+        self.assertTrue(self.student_user.must_change_password)
+        self.assertTrue(self.student_user.check_password(temporary_password))
+        self.assertTrue(
+            PasswordResetAudit.objects.filter(
+                target_username=self.student_user.username,
+                performed_by_username=self.admin.username,
+            ).exists()
+        )
+
     def test_profile_renders_for_every_role(self):
         for user in (
             self.admin,
@@ -47,6 +72,116 @@ class ProfileViewTests(DemoDataTestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, "/dashboard/")
 
+
+class StaffManagementWorkflowTests(DemoDataTestCase):
+    def test_admin_can_export_teacher_list_as_excel_and_word(self):
+        self.client.force_login(self.admin)
+
+        listing = self.client.get(reverse("lecturer_list"))
+        self.assertContains(listing, 'download="teachers_staff.xlsx"')
+        self.assertContains(listing, 'download="teachers_staff.docx"')
+        self.assertContains(listing, 'Change division/class')
+        self.assertNotContains(listing, 'target="_blank" href="/en/accounts/create_lecturers_pdf_list/')
+
+        for extension in ("xlsx", "docx"):
+            response = self.client.get(reverse("staff_export", args=["teachers", extension]))
+            self.assertEqual(response.status_code, 200)
+            self.assertIn("attachment; filename=", response["Content-Disposition"])
+            self.assertGreater(len(response.content), 1000)
+            if extension == "xlsx":
+                exported = load_workbook(BytesIO(response.content), read_only=True)
+                self.assertIn("Ghana Card number", list(exported.active.values)[0])
+                self.assertIn("SSNIT number", list(exported.active.values)[0])
+            else:
+                document = Document(BytesIO(response.content))
+                self.assertTrue(any("Ghana Card number" in row.cells[0].text for table in document.tables for row in table.rows))
+
+        pdf_response = self.client.get(reverse("lecturer_list_pdf"))
+        self.assertEqual(pdf_response.status_code, 200)
+        self.assertIn("attachment; filename=", pdf_response["Content-Disposition"])
+
+    def test_admin_can_promote_non_teaching_staff_to_teacher(self):
+        staff_member = User.objects.create_user(
+            username="nonteacher", password=PASSWORD, school=self.school,
+            first_name="Nana", last_name="Mensah", is_non_teaching_staff=True,
+            non_teaching_position="LIBRARIAN",
+        )
+        self.client.force_login(self.admin)
+
+        response = self.client.post(reverse("staff_promote", args=[staff_member.pk]), {
+            "division": "Primary", "assigned_level": "Primary 1", "is_class_teacher": "on",
+        })
+
+        self.assertRedirects(response, reverse("lecturer_list"))
+        staff_member.refresh_from_db()
+        self.assertTrue(staff_member.is_teacher)
+        self.assertTrue(staff_member.is_lecturer)
+        self.assertFalse(staff_member.is_non_teaching_staff)
+        self.assertEqual(staff_member.division, "Primary")
+        self.assertEqual(staff_member.assigned_level, "Primary 1")
+        self.assertTrue(staff_member.is_class_teacher)
+        self.assertEqual(staff_member.department.division, "Primary")
+
+    def test_admin_can_transfer_teacher_to_another_division_and_class(self):
+        self.client.force_login(self.admin)
+
+        edit_url = reverse("staff_edit", args=[self.teacher.pk])
+        self.assertContains(self.client.get(reverse("lecturer_list")), f'{edit_url}?assignment=1')
+        response = self.client.post(edit_url + "?assignment=1", {
+            "division": "JHS", "assigned_level": "JHS 1", "is_class_teacher": "on",
+        })
+
+        self.assertRedirects(response, reverse("lecturer_list"))
+        self.teacher.refresh_from_db()
+        self.assertEqual(self.teacher.division, "JHS")
+        self.assertEqual(self.teacher.assigned_level, "JHS 1")
+        self.assertTrue(self.teacher.is_class_teacher)
+        self.assertEqual(self.teacher.department.division, "JHS")
+
+    def test_excel_import_creates_staff_accounts_with_temporary_password_reset(self):
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.append([
+            "staff_type", "username", "first_name", "last_name", "email", "phone",
+            "address", "gender", "division", "assigned_level", "designation",
+            "work_unit", "employment_type", "non_teaching_position", "staff_id",
+        ])
+        sheet.append([
+            "teacher", "imported.teacher", "Esi", "Boateng", "", "0200000000",
+            "Accra", "F", "Primary", "Primary 1", "Teacher", "Primary",
+            "PERMANENT", "", "GES-101",
+        ])
+        output = BytesIO()
+        workbook.save(output)
+        upload = SimpleUploadedFile(
+            "staff.xlsx", output.getvalue(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        self.client.force_login(self.admin)
+
+        response = self.client.post(reverse("staff_import"), {"workbook": upload})
+
+        self.assertRedirects(response, reverse("non_teaching_staff_list"))
+        imported = User.objects.get(username="imported.teacher", school=self.school)
+        self.assertTrue(imported.is_teacher)
+        self.assertTrue(imported.must_change_password)
+        self.assertEqual(imported.division, "Primary")
+
+    def test_staff_import_template_contains_all_staff_profile_columns(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse("staff_import_template"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("attachment; filename=", response["Content-Disposition"])
+        import_page = self.client.get(reverse("staff_import"))
+        self.assertContains(import_page, 'download="staff_import_template.xlsx"')
+        sheet = load_workbook(BytesIO(response.content), read_only=True).active
+        headers = list(next(sheet.iter_rows(values_only=True)))
+        self.assertIn("date_of_birth", headers)
+        self.assertIn("ghana_card_number", headers)
+        self.assertIn("bank_account_number", headers)
+        self.assertIn("emergency_contact_phone", headers)
+
+class ProfileViewTests(DemoDataTestCase):
     def test_profile_single_scopes_users_to_the_current_school(self):
         other_school_user = User.objects.create_user(
             username="outsider",
@@ -110,7 +245,12 @@ class ProfileViewTests(DemoDataTestCase):
         self.assertEqual(self.admin.phone, "+233200088888")
 
     def test_change_password(self):
+        self.teacher.must_change_password = True
+        self.teacher.save(update_fields=["must_change_password"])
         self.client.force_login(self.teacher)
+
+        forced_change = self.client.get(reverse("profile"))
+        self.assertRedirects(forced_change, reverse("change_password"))
 
         response = self.client.post(
             reverse("change_password"),
@@ -124,9 +264,33 @@ class ProfileViewTests(DemoDataTestCase):
         self.assertRedirects(response, reverse("profile"))
         self.teacher.refresh_from_db()
         self.assertTrue(self.teacher.check_password("BrandNewPass123!"))
+        self.assertFalse(self.teacher.must_change_password)
 
 
 class StaffAndStudentManagementViewTests(DemoDataTestCase):
+    def test_admin_can_save_separate_student_id_formats(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse("admin_panel"),
+            {
+                "action": "save_student_id_formats",
+                "student_id_nursery_prefix": "NURS",
+                "student_id_nursery_pattern": "DIVISION_SEQUENCE",
+                "student_id_primary_prefix": "PRI",
+                "student_id_primary_pattern": "SCHOOL_DIVISION_YEAR_SEQUENCE",
+                "student_id_jhs_prefix": "JUN",
+                "student_id_jhs_pattern": "SCHOOL_DIVISION_SEQUENCE",
+            },
+        )
+
+        self.assertRedirects(response, reverse("admin_panel"))
+        self.school.refresh_from_db()
+        self.assertEqual(self.school.student_id_nursery_prefix, "NURS")
+        self.assertEqual(self.school.student_id_nursery_pattern, "DIVISION_SEQUENCE")
+        self.assertEqual(self.school.student_id_primary_prefix, "PRI")
+        self.assertEqual(self.school.student_id_jhs_prefix, "JUN")
+
     def test_lecturer_list_is_admin_only(self):
         self.client.force_login(self.admin)
         response = self.client.get(reverse("lecturer_list"))
@@ -174,7 +338,8 @@ class StaffAndStudentManagementViewTests(DemoDataTestCase):
             },
         )
 
-        self.assertRedirects(response, reverse("lecturer_list"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "added.teacher")
         user = User.objects.get(username="added.teacher")
         self.assertTrue(user.is_teacher)
         self.assertTrue(user.is_lecturer)
@@ -201,7 +366,8 @@ class StaffAndStudentManagementViewTests(DemoDataTestCase):
             },
         )
 
-        self.assertRedirects(response, reverse("class_detail", args=["Primary 1"]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "added.student")
         user = User.objects.get(username="added.student")
         self.assertEqual(user.school, self.school)
         self.assertTrue(user.is_student)
@@ -262,11 +428,8 @@ class StaffAndStudentManagementViewTests(DemoDataTestCase):
         )
 
         parent = Parent.objects.get(user__username="added.parent")
-        self.assertEqual(response.status_code, 302)
-        self.assertRedirects(
-            response,
-            reverse("profile_single", args=[parent.user_id]),
-        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "added.parent")
         self.assertEqual(parent.user.school, self.school)
         self.assertEqual(parent.student, student)
 
