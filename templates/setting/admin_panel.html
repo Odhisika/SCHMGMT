@@ -32,6 +32,19 @@
             <p class="text-muted">CRUD (Create, Retrieve, Update &amp; Delete) {% trans 'students' %}</p>
             </div>
 
+            <div class="border-bottom mt-3 pb-3">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                    <div>
+                        <span class="text-muted">{% trans 'Administration' %}</span>
+                        <a class="link" href="{% url 'non_teaching_staff_list' %}">{% trans 'Non-teaching Staff' %} &raquo;</a>
+                    </div>
+                    <a class="btn btn-sm btn-outline-primary" href="{% url 'non_teaching_staff_add' %}">
+                        <i class="fas fa-user-plus me-1"></i>{% trans 'Add staff member' %}
+                    </a>
+                </div>
+                <p class="text-muted mb-0">{% trans 'Register cleaners, drivers, canteen staff, security, maintenance, and other school employees.' %}</p>
+            </div>
+
 
 
             <div class="mt-3">

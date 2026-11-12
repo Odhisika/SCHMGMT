@@ -167,6 +167,16 @@ document.addEventListener('DOMContentLoaded', function () {
         updateSaveState();
         if (saveBtn.disabled) return;
 
+        const confirmed = await window.appConfirm({
+            title: 'Save score changes?',
+            message: 'This will update the recorded scores for every student shown in this subject.',
+            okText: 'Save changes',
+            cancelText: 'Keep editing',
+            variant: 'primary',
+            icon: 'floppy-disk'
+        });
+        if (!confirmed) return;
+
         const rows = Array.from(table.querySelectorAll('tbody tr[data-id]'));
         const scores = rows.map(row => ({
             id: row.dataset.id,
@@ -186,15 +196,15 @@ document.addEventListener('DOMContentLoaded', function () {
             const data = await response.json();
             if (!response.ok || data.status !== 'success') {
                 const details = data.errors ? '\n' + data.errors.join('\n') : '';
-                alert((data.message || 'Scores could not be saved.') + details);
+                window.appNotify((data.message || 'Scores could not be saved.') + details, 'danger', 'Save failed');
                 if (response.status === 409) refreshConfiguration();
                 return;
             }
             rows.forEach(row => row.classList.remove('table-warning'));
-            alert(data.message);
+            window.appNotify(data.message, 'success', 'Scores saved');
         } catch (error) {
             console.error(error);
-            alert('An error occurred while saving scores.');
+            window.appNotify('An error occurred while saving scores.', 'danger', 'Save failed');
         } finally {
             isSaving = false;
             saveBtn.innerHTML = originalText;

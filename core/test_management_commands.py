@@ -21,6 +21,11 @@ def _fake_demo_data():
         ),
         current_term="Demo Term",
         courses={"Primary 1": [object()]},
+        courses_by_term={"Primary 1": {"First": [object()]}},
+        class_teachers={
+            "Primary 1": SimpleNamespace(username="teacher.class.primary1")
+        },
+        teachers={"Primary": SimpleNamespace(username="teacher.primary")},
         students={
             "Primary 1": [
                 SimpleNamespace(student=SimpleNamespace(username="student.primary1.1"))
@@ -28,6 +33,7 @@ def _fake_demo_data():
         },
         parents={"Primary 1": SimpleNamespace(user=SimpleNamespace(username="parent.primary1"))},
         results=[],
+        results_by_term={"First": []},
         quizzes=[],
     )
 

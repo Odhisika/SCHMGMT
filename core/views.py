@@ -12,18 +12,17 @@ from accounts.models import User, Student
 from course.models import Program, Course
 from .forms import SemesterForm, NewsAndEventsForm, TermWeekForm
 from .models import NewsAndEvents, ActivityLog, Semester, TermWeek
+from .models import Notification
+from .notifications import notify, notify_students, notify_parents
 
 
 # ########################################################
 # News & Events
 # ########################################################
-@login_required
-def home_view(request):
-    user = request.user
-    
-    # Base filter: School
-    items = NewsAndEvents.objects.filter(school=request.school)
-    
+def get_visible_posts(user, school):
+    """Return the news/events that ``user`` is allowed to see in ``school``."""
+    items = NewsAndEvents.objects.filter(school=school)
+
     if not user.is_superuser and not user.is_school_admin:
         # 1. Define Role Filter
         if user.is_teacher or user.is_lecturer:
@@ -32,30 +31,38 @@ def home_view(request):
             role_q = Q(target_role__in=['ALL', 'STUDENTS'])
         elif user.is_parent:
             role_q = Q(target_role__in=['ALL', 'PARENTS'])
-        else: # user, etc
+        else:  # user, etc
             role_q = Q(target_role='ALL')
-            
+
         # 2. Define Division Filter
-        # If post has no division (None/""), it's for everyone. If it has a division, user must match it.
-        # Note: If user.division is None, they only see Global posts.
+        # If post has no division (None/""), it's for everyone. If it has a
+        # division, the user must match it.
         if user.division:
-            div_q = Q(target_division__isnull=True) | Q(target_division="") | Q(target_division=user.division)
+            div_q = (
+                Q(target_division__isnull=True)
+                | Q(target_division="")
+                | Q(target_division=user.division)
+            )
         else:
             # Users with no division (e.g. some staff) only see global posts
             div_q = Q(target_division__isnull=True) | Q(target_division="")
-            
+
         # 3. Combine Logic
         # Show if:
         # (It is a Targeted Specific Post AND User is in list)
         # OR
         # (It is NOT Specific AND Matches Division AND Matches Role)
-        
         specific_q = Q(target_role='SPECIFIC') & Q(specific_users=user)
         general_q = ~Q(target_role='SPECIFIC') & div_q & role_q
-        
+
         items = items.filter(specific_q | general_q).distinct()
 
-    items = items.order_by("-updated_date")
+    return items
+
+
+@login_required
+def home_view(request):
+    items = get_visible_posts(request.user, request.school).order_by("-updated_date")
 
     current_term = Semester.objects.filter(is_current_term=True, school=request.school).first()
     term_weeks = TermWeek.objects.filter(term=current_term, is_active=True).order_by("week_number") if current_term else []
@@ -81,6 +88,19 @@ def home_view(request):
         "show_all": show_all,
     }
     return render(request, "core/index.html", context)
+
+
+@login_required
+def post_detail(request, pk):
+    """Show the full contents of a news item or event for the current user."""
+    post = get_object_or_404(
+        get_visible_posts(request.user, request.school),
+        pk=pk,
+    )
+    return render(request, "core/post_detail.html", {
+        "title": post.title,
+        "post": post,
+    })
 
 
 @login_required
@@ -228,6 +248,34 @@ def post_add(request):
             instance = form.save(commit=False)
             instance.school = request.school
             instance.save()
+            form.save_m2m()
+            if instance.target_role == "SPECIFIC":
+                for recipient in instance.specific_users.filter(school=request.school):
+                    notify(
+                        school=request.school,
+                        recipient=recipient,
+                        title=instance.title or "School announcement",
+                        message=instance.summary or "",
+                        link="/",
+                        actor=request.user,
+                    )
+            else:
+                audience = {
+                    "ALL": Notification.AUDIENCE_ALL,
+                    "TEACHERS": Notification.AUDIENCE_TEACHER,
+                    "STUDENTS": Notification.AUDIENCE_STUDENT,
+                    "PARENTS": Notification.AUDIENCE_PARENT,
+                }.get(instance.target_role)
+                if audience:
+                    notify(
+                        school=request.school,
+                        audience=audience,
+                        division=instance.target_division or "",
+                        title=instance.title or "School announcement",
+                        message=instance.summary or "",
+                        link="/",
+                        actor=request.user,
+                    )
             messages.success(request, f"{title} has been uploaded.")
             return redirect("home")
         messages.error(request, "Please correct the error(s) below.")
@@ -292,6 +340,19 @@ def semester_add_view(request):
             term = form.save(commit=False)
             term.school = request.school
             term.save()
+            if term.result_released:
+                title = f"{term.get_term_display()} {term.year} results are available"
+                notify_students(
+                    request.school, title, "Your term results are ready to view.",
+                    link="/result/report-cards/",
+                    notification_type=Notification.TYPE_SUCCESS, actor=request.user,
+                )
+                notify_parents(
+                    request.school, title,
+                    "Term results for your linked student are ready to view.",
+                    link="/result/report-cards/",
+                    notification_type=Notification.TYPE_SUCCESS, actor=request.user,
+                )
             
             messages.success(request, "Semester added successfully.")
             return redirect("semester_list")
@@ -307,9 +368,28 @@ def semester_update_view(request, pk):
     if request.method == "POST":
         form = SemesterForm(request.POST, instance=semester)
         if form.is_valid():
+            was_released = semester.result_released
             if _is_truthy(form.cleaned_data.get("is_current_term")):
                 unset_current_semester(request.school)
-            form.save()
+            semester = form.save()
+            if not was_released and semester.result_released:
+                title = f"{semester.get_term_display()} {semester.year} results are available"
+                notify_students(
+                    request.school,
+                    title,
+                    "Your term results are ready to view.",
+                    link="/result/report-cards/",
+                    notification_type=Notification.TYPE_SUCCESS,
+                    actor=request.user,
+                )
+                notify_parents(
+                    request.school,
+                    title,
+                    "Term results for your linked student are ready to view.",
+                    link="/result/report-cards/",
+                    notification_type=Notification.TYPE_SUCCESS,
+                    actor=request.user,
+                )
             messages.success(request, "Semester updated successfully!")
             return redirect("semester_list")
     else:

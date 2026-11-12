@@ -3,7 +3,15 @@ from django.forms.widgets import RadioSelect, Textarea
 from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.utils.translation import gettext_lazy as _
 from django.forms.models import inlineformset_factory
-from .models import Question, Quiz, MCQuestion, Choice
+from .models import (
+    Choice,
+    EssayQuestion,
+    FillInTheBlankQuestion,
+    MCQuestion,
+    Question,
+    Quiz,
+    TrueFalseQuestion,
+)
 
 
 class QuestionForm(forms.Form):
@@ -153,6 +161,37 @@ class MCQuestionForm(forms.ModelForm):
     class Meta:
         model = MCQuestion
         exclude = ()
+
+
+class TrueFalseQuestionForm(forms.ModelForm):
+    class Meta:
+        model = TrueFalseQuestion
+        fields = ["content", "figure", "explanation", "correct_answer"]
+        widgets = {
+            "content": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "explanation": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
+        }
+
+
+class FillInTheBlankQuestionForm(forms.ModelForm):
+    class Meta:
+        model = FillInTheBlankQuestion
+        fields = ["content", "figure", "explanation", "correct_answer", "case_sensitive"]
+        widgets = {
+            "content": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "explanation": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
+            "correct_answer": forms.TextInput(attrs={"class": "form-control"}),
+        }
+
+
+class EssayQuestionForm(forms.ModelForm):
+    class Meta:
+        model = EssayQuestion
+        fields = ["content", "figure", "explanation"]
+        widgets = {
+            "content": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "explanation": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
+        }
 
 
 class MCQuestionFormSet(forms.BaseInlineFormSet):

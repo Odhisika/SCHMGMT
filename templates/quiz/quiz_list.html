@@ -28,7 +28,7 @@
             <i class="fas fa-history me-1"></i>{% trans 'My Attempts' %}
         </a>
         {% endif %}
-        {% if request.user.is_superuser or request.user.is_lecturer %}
+        {% if request.user.can_manage_quizzes %}
         <a href="{% url 'teacher_quiz_report' %}" class="btn btn-outline-info btn-sm">
             <i class="fas fa-chart-bar me-1"></i>{% trans 'Full Report' %}
         </a>
@@ -78,13 +78,18 @@
                             {% elif item.status == 'active' %}{% trans 'Live' %}
                             {% else %}{% trans 'Closed' %}{% endif %}
                         </span>
-                        {% if request.user.is_superuser or request.user.is_lecturer %}
+                        {% if request.user.can_manage_quizzes %}
                         <!-- Quick actions -->
                         <div class="dropstart">
                             <button class="btn btn-sm btn-light p-1 px-2" type="button" data-bs-toggle="dropdown">
                                 <i class="fas fa-ellipsis-v"></i>
                             </button>
                             <ul class="dropdown-menu shadow border-0">
+                                <li>
+                                    <a class="dropdown-item" href="{% url 'quiz_questions' slug=course.slug quiz_id=item.quiz.id %}">
+                                        <i class="fas fa-list-ol me-2 text-primary"></i>{% trans 'Add / Manage Questions' %}
+                                    </a>
+                                </li>
                                 <li>
                                     <a class="dropdown-item" href="{% url 'quiz_update' slug=course.slug pk=item.quiz.id %}">
                                         <i class="fas fa-pencil-alt me-2 text-warning"></i>{% trans 'Edit Quiz' %}
@@ -187,6 +192,14 @@
                 </div>
                 {% endif %}
 
+                {% if request.user.can_manage_quizzes %}
+                <a href="{% url 'quiz_questions' slug=course.slug quiz_id=item.quiz.id %}"
+                   class="btn btn-sm btn-outline-primary w-100 mb-2">
+                    <i class="fas fa-list-ol me-1"></i>
+                    {% trans 'Add / Manage Questions' %} ({{ item.quiz.get_questions.count }})
+                </a>
+                {% endif %}
+
                 <!-- CTA Buttons -->
                 <div class="mt-auto">
                     {% if item.status == 'active' and not item.has_completed %}
@@ -206,7 +219,7 @@
                             <i class="fas fa-lock me-1"></i>{% trans 'Not Yet Available' %}
                         </button>
                     {% elif item.status == 'draft' %}
-                        {% if request.user.is_superuser or request.user.is_lecturer %}
+                        {% if request.user.can_manage_quizzes %}
                         <a class="btn btn-outline-secondary w-100" href="{% url 'quiz_take' pk=course.pk slug=item.quiz.slug %}">
                             <i class="fas fa-vial me-1"></i>{% trans 'Preview (Draft)' %}
                         </a>
@@ -246,7 +259,7 @@
         <div class="text-center py-5 text-muted">
             <i class="fa-regular fa-folder-open fa-3x mb-3 d-block"></i>
             <h5>{% trans 'No quizzes yet.' %}</h5>
-            {% if request.user.is_superuser or request.user.is_lecturer %}
+            {% if request.user.can_manage_quizzes %}
             <a href="{% url 'quiz_create' course.slug %}" class="btn btn-primary mt-2">{% trans 'Create First Quiz' %}</a>
             {% endif %}
         </div>

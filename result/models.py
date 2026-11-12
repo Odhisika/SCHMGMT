@@ -195,7 +195,7 @@ class TakenCourse(models.Model):
         else:
             return FAIL
 
-    def save(self, *args, **kwargs):
+    def save(self, *args, update_position=True, **kwargs):
         if not self.school and self.student:
             self.school = self.student.student.school
 
@@ -221,7 +221,8 @@ class TakenCourse(models.Model):
         self.grade = self.get_grade()
         self.comment = self.get_comment()
         super().save(*args, **kwargs)
-        self.calculate_class_position()
+        if update_position:
+            self.calculate_class_position()
 
     def calculate_class_position(self):
         """Calculate student's position in class for this subject."""
@@ -302,13 +303,14 @@ class Result(models.Model):
     def __str__(self):
         return f"Result for {self.student} - Term: {self.term}, Level: {self.level}"
 
-    def save(self, *args, **kwargs):
+    def save(self, *args, update_position=True, **kwargs):
         if not self.school and self.student:
             self.school = self.student.student.school
         # Sync promoted boolean from status
         self.promoted = self.promotion_status in ('AUTO_PASS', 'MANUAL_PASS')
         super().save(*args, **kwargs)
-        self.calculate_overall_position()
+        if update_position:
+            self.calculate_overall_position()
 
     def auto_evaluate_promotion(self):
         """

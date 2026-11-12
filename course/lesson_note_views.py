@@ -1,11 +1,13 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.db.models import Q
 
 from accounts.decorators import lecturer_required, admin_required
-from core.models import Term
+from core.models import Notification, Term
+from core.notifications import notify, notify_admins
 from .models import LessonNote, Course
 from .forms import LessonNoteForm, LessonNoteAdminReviewForm
 
@@ -125,7 +127,19 @@ def lesson_note_submit(request, pk):
     lesson_note.status = 'SUBMITTED'
     lesson_note.submitted_at = timezone.now()
     lesson_note.save()
-    
+
+    notify_admins(
+        school=lesson_note.course.school or request.school,
+        title=f"Lesson note submitted: {lesson_note.title}",
+        message=(
+            f"{request.user.get_full_name} submitted a lesson note for "
+            f"{lesson_note.course.title} (Week {lesson_note.week_number})."
+        ),
+        link=reverse('lesson_note_admin_review', args=[lesson_note.pk]),
+        notification_type=Notification.TYPE_INFO,
+        actor=request.user,
+    )
+
     messages.success(request, f"Lesson note '{lesson_note.title}' has been submitted for review.")
     return redirect('lesson_note_detail', pk=pk)
 
@@ -254,8 +268,32 @@ def lesson_note_admin_review(request, pk):
             lesson_note.reviewed_by = request.user
             lesson_note.reviewed_at = timezone.now()
             lesson_note.save()
-            
+
             status_text = lesson_note.get_status_display()
+            approved = lesson_note.status == 'APPROVED'
+            feedback = (lesson_note.admin_comments or '').strip()
+            message = (
+                f"Your lesson note '{lesson_note.title}' was marked as {status_text}."
+            )
+            if feedback:
+                message = f"{message} Admin comment: {feedback[:200]}"
+
+            notify(
+                school=lesson_note.course.school or request.school,
+                title=(
+                    f"Lesson note approved: {lesson_note.title}"
+                    if approved
+                    else f"Lesson note needs revision: {lesson_note.title}"
+                ),
+                message=message,
+                link=reverse('lesson_note_detail', args=[lesson_note.pk]),
+                notification_type=(
+                    Notification.TYPE_SUCCESS if approved else Notification.TYPE_WARNING
+                ),
+                recipient=lesson_note.teacher,
+                actor=request.user,
+            )
+
             messages.success(
                 request,
                 f"Lesson note '{lesson_note.title}' has been marked as {status_text}."

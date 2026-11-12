@@ -106,9 +106,14 @@
                 <div class="card-body">
                     <div class="d-grid gap-2">
                         {% if lesson_note.can_submit %}
-                        <form action="{% url 'lesson_note_submit' lesson_note.pk %}" method="post" class="d-grid">
+                        <form action="{% url 'lesson_note_submit' lesson_note.pk %}" method="post" class="d-grid"
+                              data-confirm="Submit this lesson note for review? You will not be able to edit it until it is reviewed."
+                              data-confirm-title="Submit lesson note?"
+                              data-confirm-ok="Submit for review"
+                              data-confirm-variant="success"
+                              data-confirm-icon="paper-plane">
                             {% csrf_token %}
-                            <button type="submit" class="btn btn-success btn-lg mb-2" onclick="return confirm('Submit this lesson note for review? You will not be able to edit it until it is reviewed.');">
+                            <button type="submit" class="btn btn-success btn-lg mb-2">
                                 <i class="fas fa-paper-plane"></i> {% trans 'Submit for Review' %}
                             </button>
                         </form>

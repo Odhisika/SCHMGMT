@@ -1,4 +1,4 @@
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
 from django.http import HttpResponseRedirect, JsonResponse
 from django.urls import reverse_lazy
@@ -34,6 +34,7 @@ from accounts.decorators import lecturer_required, student_required, admin_requi
 from django.utils.translation import gettext as _
 from django.db.models import Count
 from .models import TakenCourse, Result
+from .promotion import apply_promotion, build_candidates
 from school.models import GradeWeightConfig
 
 
@@ -64,7 +65,9 @@ def create_promotion(request):
     ).first()
     is_third_term = current_term and current_term.term == settings.THIRD_TERM
 
-    pass_mark = 50.0  # Pass mark percentage
+    policy = getattr(request.school, "promotion_policy", None)
+    pass_mark = float(policy.promotion_cut_off) if policy else 50.0
+    failure_mark = float(policy.failure_cut_off) if policy else 40.0
     
     # Division filtering logic
     DEFAULT_DIV = settings.DIVISION_NURSERY
@@ -89,6 +92,7 @@ def create_promotion(request):
         "is_third_term": is_third_term,
         "levels": division_level_choices, # Filtered levels
         "pass_mark": pass_mark,
+        "failure_mark": failure_mark,
         "current_division": current_division,
         "divisions": [
             (settings.DIVISION_NURSERY, _("Nursery/Pre-School")),
@@ -103,69 +107,67 @@ def create_promotion(request):
             level=selected_level, student__school=request.school
         ).order_by("student__last_name")
 
-        promotion_list = []
-
-        for student in students:
-            # Fetch results for the current academic session
-            results = Result.objects.filter(
-                student=student,
-                session=current_term.year,
-                level=selected_level,
-                school=request.school,
-            )
-
-            t1 = results.filter(term=settings.FIRST_TERM).first()
-            t2 = results.filter(term=settings.SECOND_TERM).first()
-            t3 = results.filter(term=settings.THIRD_TERM).first()
-
-            score1 = float(t1.term_average) if t1 and t1.term_average else 0
-            score2 = float(t2.term_average) if t2 and t2.term_average else 0
-            score3 = float(t3.term_average) if t3 and t3.term_average else 0
-
-            # Determine divisor based on available results?
-            # Ideally annual avg is sum / 3. If a term is missing, it counts as 0.
-            annual_avg = round((score1 + score2 + score3) / 3, 2)
-
-            next_lvl = get_next_level(selected_level)
-
-            item = {
-                "student": student,
-                "term1": score1,
-                "term2": score2,
-                "term3": score3,
-                "average": annual_avg,
-                "next_level": next_lvl,
-                "is_graduating": next_lvl is None,
-                "promoted": False,
-            }
-
-            # Logic for Promotion
-            if annual_avg >= pass_mark:
-                item["promoted"] = True
-
-            promotion_list.append(item)
+        promotion_list = build_candidates(
+            selected_level,
+            current_term.year if current_term else None,
+            request.school,
+            policy,
+        )
 
         # Handle POST: Execute Promotion
         if request.method == "POST" and is_third_term:
-            promote_count = 0
-            for item in promotion_list:
-                if item["promoted"]:
-                    student = item["student"]
-                    if item["next_level"]:
-                        student.level = item["next_level"]
-                        student.save()
-                        promote_count += 1
-                        # Create a record or log if necessary
-                    elif item["is_graduating"]:
-                        # Logic for graduation
-                        # Maybe status=Alumni? For now, we'll just log it
-                        pass
+            student_action = request.POST.get("student_action", "")
+            if ":" in student_action:
+                student_id, action = student_action.rsplit(":", 1)
+            else:
+                student_id = request.POST.get("student_id")
+                action = request.POST.get("action")
 
+            if student_id and action in ("promote", "repeat"):
+                candidate = next(
+                    (
+                        item
+                        for item in promotion_list
+                        if str(item.student.pk) == str(student_id)
+                    ),
+                    None,
+                )
+                if candidate is None:
+                    messages.error(request, "That student is no longer in this class list.")
+                else:
+                    new_status = "MANUAL_PASS" if action == "promote" else "MANUAL_FAIL"
+                    if candidate.result is not None:
+                        candidate.result.promotion_status = new_status
+                        candidate.result.save(
+                            update_fields=["promotion_status", "promoted"]
+                        )
+                    candidate.status = new_status
+                    candidate.promoted = action == "promote"
+                    summary = apply_promotion([candidate])
+                    verb = "promoted" if action == "promote" else "held back"
+                    messages.success(
+                        request,
+                        f"{candidate.student.student.get_full_name()} was {verb}.",
+                    )
+                return HttpResponseRedirect(
+                    reverse_lazy("create_promotion")
+                    + f"?division={current_division}&level={selected_level}"
+                )
+
+            summary = apply_promotion(promotion_list)
             messages.success(
                 request,
-                f"Successfully promoted {promote_count} students from {selected_level}.",
+                (
+                    f"Promotion processed for {selected_level}: "
+                    f"{summary['promoted']} promoted, "
+                    f"{summary['graduated']} graduated, "
+                    f"{summary['held_back']} held back to repeat."
+                ),
             )
-            return HttpResponseRedirect(reverse_lazy("create_promotion") + f"?division={current_division}")
+            return HttpResponseRedirect(
+                reverse_lazy("create_promotion")
+                + f"?division={current_division}&level={selected_level}"
+            )
 
         context["promotion_list"] = promotion_list
         context["students"] = students # Adding students to context to trigger list view
@@ -176,28 +178,13 @@ def create_promotion(request):
 @lecturer_required
 def add_score(request):
     """
-    Shows a page where a teacher will select a subject allocated
-    to him for score entry in a specific term
+    Legacy score-entry landing page.
+
+    Score entry is now handled by the weighted ``manage_scores`` workflow.
+    Keep this route as a permanent redirect so old bookmarks and links do not
+    expose the retired 40/60 entry screen.
     """
-    current_term = Semester.objects.filter(
-        is_current_term=True, school=request.school
-    ).first()
-
-    if not current_term:
-        messages.error(request, "No active term found.")
-        return render(request, "result/add_score.html")
-
-    current_session = current_term.year
-    courses = Course.objects.filter(
-        allocated_course__teacher__pk=request.user.id,
-        school=request.school
-    ).filter(term=current_term.term)
-    context = {
-        "current_session": current_session,
-        "current_term": current_term,
-        "courses": courses,
-    }
-    return render(request, "result/add_score.html", context)
+    return redirect("manage_scores")
 
 
 @login_required
@@ -213,6 +200,14 @@ def add_score_for(request, id):
     )
     current_session = current_term.year
     course = get_object_or_404(Course, pk=id, school=request.school)
+
+    # All normal score entry uses the weighted interface. The legacy page is
+    # only retained for the post-publication amendment workflow below.
+    if not current_term.result_released:
+        return redirect(
+            f"{reverse_lazy('enter_scores', kwargs={'level': course.level})}"
+            f"?subject={course.pk}"
+        )
     
     # Check for Edit Permission
     from .models import ResultEditRequest
@@ -298,6 +293,25 @@ def add_score_for(request, id):
                 request_type=req_type,
                 school=request.school
             )
+            from core.notifications import notify, notify_admins
+            from core.models import Notification
+            if req_type == ResultEditRequest.TEACHER_REQUEST:
+                notify_admins(
+                    request.school,
+                    title="Result amendment needs review",
+                    message=f"{allocated_teacher.get_full_name} requested a result amendment for {course.title}.",
+                    link=reverse_lazy("result_amendment_requests"),
+                    actor=request.user,
+                )
+            else:
+                notify(
+                    school=request.school,
+                    recipient=allocated_teacher,
+                    title="Admin requested a result amendment",
+                    message=f"Please review the result amendment request for {course.title}.",
+                    link=reverse_lazy("result_amendment_requests"),
+                    actor=request.user,
+                )
             messages.info(request, "Request for result amendment has been submitted.")
             return HttpResponseRedirect(reverse_lazy("add_score_for", kwargs={"id": id}))
 
@@ -385,10 +399,32 @@ def result_amendment_requests(request):
         if action == "approve":
             req.status = ResultEditRequest.APPROVED
             req.save()
+            from core.models import Notification
+            from core.notifications import notify
+            notify(
+                school=request.school,
+                recipient=req.requested_by,
+                title="Result amendment approved",
+                message=f"The amendment request for {req.course.title} was approved.",
+                link=reverse_lazy("result_amendment_requests"),
+                notification_type=Notification.TYPE_SUCCESS,
+                actor=request.user,
+            )
             messages.success(request, f"Approved amendment request.")
         elif action == "reject":
             req.status = ResultEditRequest.REJECTED
             req.save()
+            from core.models import Notification
+            from core.notifications import notify
+            notify(
+                school=request.school,
+                recipient=req.requested_by,
+                title="Result amendment rejected",
+                message=f"The amendment request for {req.course.title} was rejected.",
+                link=reverse_lazy("result_amendment_requests"),
+                notification_type=Notification.TYPE_WARNING,
+                actor=request.user,
+            )
             messages.info(request, f"Rejected amendment request.")
             
         return redirect("result_amendment_requests")
@@ -1113,18 +1149,31 @@ def manage_scores_dashboard(request):
     Dashboard for teachers to select class and subject for score entry.
     Strictly filters based on teacher's course allocations.
     """
+    current_term = Semester.objects.filter(
+        is_current_term=True, school=request.school
+    ).first()
+
     # Get subjects taught by teacher (strictly allocated)
-    if request.user.is_superuser or request.user.is_school_admin:
+    is_admin = request.user.is_superuser or request.user.is_school_admin
+    if is_admin:
         # Admins see all courses in their school if they navigate here
         subjects = Course.objects.filter(school=request.school).distinct()
-        allocated_levels = [l[0] for l in settings.LEVEL_CHOICES]
     else:
-        # Filter strictly by teacher allocation
-        from course.models import CourseAllocation
-        # Get courses directly from the allocation
-        subjects = Course.objects.filter(allocated_course__teacher=request.user).distinct()
-        # Get levels only from the subjects they teach
-        allocated_levels = list(subjects.values_list('level', flat=True).distinct())
+        # Filter strictly by teacher allocation, within this school
+        subjects = Course.objects.filter(
+            school=request.school,
+            allocated_course__teacher=request.user,
+        ).distinct()
+
+    # Courses are term-specific, so the entry screen only concerns the
+    # currently active term.
+    if current_term:
+        subjects = subjects.filter(term=current_term.term)
+
+    # Only offer levels that actually have a subject the user can manage.
+    allocated_levels = list(
+        subjects.values_list("level", flat=True).distinct()
+    )
 
     # Map levels to settings choices for labels
     levels = [l for l in settings.LEVEL_CHOICES if l[0] in allocated_levels]
@@ -1151,6 +1200,14 @@ def enter_scores(request, level):
         return HttpResponseRedirect(reverse_lazy('manage_scores'))
         
     course = get_object_or_404(Course, pk=subject_id, school=request.school)
+
+    # The selected subject belongs to one level. Correct a mismatched level
+    # instead of showing an empty score table.
+    if level != course.level:
+        return redirect(
+            f"{reverse_lazy('enter_scores', kwargs={'level': course.level})}"
+            f"?subject={course.pk}"
+        )
     
     # Authorization Check: Ensure teacher is allocated to this course
     if not (request.user.is_superuser or request.user.is_school_admin):
@@ -1224,6 +1281,15 @@ def save_scores(request):
     parsed_rows = []
     errors = []
     is_admin = request.user.is_superuser or request.user.is_school_admin
+
+    current_term = Semester.objects.filter(
+        is_current_term=True, school=request.school
+    ).first()
+    if current_term and current_term.result_released and not is_admin:
+        return JsonResponse({
+            "status": "error",
+            "message": "Results for this term have been published. Request an amendment before editing scores.",
+        }, status=403)
 
     for item in scores:
         if not isinstance(item, dict):

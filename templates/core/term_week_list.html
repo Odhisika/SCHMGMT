@@ -16,7 +16,12 @@
     <p class="title-1 mb-0"><i class="fas fa-calendar-week"></i>{{ term }} - {% trans 'Weekly Activities' %}</p>
     <div>
         {% if term.start_date and term.end_date %}
-        <a href="{% url 'term_week_init' term_pk=term.pk %}" class="btn btn-outline-primary me-2" onclick="return confirm('{% trans 'Generate weeks from term dates? This will only work if no weeks exist yet.' %}')">
+        <a href="{% url 'term_week_init' term_pk=term.pk %}" class="btn btn-outline-primary me-2"
+           data-confirm="{% trans 'Generate weeks from term dates? This will only work if no weeks exist yet.' %}"
+           data-confirm-title="{% trans 'Auto-generate weeks?' %}"
+           data-confirm-ok="{% trans 'Generate weeks' %}"
+           data-confirm-variant="primary"
+           data-confirm-icon="wand-magic-sparkles">
             <i class="fas fa-magic"></i> {% trans 'Auto-Generate Weeks' %}
         </a>
         {% endif %}
@@ -78,7 +83,12 @@
                 <td>
                     <div class="update-delete">
                         <a href="{% url 'term_week_edit' term_pk=term.pk pk=week.pk %}" class="update" title="{% trans 'Edit' %}"><i class="fas fa-pencil-alt"></i></a>
-                        <a href="{% url 'term_week_delete' term_pk=term.pk pk=week.pk %}" class="delete" title="{% trans 'Delete' %}" onclick="return confirm('{% trans 'Delete this week?' %}')"><i class="fas fa-trash-alt"></i></a>
+                        <a href="{% url 'term_week_delete' term_pk=term.pk pk=week.pk %}" class="delete" title="{% trans 'Delete' %}"
+                           data-confirm="{% trans 'Delete this week?' %}"
+                           data-confirm-title="{% trans 'Delete week?' %}"
+                           data-confirm-ok="{% trans 'Delete' %}"
+                           data-confirm-variant="danger"
+                           data-confirm-icon="trash"><i class="fas fa-trash-alt"></i></a>
                     </div>
                 </td>
             </tr>

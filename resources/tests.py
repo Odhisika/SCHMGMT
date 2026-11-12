@@ -5,6 +5,7 @@ from django.urls import reverse
 from core.models import ActivityLog
 from core.testing import DemoDataTestCase
 from course.models import Course
+from resources.forms import CourseVideoForm
 from resources.models import CourseFile, CourseVideo
 
 
@@ -51,6 +52,58 @@ class ResourceModelTests(DemoDataTestCase):
         self.course_video.refresh_from_db()
 
         self.assertEqual(self.course_video.views, starting_views + 1)
+
+    def test_youtube_id_is_extracted_from_common_url_formats(self):
+        expected = "dQw4w9WgXcQ"
+        urls = [
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            "https://youtu.be/dQw4w9WgXcQ",
+            "https://www.youtube.com/embed/dQw4w9WgXcQ",
+            "https://www.youtube.com/shorts/dQw4w9WgXcQ",
+            "https://m.youtube.com/watch?v=dQw4w9WgXcQ&t=42s",
+            "dQw4w9WgXcQ",
+        ]
+
+        for url in urls:
+            with self.subTest(url=url):
+                video = CourseVideo(youtube_url=url)
+                self.assertEqual(video.get_youtube_id(), expected)
+                self.assertTrue(video.is_youtube)
+                self.assertIn(expected, video.youtube_embed_url)
+                self.assertIn(expected, video.youtube_thumbnail_url)
+
+    def test_invalid_youtube_url_has_no_video_id(self):
+        video = CourseVideo(youtube_url="https://example.com/not-a-video")
+        self.assertEqual(video.get_youtube_id(), "")
+
+    def test_video_form_requires_a_file_or_youtube_link(self):
+        form = CourseVideoForm(data={"title": "No source"})
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("__all__", form.errors)
+
+    def test_video_form_accepts_a_youtube_link(self):
+        form = CourseVideoForm(
+            data={
+                "title": "Recorded Lesson",
+                "youtube_url": "https://youtu.be/dQw4w9WgXcQ",
+                "description": "",
+            }
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_video_form_rejects_a_non_youtube_link(self):
+        form = CourseVideoForm(
+            data={
+                "title": "Recorded Lesson",
+                "youtube_url": "https://example.com/video",
+                "description": "",
+            }
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("youtube_url", form.errors)
 
     def test_upload_and_delete_are_logged(self):
         before = ActivityLog.objects.count()
@@ -132,3 +185,29 @@ class ResourceViewTests(DemoDataTestCase):
         self.assertEqual(response.status_code, 200)
         video.refresh_from_db()
         self.assertEqual(video.views, starting_views + 1)
+
+    def test_youtube_video_detail_embeds_the_player(self):
+        video = CourseVideo.objects.create(
+            title="YouTube Lesson",
+            course=self.primary_course,
+            youtube_url="https://youtu.be/dQw4w9WgXcQ",
+            school=self.school,
+            uploaded_by=self.teacher,
+        )
+        self.client.force_login(self.student_user)
+
+        response = self.client.get(
+            reverse(
+                "resources:video_detail",
+                kwargs={
+                    "course_slug": self.primary_course.slug,
+                    "video_slug": video.slug,
+                },
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response, "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ"
+        )
+        self.assertContains(response, "YouTube")

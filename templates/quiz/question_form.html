@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% load crispy_forms_tags %}
+
+{% block title %}{{ type_label }} {% trans 'Question' %} | {{ quiz.title }}{% endblock %}
+
+{% block content %}
+
+<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'programs' %}">{% trans 'Programs' %}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'program_detail' course.program.id %}">{{ course.program }}</a></li>
+        <li class="breadcrumb-item"><a href="{{ course.get_absolute_url }}">{{ course }}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'quiz_index' course.slug %}">{% trans 'Quizzes' %}</a></li>
+        <li class="breadcrumb-item">
+            <a href="{% url 'quiz_questions' slug=course.slug quiz_id=quiz.pk %}">{% trans 'Questions' %}</a>
+        </li>
+        <li class="breadcrumb-item active" aria-current="page">{{ type_label }}</li>
+    </ol>
+</nav>
+
+{% include 'snippets/messages.html' %}
+
+<div class="d-flex justify-content-between align-items-start mb-4">
+    <div>
+        <h2 class="mb-1">
+            {% if question %}{% trans 'Edit' %}{% else %}{% trans 'Add' %}{% endif %}
+            {{ type_label }} {% trans 'Question' %}
+        </h2>
+        <p class="text-muted mb-0">{{ quiz.title }} &middot; {{ course.code }}</p>
+    </div>
+    <a href="{% url 'quiz_questions' slug=course.slug quiz_id=quiz.pk %}" class="btn btn-light">
+        <i class="fas fa-arrow-left me-1"></i>{% trans 'Back to Questions' %}
+    </a>
+</div>
+
+<div class="card border-0 shadow-sm mb-5">
+    <div class="card-body">
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+            {% endif %}
+
+            {{ form.content|as_crispy_field }}
+            {{ form.figure|as_crispy_field }}
+            {{ form.explanation|as_crispy_field }}
+
+            {% if qtype == 'truefalse' %}
+            {{ form.correct_answer|as_crispy_field }}
+            {% elif qtype == 'fillblank' %}
+            {{ form.correct_answer|as_crispy_field }}
+            {{ form.case_sensitive|as_crispy_field }}
+            {% elif qtype == 'essay' %}
+            <div class="alert alert-info small py-2">
+                <i class="fas fa-info-circle me-1"></i>
+                {% trans 'Essay answers are stored with the attempt and must be marked manually from the marking screen.' %}
+            </div>
+            {% endif %}
+
+            <div class="d-flex gap-2 mt-4">
+                <button type="submit" class="btn btn-primary px-4">
+                    <i class="fas fa-save me-1"></i>{% trans 'Save Question' %}
+                </button>
+                {% if not question %}
+                <button type="submit" name="another" class="btn btn-outline-primary px-4">
+                    {% trans 'Save and Add Another' %}
+                </button>
+                {% endif %}
+                <a href="{% url 'quiz_questions' slug=course.slug quiz_id=quiz.pk %}" class="btn btn-light px-4">
+                    {% trans 'Cancel' %}
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}

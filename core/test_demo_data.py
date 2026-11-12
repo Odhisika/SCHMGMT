@@ -1,5 +1,6 @@
 from io import StringIO
 
+from django.conf import settings
 from django.core.management import call_command
 from django.test import TestCase
 
@@ -61,7 +62,11 @@ class DemoDataIntegrityTests(DemoDataTestCase):
         self.assertTrue(self.student_user.is_student)
 
         self.assertEqual(User.objects.filter(is_student=True).count(), 4)
-        self.assertEqual(User.objects.filter(is_parent=True).count(), 2)
+        self.assertEqual(User.objects.filter(is_parent=True).count(), 4)
+        self.assertEqual(
+            User.objects.filter(is_teacher=True, is_class_teacher=True).count(),
+            len(self.demo_levels),
+        )
 
     def test_login_credentials_work_for_seeded_users(self):
         self.assertTrue(
@@ -73,14 +78,62 @@ class DemoDataIntegrityTests(DemoDataTestCase):
         )
 
     def test_courses_and_enrollments(self):
-        self.assertEqual(Course.objects.filter(school=self.school).count(), 10)
-        self.assertEqual(
-            list(self.demo.courses[self.demo_levels[0]][0].code.split("-")),
-            ["ENG", "PRIMARY1"],
-        )
-        self.assertEqual(TakenCourse.objects.filter(school=self.school).count(), 20)
-        self.assertEqual(Result.objects.filter(school=self.school).count(), 4)
+        # 5 subjects x 3 terms x 2 levels.
+        self.assertEqual(Course.objects.filter(school=self.school).count(), 30)
+        first_course = self.demo.courses[self.demo_levels[0]][0]
+        self.assertTrue(first_course.code.startswith("ENG-PRIMARY1-"))
+        self.assertEqual(first_course.term, self.current_term.term)
+
+        # 2 students x 5 subjects x 3 terms per level.
+        self.assertEqual(TakenCourse.objects.filter(school=self.school).count(), 60)
+        self.assertEqual(Result.objects.filter(school=self.school).count(), 12)
         self.assertTrue(all(result.term_average is not None for result in self.demo.results))
+
+    def test_results_exist_for_every_term(self):
+        for term_name in (
+            settings.FIRST_TERM,
+            settings.SECOND_TERM,
+            settings.THIRD_TERM,
+        ):
+            self.assertIn(term_name, self.demo.results_by_term)
+            self.assertEqual(
+                len(self.demo.results_by_term[term_name]),
+                sum(len(students) for students in self.demo.students.values()),
+            )
+
+    def test_every_class_has_a_distinct_teacher_and_students(self):
+        teacher_names = set()
+        for level, teacher in self.demo.class_teachers.items():
+            self.assertTrue(teacher.is_class_teacher)
+            self.assertEqual(teacher.assigned_level, level)
+            self.assertEqual(
+                teacher.division,
+                next(
+                    division
+                    for division, levels in settings.DIVISION_LEVEL_MAPPING.items()
+                    if level in levels
+                ),
+            )
+            full_name = (teacher.first_name, teacher.last_name)
+            self.assertNotIn(full_name, teacher_names)
+            teacher_names.add(full_name)
+            self.assertTrue(self.demo.students[level])
+
+        # All teacher names, including coordinators, are unique.
+        all_teacher_names = list(
+            User.objects.filter(is_teacher=True).values_list(
+                "first_name", "last_name"
+            )
+        )
+        self.assertEqual(len(all_teacher_names), len(set(all_teacher_names)))
+
+    def test_third_term_results_have_mixed_promotion_outcomes(self):
+        statuses = {
+            result.promotion_status
+            for result in self.demo.results_by_term[settings.THIRD_TERM]
+        }
+        self.assertIn("AUTO_PASS", statuses)
+        self.assertTrue(statuses & {"AUTO_FAIL", "BORDERLINE"})
 
     def test_attendance_sessions_records_and_summaries(self):
         self.assertEqual(
@@ -160,8 +213,9 @@ class DemoDataToggleTests(TestCase):
         self.assertEqual(Quiz.objects.count(), 0)
         self.assertEqual(CourseFile.objects.count(), 0)
         self.assertEqual(CourseVideo.objects.count(), 0)
-        self.assertEqual(Course.objects.count(), 5)
+        self.assertEqual(Course.objects.count(), 15)
         self.assertEqual(Student.objects.count(), 1)
+        self.assertEqual(Result.objects.count(), 3)
         self.assertEqual(Attendance.objects.count(), 1)
         # No JHS levels were requested, so no BECE mock data.
         self.assertEqual(BECEMockExam.objects.count(), 0)

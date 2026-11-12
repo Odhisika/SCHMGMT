@@ -242,6 +242,8 @@ class StaffAndStudentManagementViewTests(DemoDataTestCase):
     def test_add_parent_creates_linked_parent_account(self):
         self.client.force_login(self.admin)
         student = self.demo.students[self.demo_levels[0]][1]
+        # Every seeded student already has a guardian, so free this one up.
+        Parent.objects.filter(student=student).delete()
 
         response = self.client.post(
             reverse("add_parent"),

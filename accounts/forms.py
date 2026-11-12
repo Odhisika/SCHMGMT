@@ -8,8 +8,12 @@ from django.contrib.auth.forms import (
 from django.contrib.auth.forms import PasswordResetForm
 from django.conf import settings
 from course.models import Program
-from .models import User, Student, Parent, RELATION_SHIP, LEVEL, GENDERS
+from .models import (
+    User, Student, Parent, RELATION_SHIP, LEVEL, GENDERS,
+    NON_TEACHING_POSITIONS,
+)
 from .utils import (
+    generate_password,
     generate_student_credentials,
     generate_lecturer_credentials,
     send_new_account_email,
@@ -167,20 +171,135 @@ class StaffAddForm(UserCreationForm):
             user.department = None
         user.division = self.cleaned_data.get("division")  # Save division
 
-        # Generate credentials if username is missing (which implies new user via this form)
-        password = None
+        # Generate a username when one was not supplied, but always make sure
+        # the account has a usable password and that the credentials email is
+        # sent for every newly created account.
+        password = self.cleaned_data.get("password1")
         if not user.username:
-            username, generated_password = generate_lecturer_credentials()
-            user.username = username
-            password = generated_password
-            user.set_password(password)
+            user.username, generated_password = generate_lecturer_credentials()
+            password = password or generated_password
+        if not password:
+            password = generate_password()
+        user.set_password(password)
 
         if commit:
             user.save()
-            if password:
-                send_new_account_email(user, password)
+            send_new_account_email(user, password)
 
         return user
+
+
+class NonTeachingStaffAddForm(UserCreationForm):
+    """Create a school employee account without teaching permissions."""
+
+    username = forms.CharField(
+        max_length=30,
+        required=False,
+        label=_("Username (optional)"),
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+    )
+    first_name = forms.CharField(
+        max_length=150,
+        label=_("First name"),
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+    )
+    last_name = forms.CharField(
+        max_length=150,
+        label=_("Last name"),
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+    )
+    email = forms.EmailField(
+        label=_("Email address"),
+        widget=forms.EmailInput(attrs={"class": "form-control"}),
+    )
+    phone = forms.CharField(
+        max_length=60,
+        required=False,
+        label=_("Phone number"),
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+    )
+    address = forms.CharField(
+        max_length=60,
+        required=False,
+        label=_("Address"),
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+    )
+    gender = forms.ChoiceField(
+        choices=[("", _("Select gender"))] + list(GENDERS),
+        required=False,
+        label=_("Gender"),
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    non_teaching_position = forms.ChoiceField(
+        choices=NON_TEACHING_POSITIONS,
+        label=_("Position"),
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    password1 = forms.CharField(
+        required=False,
+        label=_("Password (optional)"),
+        widget=forms.PasswordInput(attrs={"class": "form-control"}),
+    )
+    password2 = forms.CharField(
+        required=False,
+        label=_("Confirm password"),
+        widget=forms.PasswordInput(attrs={"class": "form-control"}),
+    )
+
+    class Meta(UserCreationForm.Meta):
+        model = User
+        fields = ("username",)
+
+    def __init__(self, *args, **kwargs):
+        self.school = kwargs.pop("school", None)
+        super().__init__(*args, **kwargs)
+
+    @transaction.atomic()
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        user.school = self.school
+        user.is_teacher = False
+        user.is_lecturer = False
+        user.is_student = False
+        user.is_parent = False
+        user.is_school_admin = False
+        user.is_non_teaching_staff = True
+        user.non_teaching_position = self.cleaned_data["non_teaching_position"]
+        user.first_name = self.cleaned_data["first_name"]
+        user.last_name = self.cleaned_data["last_name"]
+        user.email = self.cleaned_data["email"]
+        user.phone = self.cleaned_data.get("phone", "")
+        user.address = self.cleaned_data.get("address", "")
+        user.gender = self.cleaned_data.get("gender") or None
+
+        generated_username, generated_password = generate_lecturer_credentials()
+        if not user.username:
+            user.username = generated_username
+        password = self.cleaned_data.get("password1") or generated_password
+        user.set_password(password)
+
+        if commit:
+            user.save()
+            send_new_account_email(user, password)
+        return user
+
+
+class NonTeachingStaffUpdateForm(forms.ModelForm):
+    class Meta:
+        model = User
+        fields = (
+            "first_name", "last_name", "email", "phone", "address", "gender",
+            "non_teaching_position",
+        )
+        widgets = {
+            "first_name": forms.TextInput(attrs={"class": "form-control"}),
+            "last_name": forms.TextInput(attrs={"class": "form-control"}),
+            "email": forms.EmailInput(attrs={"class": "form-control"}),
+            "phone": forms.TextInput(attrs={"class": "form-control"}),
+            "address": forms.TextInput(attrs={"class": "form-control"}),
+            "gender": forms.Select(attrs={"class": "form-select"}),
+            "non_teaching_position": forms.Select(attrs={"class": "form-select"}),
+        }
 
 
 class StudentAddForm(UserCreationForm):
@@ -324,23 +443,16 @@ class StudentAddForm(UserCreationForm):
         user.address = self.cleaned_data.get("address")
         user.email = self.cleaned_data.get("email")
         
-        # Generate credentials if username is missing
-        password = None
+        # Generate a username when one was not supplied, but always make sure
+        # the account has a usable password and that the credentials email is
+        # sent for every newly created account.
+        password = self.cleaned_data.get("password1")
         if not user.username:
-            username, generated_password = generate_student_credentials()
-            user.username = username
-            
-            # Check if password provided in form, otherwise use generated
-            if self.cleaned_data.get('password1'):
-                password = self.cleaned_data.get('password1')
-                user.set_password(password)
-            else:
-                password = generated_password
-                user.set_password(password)
-        elif self.cleaned_data.get('password1'):
-             # Username exists but password provided to update/set? 
-             # (Though usually this form is for creation)
-             user.set_password(self.cleaned_data.get('password1'))
+            user.username, generated_password = generate_student_credentials()
+            password = password or generated_password
+        if not password:
+            password = generate_password()
+        user.set_password(password)
 
         if commit:
             user.save()
@@ -349,8 +461,7 @@ class StudentAddForm(UserCreationForm):
                 level=self.cleaned_data.get("level"),
                 program=self.cleaned_data.get("program"),
             )
-            if password:
-                 send_new_account_email(user, password)
+            send_new_account_email(user, password)
 
         return user
 

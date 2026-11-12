@@ -1,0 +1,149 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans 'Manage Questions' %} | {{ quiz.title }}{% endblock %}
+
+{% block content %}
+
+<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'programs' %}">{% trans 'Programs' %}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'program_detail' course.program.id %}">{{ course.program }}</a></li>
+        <li class="breadcrumb-item"><a href="{{ course.get_absolute_url }}">{{ course }}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'quiz_index' course.slug %}">{% trans 'Quizzes' %}</a></li>
+        <li class="breadcrumb-item active" aria-current="page">{% trans 'Questions' %}</li>
+    </ol>
+</nav>
+
+{% include 'snippets/messages.html' %}
+
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <div>
+        <h2 class="mb-1">{{ quiz.title }}</h2>
+        <p class="text-muted mb-0">
+            {{ questions|length }} {% trans 'question' %}{{ questions|length|pluralize }}
+            &middot; {{ course.code }}
+        </p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a href="{% url 'quiz_index' course.slug %}" class="btn btn-light">
+            <i class="fas fa-arrow-left me-1"></i>{% trans 'All Quizzes' %}
+        </a>
+        <a href="{% url 'quiz_update' slug=course.slug pk=quiz.pk %}" class="btn btn-outline-secondary">
+            <i class="fas fa-cog me-1"></i>{% trans 'Quiz Settings' %}
+        </a>
+        <a href="{% url 'quiz_results' slug=course.slug pk=quiz.pk %}" class="btn btn-outline-info">
+            <i class="fas fa-chart-bar me-1"></i>{% trans 'Results' %}
+        </a>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white py-3">
+        <h5 class="mb-0"><i class="fas fa-plus-circle me-2 text-primary"></i>{% trans 'Add a Question' %}</h5>
+    </div>
+    <div class="card-body">
+        <p class="text-muted small">
+            {% trans 'Choose the question type. Multiple-choice questions support an unlimited number of answer options.' %}
+        </p>
+        <div class="d-flex flex-wrap gap-2">
+            <a href="{% url 'mc_create' slug=course.slug quiz_id=quiz.pk %}" class="btn btn-primary">
+                <i class="fas fa-list-ul me-1"></i>{% trans 'Multiple Choice' %}
+            </a>
+            <a href="{% url 'question_create' slug=course.slug quiz_id=quiz.pk qtype='truefalse' %}" class="btn btn-outline-primary">
+                <i class="fas fa-check me-1"></i>{% trans 'True/False' %}
+            </a>
+            <a href="{% url 'question_create' slug=course.slug quiz_id=quiz.pk qtype='fillblank' %}" class="btn btn-outline-primary">
+                <i class="fas fa-underline me-1"></i>{% trans 'Fill in the Blank' %}
+            </a>
+            <a href="{% url 'question_create' slug=course.slug quiz_id=quiz.pk qtype='essay' %}" class="btn btn-outline-primary">
+                <i class="fas fa-pen-fancy me-1"></i>{% trans 'Essay' %}
+            </a>
+        </div>
+    </div>
+</div>
+
+{% if questions %}
+<div class="d-flex flex-column gap-3 mb-5">
+    {% for question in questions %}
+    <div class="card border-0 shadow-sm">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start gap-3">
+                <div class="flex-grow-1">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <span class="badge bg-secondary">Q{{ forloop.counter }}</span>
+                        <span class="badge bg-primary-subtle text-primary border">{{ question.type_label }}</span>
+                        {% if question.is_essay %}
+                        <span class="badge bg-warning-subtle text-warning border">{% trans 'Marked manually' %}</span>
+                        {% endif %}
+                    </div>
+                    <p class="mb-2 fw-semibold">{{ question.content|linebreaksbr }}</p>
+
+                    {% if question.figure %}
+                    <div class="mb-2">
+                        <img src="{{ question.figure.url }}" alt="{% trans 'Question figure' %}" class="img-fluid rounded border" style="max-height: 180px;">
+                    </div>
+                    {% endif %}
+
+                    {% if question.is_mc %}
+                    <ul class="list-group list-group-flush small mb-2">
+                        {% for choice in question.choices %}
+                        <li class="list-group-item px-0 py-1 {% if choice.correct %}text-success fw-semibold{% endif %}">
+                            <i class="fas {% if choice.correct %}fa-check-circle{% else %}fa-circle-notch text-muted{% endif %} me-2"></i>
+                            {{ choice.choice_text }}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% elif question.is_truefalse %}
+                    <p class="small mb-2">
+                        <span class="text-muted">{% trans 'Correct answer' %}:</span>
+                        <span class="badge bg-success">{% if question.correct_answer %}{% trans 'True' %}{% else %}{% trans 'False' %}{% endif %}</span>
+                    </p>
+                    {% elif question.is_fillblank %}
+                    <p class="small mb-2">
+                        <span class="text-muted">{% trans 'Correct answer' %}:</span>
+                        <span class="badge bg-success">{{ question.correct_answer }}</span>
+                        {% if question.case_sensitive %}
+                        <span class="badge bg-light text-dark border">{% trans 'Case sensitive' %}</span>
+                        {% endif %}
+                    </p>
+                    {% endif %}
+
+                    {% if question.explanation %}
+                    <p class="text-muted small mb-0">
+                        <i class="fas fa-info-circle me-1"></i>{{ question.explanation }}
+                    </p>
+                    {% endif %}
+                </div>
+
+                <div class="d-flex flex-column gap-2">
+                    {% if question.can_edit_here %}
+                    <a href="{% url 'question_edit' slug=course.slug quiz_id=quiz.pk pk=question.pk %}"
+                       class="btn btn-sm btn-outline-secondary" title="{% trans 'Edit question' %}">
+                        <i class="fas fa-pencil-alt"></i>
+                    </a>
+                    {% endif %}
+                    <form method="post"
+                          action="{% url 'question_delete' slug=course.slug quiz_id=quiz.pk pk=question.pk %}"
+                          onsubmit="return confirm('{% trans "Delete this question? This cannot be undone." %}');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-outline-danger w-100" title="{% trans 'Delete question' %}">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-5 text-muted">
+    <i class="fa-regular fa-folder-open fa-3x mb-3 d-block"></i>
+    <h5>{% trans 'This quiz has no questions yet.' %}</h5>
+    <p class="mb-0">{% trans 'Add the first question using the buttons above.' %}</p>
+</div>
+{% endif %}
+
+{% endblock %}

@@ -103,18 +103,19 @@
 
 <div class="container-fluid">
     {% if items %}
-    <div class="row">
+    <div class="row g-4">
         {% for item in items %}
-        <div class="col-md-4 mb-4">
-            <div class="bg-white border">
-                <div class="card-header-ne {% if item.posted_as == 'News' %}{% trans 'news' %}{% else %}{% trans 'events' %}{% endif %} p-2">
-                    <span class="p-0">
-                        {{ item.title|title }}
+        <div class="col-md-6 col-xl-4">
+            <div class="card h-100 border-0 shadow-sm news-card">
+                <div class="card-header-ne {% if item.posted_as == 'News' %}{% trans 'news' %}{% else %}{% trans 'events' %}{% endif %} p-2 d-flex align-items-center justify-content-between">
+                    <span class="badge {% if item.posted_as == 'News' %}bg-primary{% else %}bg-purple{% endif %}">
+                        <i class="fas {% if item.posted_as == 'News' %}fa-newspaper{% else %}fa-calendar-day{% endif %} me-1"></i>
+                        {{ item.get_posted_as_display }}
                     </span>
                     {% if request.user.is_superuser or request.user.is_school_admin %}
                     <div class="dropstart">
-                        <button class="btn btn-sm" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="fas fa-ellipsis-v text-white"></i>
+                        <button class="btn btn-sm text-white" data-bs-toggle="dropdown" aria-expanded="false" aria-label="{% trans 'Post actions' %}">
+                            <i class="fas fa-ellipsis-v"></i>
                         </button>
                         <div class="dropdown-menu">
                             <a class="dropdown-item" href="{% url 'edit_post' pk=item.id %}"><i
@@ -126,13 +127,25 @@
                     {% endif %}
                 </div>
 
-                <div class="p-2 my-2" style="min-height: 120px;">{{ item.summary }}</div>
-
-                <div class="bg-light p-1 small text-secondary text-end pe-3">
-                    <i class="fa fa-calendar small unstyled"></i>
-                    {{ item.updated_date|timesince }} {% trans 'ago' %}
-                </div>
-
+                <a href="{% url 'post_detail' item.id %}" class="news-card-link text-reset text-decoration-none d-flex flex-column flex-grow-1">
+                    <div class="card-body d-flex flex-column">
+                        <h5 class="fw-bold mb-2">{{ item.title|title }}</h5>
+                        <p class="text-muted mb-3 flex-grow-1">
+                            {% if item.summary %}
+                                {{ item.summary|striptags|truncatewords:30 }}
+                            {% else %}
+                                <em>{% trans 'Open to read this announcement.' %}</em>
+                            {% endif %}
+                        </p>
+                        <span class="news-read-more fw-semibold">
+                            {% trans 'Read full post' %} <i class="fas fa-arrow-right ms-1"></i>
+                        </span>
+                    </div>
+                    <div class="bg-light p-2 small text-secondary d-flex justify-content-between px-3">
+                        <span><i class="fa fa-calendar small unstyled me-1"></i>{{ item.updated_date|date:"M d, Y" }}</span>
+                        <span>{{ item.updated_date|timesince }} {% trans 'ago' %}</span>
+                    </div>
+                </a>
             </div>
         </div>
         {% endfor %}
@@ -146,5 +159,13 @@
     {% endif %}
 
 </div>
+
+<style>
+    .news-card { border-radius: 14px; overflow: hidden; transition: transform .18s ease, box-shadow .18s ease; }
+    .news-card:hover { transform: translateY(-3px); box-shadow: 0 .75rem 1.5rem rgba(15, 23, 42, .12) !important; }
+    .news-card-link { outline-offset: -3px; }
+    .news-card .news-read-more { color: var(--bs-primary); }
+    .news-card:hover .news-read-more { text-decoration: underline; }
+</style>
 
 {% endblock content %}

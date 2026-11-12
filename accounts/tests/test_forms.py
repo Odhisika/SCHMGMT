@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.test import TestCase
 
 from accounts.forms import (
@@ -74,6 +76,32 @@ class StaffAddFormTests(AccountFormTestBase):
         self.assertTrue(user.has_usable_password())
         self.assertEqual(user.department.division, "JHS")
 
+    @patch("accounts.forms.send_new_account_email")
+    def test_sends_credentials_email_when_admin_supplies_username_and_password(
+        self, send_email
+    ):
+        form = StaffAddForm(
+            data={
+                "username": "new.teacher",
+                "first_name": "New",
+                "last_name": "Teacher",
+                "gender": "M",
+                "department": "Primary",
+                "division": "Primary",
+                "address": "Accra",
+                "phone": "0240000000",
+                "email": "new.teacher@example.test",
+                "password1": PASSWORD,
+                "password2": PASSWORD,
+            },
+            school=self.school,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        user = form.save()
+
+        send_email.assert_called_once_with(user, PASSWORD)
+
 
 class StudentAddFormTests(AccountFormTestBase):
     def test_creates_student_profile_in_the_current_school(self):
@@ -103,6 +131,32 @@ class StudentAddFormTests(AccountFormTestBase):
         student = Student.objects.get(student=user)
         self.assertEqual(student.level, "Primary 1")
         self.assertEqual(student.program, self.program)
+
+    @patch("accounts.forms.send_new_account_email")
+    def test_sends_credentials_email_when_admin_supplies_username_and_password(
+        self, send_email
+    ):
+        form = StudentAddForm(
+            data={
+                "username": "new.student",
+                "first_name": "New",
+                "last_name": "Student",
+                "gender": "F",
+                "level": "Primary 1",
+                "program": self.program.pk,
+                "address": "Tema",
+                "phone": "0240000002",
+                "email": "new.student@example.test",
+                "password1": PASSWORD,
+                "password2": PASSWORD,
+            },
+            school=self.school,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        user = form.save()
+
+        send_email.assert_called_once_with(user, PASSWORD)
 
     def test_program_queryset_is_scoped_to_the_school(self):
         other_school = School.objects.create(name="Other Academy")

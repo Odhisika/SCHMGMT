@@ -13,6 +13,8 @@
 				</button>
 			</form>
 
+			{% include 'notifications/widget.html' %}
+
 			<div class="dropdown">
 				<div class="avatar border border-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
 					<img src="{{ request.user.picture.url }}">

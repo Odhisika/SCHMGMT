@@ -31,6 +31,10 @@ from .views import (
     render_student_pdf_list,  # new
     class_list_view,
     class_detail_view,
+    non_teaching_staff_list,
+    non_teaching_staff_add,
+    non_teaching_staff_edit,
+    non_teaching_staff_delete,
 )
 
 
@@ -67,6 +71,10 @@ urlpatterns = [
     path("lecturer/add/", staff_add_view, name="add_lecturer"),
     path("staff/<int:pk>/edit/", edit_staff, name="staff_edit"),
     path("lecturers/<int:pk>/delete/", delete_staff, name="lecturer_delete"),
+    path("non-teaching-staff/", non_teaching_staff_list, name="non_teaching_staff_list"),
+    path("non-teaching-staff/add/", non_teaching_staff_add, name="non_teaching_staff_add"),
+    path("non-teaching-staff/<int:pk>/edit/", non_teaching_staff_edit, name="non_teaching_staff_edit"),
+    path("non-teaching-staff/<int:pk>/delete/", non_teaching_staff_delete, name="non_teaching_staff_delete"),
     path("students/", StudentListView.as_view(), name="student_list"),
     path("classes/", class_list_view, name="class_list"),
     path("classes/<str:level_code>/", class_detail_view, name="class_detail"),

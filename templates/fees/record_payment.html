@@ -301,7 +301,7 @@
     paymentForm.addEventListener('submit', function(e) {
         if (!selectedStudent) {
             e.preventDefault();
-            alert('{% trans "Please select a student first" %}');
+            window.appNotify('{% trans "Please select a student first" %}', 'warning', '{% trans "Student required" %}');
         }
     });
     

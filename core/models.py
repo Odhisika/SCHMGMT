@@ -55,7 +55,9 @@ class NewsAndEventsManager(models.Manager):
 
 class NewsAndEvents(models.Model):
     title = models.CharField(max_length=200, null=True)
-    summary = models.TextField(max_length=200, blank=True, null=True)
+    # Long announcements/events must not be silently truncated. ``TextField``
+    # also lets the form accept multi-paragraph content without a 200-char cap.
+    summary = models.TextField(blank=True, null=True)
     posted_as = models.CharField(choices=POST, max_length=10)
     updated_date = models.DateTimeField(auto_now=True, auto_now_add=False, null=True)
     upload_time = models.DateTimeField(auto_now=False, auto_now_add=True, null=True)
@@ -168,4 +170,133 @@ class ActivityLog(models.Model):
 
     def __str__(self):
         return f"[{self.created_at}]{self.message}"
+
+
+class Notification(models.Model):
+    """
+    In-app notification shown in the navbar notification center.
+
+    A notification can target a single user (``recipient``) or a whole
+    audience inside one school. Audience notifications are shared rows and
+    each user tracks their own read state through ``read_by`` so that a
+    school admin reading a notification does not mark it as read for other
+    admins.
+    """
+
+    AUDIENCE_USER = "USER"
+    AUDIENCE_ADMIN = "ADMIN"
+    AUDIENCE_TEACHER = "TEACHER"
+    AUDIENCE_STUDENT = "STUDENT"
+    AUDIENCE_PARENT = "PARENT"
+    AUDIENCE_ALL = "ALL"
+
+    AUDIENCE_CHOICES = (
+        (AUDIENCE_USER, _("Specific user")),
+        (AUDIENCE_ADMIN, _("School administrators")),
+        (AUDIENCE_TEACHER, _("Teachers")),
+        (AUDIENCE_STUDENT, _("Students")),
+        (AUDIENCE_PARENT, _("Parents")),
+        (AUDIENCE_ALL, _("Everyone")),
+    )
+
+    TYPE_INFO = "info"
+    TYPE_SUCCESS = "success"
+    TYPE_WARNING = "warning"
+    TYPE_DANGER = "danger"
+
+    TYPE_CHOICES = (
+        (TYPE_INFO, _("Information")),
+        (TYPE_SUCCESS, _("Success")),
+        (TYPE_WARNING, _("Warning")),
+        (TYPE_DANGER, _("Important")),
+    )
+
+    recipient = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="notifications",
+        verbose_name=_("Recipient"),
+        help_text=_("Set for a personal notification. Leave empty for an audience notification."),
+    )
+    audience = models.CharField(
+        max_length=20,
+        choices=AUDIENCE_CHOICES,
+        default=AUDIENCE_ALL,
+        verbose_name=_("Audience"),
+    )
+    school = models.ForeignKey(
+        "school.School",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="notifications",
+        verbose_name=_("School"),
+    )
+    division = models.CharField(
+        max_length=25,
+        blank=True,
+        verbose_name=_("Division"),
+        help_text=_("Optional division restriction for this notification."),
+    )
+    title = models.CharField(max_length=200, verbose_name=_("Title"))
+    message = models.TextField(blank=True, verbose_name=_("Message"))
+    link = models.CharField(
+        max_length=500,
+        blank=True,
+        verbose_name=_("Link"),
+        help_text=_("Optional in-app URL opened when the notification is clicked."),
+    )
+    notification_type = models.CharField(
+        max_length=20,
+        choices=TYPE_CHOICES,
+        default=TYPE_INFO,
+        verbose_name=_("Type"),
+    )
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sent_notifications",
+        verbose_name=_("Triggered by"),
+    )
+    read_by = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        related_name="read_notifications",
+        verbose_name=_("Read by"),
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name=_("Created at"))
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = _("Notification")
+        verbose_name_plural = _("Notifications")
+        indexes = [
+            models.Index(fields=["school", "audience"]),
+            models.Index(fields=["recipient", "created_at"]),
+        ]
+
+    def __str__(self):
+        return self.title
+
+    def get_icon(self):
+        """Return the Font Awesome icon used by the notification center."""
+        return {
+            self.TYPE_INFO: "circle-info",
+            self.TYPE_SUCCESS: "circle-check",
+            self.TYPE_WARNING: "triangle-exclamation",
+            self.TYPE_DANGER: "circle-exclamation",
+        }.get(self.notification_type, "circle-info")
+
+    def get_color_class(self):
+        """Return the Bootstrap colour suffix used by the notification center."""
+        return {
+            self.TYPE_INFO: "primary",
+            self.TYPE_SUCCESS: "success",
+            self.TYPE_WARNING: "warning",
+            self.TYPE_DANGER: "danger",
+        }.get(self.notification_type, "primary")
 

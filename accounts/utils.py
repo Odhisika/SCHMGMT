@@ -1,8 +1,15 @@
+import logging
 import threading
 from datetime import datetime
-from django.contrib.auth import get_user_model
+
 from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.urls import reverse
+
 from core.utils import send_html_email
+
+
+logger = logging.getLogger(__name__)
 
 
 def generate_password():
@@ -54,31 +61,48 @@ class EmailThread(threading.Thread):
         threading.Thread.__init__(self)
 
     def run(self):
-        send_html_email(
-            subject=self.subject,
-            recipient_list=self.recipient_list,
-            template=self.template_name,
-            context=self.context,
-        )
+        try:
+            send_html_email(
+                subject=self.subject,
+                recipient_list=self.recipient_list,
+                template=self.template_name,
+                context=self.context,
+            )
+        except Exception:
+            # Threads used to swallow delivery errors completely, which made
+            # registration look successful even when no email was sent.
+            logger.exception(
+                "Failed to send account email to %s",
+                ", ".join(self.recipient_list),
+            )
 
 
 def send_new_account_email(user, password):
+    if not user.email:
+        logger.warning(
+            "Skipping account email for %s: no email address on file",
+            user.username,
+        )
+        return
+
     if user.is_student:
         template_name = "accounts/email/new_student_account_confirmation.html"
     else:
         template_name = "accounts/email/new_lecturer_account_confirmation.html"
-    
+
     school = user.school
     school_name = school.name if school else "Scolaa"
+    login_url = f"{settings.SITE_URL}{reverse('login')}"
 
     email = {
         "subject": f"Your {school_name} account confirmation and credentials",
         "recipient_list": [user.email],
         "template_name": template_name,
         "context": {
-            "user": user, 
+            "user": user,
             "password": password,
-            "school": school
+            "school": school,
+            "login_url": login_url,
         },
     }
     EmailThread(**email).start()

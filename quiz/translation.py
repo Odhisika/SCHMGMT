@@ -1,5 +1,13 @@
 from modeltranslation.translator import register, TranslationOptions
-from .models import Quiz, Question, Choice, MCQuestion, EssayQuestion
+from .models import (
+    Choice,
+    EssayQuestion,
+    FillInTheBlankQuestion,
+    MCQuestion,
+    Question,
+    Quiz,
+    TrueFalseQuestion,
+)
 
 
 @register(Quiz)
@@ -38,4 +46,16 @@ class EssayQuestionTranslationOptions(TranslationOptions):
     Registering the subclass (with no extra fields) keeps modeltranslation's
     constructor/save hooks working, matching the existing MCQuestion setup.
     """
+    pass
+
+
+@register(TrueFalseQuestion)
+class TrueFalseQuestionTranslationOptions(TranslationOptions):
+    """Inherits ``Question`` fields; registration is required for forms."""
+    pass
+
+
+@register(FillInTheBlankQuestion)
+class FillInTheBlankQuestionTranslationOptions(TranslationOptions):
+    """Inherits ``Question`` fields; registration is required for forms."""
     pass

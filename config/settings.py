@@ -47,6 +47,9 @@ ALLOWED_HOSTS = config(
     cast=lambda v: [h.strip() for h in v.split(",") if h.strip()]
 )
 
+# Absolute base URL used in outgoing emails (login links, etc.).
+SITE_URL = config("SITE_URL", default="http://localhost:8000").rstrip("/")
+
 # Public domains for the hosted school portal.
 # Production values should come from the environment.
 PUBLIC_DOMAINS = config(
@@ -157,6 +160,7 @@ TEMPLATES = [
                 "django.template.context_processors.tz",
                 "school.context_processors.school_context",
                 "school.context_processors.tenant_aware_urls",
+                "core.context_processors.notification_center",
             ],
         },
     },
@@ -269,12 +273,25 @@ EMAIL_BACKEND = config(
     "EMAIL_BACKEND", default="django.core.mail.backends.smtp.EmailBackend"
 )
 EMAIL_HOST = config("EMAIL_HOST", default="smtp.gmail.com")
-EMAIL_PORT = config("EMAIL_PORT", default=587)
+EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
 EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
+EMAIL_USE_SSL = config("EMAIL_USE_SSL", default=False, cast=bool)
 EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="youremail@example.com")
 EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="yourpassword")
-EMAIL_FROM_ADDRESS = config("EMAIL_FROM_ADDRESS", default="SkyLearn <youremail@example.com>")
-EMAIL_USE_SSL = False
+EMAIL_TIMEOUT = config("EMAIL_TIMEOUT", default=15, cast=int)
+
+# ``DEFAULT_FROM_EMAIL`` is what Django's mail helpers use. The project also
+# has a legacy ``EMAIL_FROM_ADDRESS`` setting, so keep both in sync rather
+# than silently falling back to ``webmaster@localhost`` / example.com.
+DEFAULT_FROM_EMAIL = config(
+    "DEFAULT_FROM_EMAIL", default="SkyLearn <youremail@example.com>"
+)
+EMAIL_FROM_ADDRESS = config("EMAIL_FROM_ADDRESS", default=DEFAULT_FROM_EMAIL)
+SERVER_EMAIL = config("SERVER_EMAIL", default=DEFAULT_FROM_EMAIL)
+
+# Automated tests must never contact a live SMTP server.
+if "test" in sys.argv:
+    EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 
 # crispy config
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"

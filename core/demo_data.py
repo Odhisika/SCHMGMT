@@ -79,6 +79,61 @@ SUBJECTS = [
     ("Computing", "ICT", False),
 ]
 
+TERM_SHORT_CODES = {
+    settings.FIRST_TERM: "T1",
+    settings.SECOND_TERM: "T2",
+    settings.THIRD_TERM: "T3",
+}
+
+# Unique staff identities. ``School Admin`` and the department head are drawn
+# from this pool too, so no two staff accounts share a name.
+TEACHER_PROFILES = [
+    ("Kwame", "Boateng", "M"),
+    ("Akosua", "Asante", "F"),
+    ("Yaw", "Owusu", "M"),
+    ("Abena", "Darko", "F"),
+    ("Kofi", "Appiah", "M"),
+    ("Esi", "Agyeman", "F"),
+    ("Kojo", "Addo", "M"),
+    ("Adwoa", "Frimpong", "F"),
+    ("Kwabena", "Osei", "M"),
+    ("Akua", "Antwi", "F"),
+    ("Yaw", "Danquah", "M"),
+    ("Serwaa", "Nyarko", "F"),
+    ("Nana", "Antwi", "M"),
+    ("Efua", "Quarshie", "F"),
+    ("Fiifi", "Amoah", "M"),
+    ("Yaa", "Ofori", "F"),
+    ("Kweku", "Sarpong", "M"),
+    ("Maame", "Adjei", "F"),
+    ("Kwesi", "Baah", "M"),
+    ("Esi", "Adu", "F"),
+]
+
+STUDENT_FIRST_NAMES = [
+    "Kofi", "Ama", "Yaw", "Akosua", "Kwame", "Abena", "Kojo", "Adwoa",
+    "Esi", "Fiifi", "Akua", "Kwesi", "Yaa", "Kwabena", "Serwaa", "Paa",
+    "Efua", "Kweku", "Maame", "Nana",
+]
+STUDENT_LAST_NAMES = [
+    "Owusu", "Boateng", "Asante", "Mensah", "Darko", "Appiah", "Agyeman",
+    "Addo", "Frimpong", "Osei", "Antwi", "Danquah", "Nyarko", "Quarshie",
+    "Amoah", "Ofori", "Sarpong", "Adjei", "Baah", "Adu",
+]
+PARENT_FIRST_NAMES = [
+    "Kwaku", "Afia", "Kwasi", "Nana", "Yaw", "Esi", "Kojo", "Abena",
+    "Kwabena", "Adjoa", "Kwame", "Akosua", "Yaw", "Ama", "Kofi", "Efua",
+    "Kojo", "Serwaa", "Kwesi", "Akua",
+]
+
+
+def _unique_person_name(index, first_names, last_names):
+    """Return a deterministic, non-repeating (first, last) name pair."""
+    first = first_names[index % len(first_names)]
+    last = last_names[(index * 7 + index // len(first_names)) % len(last_names)]
+    return first, last
+
+
 DIVISION_PROGRAMS = {
     settings.DIVISION_NURSERY: "Nursery Section",
     settings.DIVISION_PRIMARY: "Primary Section",
@@ -93,18 +148,22 @@ class DemoData:
     school: School
     superuser: User
     admin: User
-    teachers: dict = field(default_factory=dict)
+    teachers: dict = field(default_factory=dict)  # division -> teacher
+    class_teachers: dict = field(default_factory=dict)  # level -> class teacher
     class_teacher: User | None = None
     dep_head: User | None = None
-    parents: dict = field(default_factory=dict)
+    parents: dict = field(default_factory=dict)  # level -> first Parent
+    parents_by_level: dict = field(default_factory=dict)  # level -> [Parent]
     students: dict = field(default_factory=dict)  # level -> [Student]
     terms: dict = field(default_factory=dict)
     current_term: Term | None = None
     programs: dict = field(default_factory=dict)
     departments: dict = field(default_factory=dict)
-    courses: dict = field(default_factory=dict)  # level -> [Course]
+    courses: dict = field(default_factory=dict)  # level -> current-term [Course]
+    courses_by_term: dict = field(default_factory=dict)  # level -> term -> [Course]
     taken_courses: list = field(default_factory=list)
     results: list = field(default_factory=list)
+    results_by_term: dict = field(default_factory=dict)  # term -> [Result]
     quizzes: list = field(default_factory=list)
     fee_structures: list = field(default_factory=list)
     payments: list = field(default_factory=list)
@@ -122,6 +181,58 @@ def _division_for_level(level: str) -> str:
         if level in levels:
             return division
     return settings.DIVISION_PRIMARY
+
+
+def _bulk_recalculate_class_positions(taken_courses):
+    """Assign ``class_position`` for every TakenCourse in a handful of queries."""
+    groups = {}
+    for tc in taken_courses:
+        key = (
+            tc.course_id,
+            tc.student.level,
+            tc.student.program_id,
+            tc.school_id,
+        )
+        groups.setdefault(key, []).append(tc)
+
+    for group in groups.values():
+        group.sort(
+            key=lambda tc: tc.total if tc.total is not None else Decimal("-1"),
+            reverse=True,
+        )
+        for position, tc in enumerate(group, start=1):
+            tc.class_position = position
+        TakenCourse.objects.bulk_update(
+            group, ["class_position"], batch_size=500
+        )
+
+
+def _bulk_recalculate_overall_positions(results):
+    """Assign ``overall_position`` for every Result in a handful of queries."""
+    groups = {}
+    for result in results:
+        key = (
+            result.term,
+            result.session,
+            result.level,
+            result.school_id,
+        )
+        groups.setdefault(key, []).append(result)
+
+    for group in groups.values():
+        group.sort(
+            key=lambda result: (
+                result.term_average
+                if result.term_average is not None
+                else Decimal("-1")
+            ),
+            reverse=True,
+        )
+        for position, result in enumerate(group, start=1):
+            result.overall_position = position
+        Result.objects.bulk_update(
+            group, ["overall_position"], batch_size=500
+        )
 
 
 def _create_user(username, *, school, password=DEMO_PASSWORD, **extra):
@@ -280,27 +391,35 @@ def build_demo_data(
     data.departments["mathematics"] = maths_department
 
     # ------------------------------------------------------------------
-    # Courses and subject templates
+    # Courses and subject templates (one set of courses per term)
     # ------------------------------------------------------------------
     for level in levels:
         division = _division_for_level(level)
         program = data.programs[division]
-        level_courses = []
-        for subject, prefix, is_core in SUBJECTS:
-            code = f"{prefix}-{_level_code(level)}"
-            course = Course.objects.create(
-                title=subject,
-                code=code,
-                summary=f"{subject} for {level}",
-                program=program,
-                level=level,
-                term=current_term.term,
-                is_core_subject=is_core,
-                is_elective=not is_core,
-                school=school,
-            )
-            level_courses.append(course)
-        data.courses[level] = level_courses
+        data.courses_by_term[level] = {}
+
+        for term_name in term_names:
+            term_code = TERM_SHORT_CODES[term_name]
+            level_courses = []
+            for subject, prefix, is_core in SUBJECTS:
+                code = f"{prefix}-{_level_code(level)}-{term_code}"
+                course = Course.objects.create(
+                    title=subject,
+                    code=code,
+                    summary=f"{subject} for {level} ({term_name} Term)",
+                    program=program,
+                    level=level,
+                    term=term_name,
+                    is_core_subject=is_core,
+                    is_elective=not is_core,
+                    school=school,
+                )
+                level_courses.append(course)
+            data.courses_by_term[level][term_name] = level_courses
+
+        # ``data.courses`` is kept as the current-term view for backwards
+        # compatibility with callers that expect one course list per level.
+        data.courses[level] = data.courses_by_term[level][current_term.term]
 
         SubjectTemplate.objects.create(
             title=f"{level} Core Package",
@@ -314,7 +433,7 @@ def build_demo_data(
         )
 
     # ------------------------------------------------------------------
-    # Users: superuser, admin, teachers, class teacher, department head
+    # Users: superuser, admin, teachers, class teachers, department head
     # ------------------------------------------------------------------
     data.superuser = User.objects.create_superuser(
         username="root",
@@ -333,7 +452,14 @@ def build_demo_data(
         phone="+233200000002",
     )
 
-    for division in DIVISION_PROGRAMS:
+    # Each staff account gets a distinct, realistic name from the pool.
+    staff_profiles = iter(TEACHER_PROFILES)
+
+    def next_staff():
+        return next(staff_profiles)
+
+    for division_index, division in enumerate(DIVISION_PROGRAMS):
+        first_name, last_name, gender = next_staff()
         teacher = _create_user(
             f"teacher.{division.lower()}",
             school=school,
@@ -341,26 +467,37 @@ def build_demo_data(
             is_teacher=True,
             division=division,
             department=data.programs[division],
-            gender="M",
-            phone="+233200000010",
+            first_name=first_name,
+            last_name=last_name,
+            gender=gender,
+            phone=f"+2332000001{division_index:02d}",
         )
         data.teachers[division] = teacher
 
-    primary_levels = settings.DIVISION_LEVEL_MAPPING[settings.DIVISION_PRIMARY]
-    data.class_teacher = _create_user(
-        "class.teacher",
-        school=school,
-        is_lecturer=True,
-        is_teacher=True,
-        is_class_teacher=True,
-        division=settings.DIVISION_PRIMARY,
-        assigned_level=primary_levels[0],
-        department=data.programs[settings.DIVISION_PRIMARY],
-        gender="F",
-        phone="+233200000011",
-    )
-    data.teachers["class_teacher"] = data.class_teacher
+    # One class teacher per class/level. This also auto-allocates the current
+    # term's core subjects to the teacher through course.signals.
+    for level_index, level in enumerate(levels):
+        first_name, last_name, gender = next_staff()
+        division = _division_for_level(level)
+        class_teacher = _create_user(
+            f"teacher.class.{_level_code(level).lower()}",
+            school=school,
+            is_lecturer=True,
+            is_teacher=True,
+            is_class_teacher=True,
+            division=division,
+            assigned_level=level,
+            department=data.programs[division],
+            first_name=first_name,
+            last_name=last_name,
+            gender=gender,
+            phone=f"+2332000002{level_index:02d}",
+        )
+        data.class_teachers[level] = class_teacher
+        if data.class_teacher is None:
+            data.class_teacher = class_teacher
 
+    first_name, last_name, gender = next_staff()
     data.dep_head = _create_user(
         "dept.head",
         school=school,
@@ -369,24 +506,29 @@ def build_demo_data(
         is_dep_head=True,
         division=settings.DIVISION_JHS,
         department=maths_department,
-        gender="M",
+        first_name=first_name,
+        last_name=last_name,
+        gender=gender,
         phone="+233200000012",
     )
     DepartmentHead.objects.create(user=data.dep_head, department=maths_department)
 
     # ------------------------------------------------------------------
-    # Students and parents
+    # Students and parents (one parent per student)
     # ------------------------------------------------------------------
-    first_names = ["Kofi", "Ama", "Yaw", "Akosua", "Kwame", "Abena", "Kojo", "Adwoa"]
-    last_names = ["Owusu", "Boateng", "Asante", "Mensah", "Darko", "Appiah"]
+    student_global_index = 0
 
     for level_index, level in enumerate(levels):
         division = _division_for_level(level)
         program = data.programs[division]
         data.students[level] = []
+        data.parents_by_level[level] = []
+
         for i in range(students_per_level):
-            first_name = first_names[(level_index + i) % len(first_names)]
-            last_name = last_names[(level_index + i) % len(last_names)]
+            first_name, last_name = _unique_person_name(
+                student_global_index, STUDENT_FIRST_NAMES, STUDENT_LAST_NAMES
+            )
+            gender = "M" if student_global_index % 2 == 0 else "F"
             username = f"student.{_level_code(level).lower()}.{i + 1}"
             user = _create_user(
                 username,
@@ -395,7 +537,7 @@ def build_demo_data(
                 division=division,
                 first_name=first_name,
                 last_name=last_name,
-                gender="M" if i % 2 == 0 else "F",
+                gender=gender,
                 phone=f"+2332000{level_index:02d}{i:03d}",
             )
             student = Student.objects.create(
@@ -406,93 +548,185 @@ def build_demo_data(
             )
             data.students[level].append(student)
 
-        # One parent per level, linked to the first student of that level.
-        parent_user = _create_user(
-            f"parent.{_level_code(level).lower()}",
-            school=school,
-            is_parent=True,
-            first_name="Parent",
-            last_name=last_name,
-            gender="F",
-            phone=f"+2332000{level_index:02d}999",
-        )
-        parent = Parent.objects.create(
-            user=parent_user,
-            student=data.students[level][0],
-            first_name="Parent",
-            last_name=last_name,
-            phone=parent_user.phone,
-            email=parent_user.email,
-            relation_ship="Mother",
-        )
-        data.parents[level] = parent
+            # One parent per student so every learner has a guardian account.
+            relationship = "Mother" if student_global_index % 2 == 0 else "Father"
+            parent_gender = "F" if relationship == "Mother" else "M"
+            parent_first = PARENT_FIRST_NAMES[student_global_index % len(PARENT_FIRST_NAMES)]
+            parent_username = f"parent.{_level_code(level).lower()}.{i + 1}"
+            parent_user = _create_user(
+                parent_username,
+                school=school,
+                is_parent=True,
+                first_name=parent_first,
+                last_name=last_name,
+                gender=parent_gender,
+                phone=f"+2332001{level_index:02d}{i:03d}",
+            )
+            parent = Parent.objects.create(
+                user=parent_user,
+                student=student,
+                first_name=parent_first,
+                last_name=last_name,
+                phone=parent_user.phone,
+                email=parent_user.email,
+                relation_ship=relationship,
+            )
+            data.parents_by_level[level].append(parent)
+
+            student_global_index += 1
+
+        data.parents[level] = data.parents_by_level[level][0]
+        data.class_teacher = data.class_teacher or data.class_teachers.get(level)
 
     # ------------------------------------------------------------------
-    # Course allocations
+    # Course allocations: division coordinators + one class teacher per class
     # ------------------------------------------------------------------
+    all_courses_by_level = {
+        level: [
+            course
+            for term_name in term_names
+            for course in data.courses_by_term[level][term_name]
+        ]
+        for level in levels
+    }
+
     for division, teacher in data.teachers.items():
-        if division not in DIVISION_PROGRAMS:
-            continue
         division_levels = settings.DIVISION_LEVEL_MAPPING[division]
-        courses = [c for level in division_levels for c in data.courses.get(level, [])]
+        courses = [
+            course
+            for level in division_levels
+            for course in all_courses_by_level.get(level, [])
+        ]
         if not courses:
             continue
-        allocation = CourseAllocation.objects.create(teacher=teacher)
+        allocation, _ = CourseAllocation.objects.get_or_create(teacher=teacher)
+        allocation.courses.set(courses)
+
+    for level, teacher in data.class_teachers.items():
+        courses = all_courses_by_level.get(level, [])
+        if not courses:
+            continue
+        allocation, _ = CourseAllocation.objects.get_or_create(teacher=teacher)
         allocation.courses.set(courses)
 
     # ------------------------------------------------------------------
-    # Enrollment (TakenCourse) and term results
+    # Enrollment (TakenCourse) and results for every term
     # ------------------------------------------------------------------
+    # Ability tiers create a realistic spread: some learners pass comfortably,
+    # some sit just below the cut-off and some fail and repeat the class.
+    ability_tiers = [44, 58, 30, 66, 50, 72, 47, 63, 55, 80]
+    term_offsets = {
+        settings.FIRST_TERM: -2,
+        settings.SECOND_TERM: 1,
+        settings.THIRD_TERM: 3,
+    }
+
+    # Warm the grade-config cache on the shared School instance so the overridden
+    # ``TakenCourse.save`` does not re-query it for every one of the thousands
+    # of seeded rows.
+    getattr(school, "grade_config", None)
+
     for level_index, level in enumerate(levels):
-        level_courses = data.courses[level]
-        for student_index, student in enumerate(data.students[level]):
-            for course_index, course in enumerate(level_courses):
-                base = 45 + ((level_index * 7 + student_index * 11 + course_index * 5) % 50)
-                # ``course.signals`` auto-enrols students in core subjects, so
-                # reuse any existing row rather than creating duplicates.
-                tc, _ = TakenCourse.objects.get_or_create(
-                    student=student,
-                    course=course,
-                    school=school,
+        for term_name in term_names:
+            term_courses = data.courses_by_term[level][term_name]
+            term_taken_by_student = {}
+
+            for student_index, student in enumerate(data.students[level]):
+                ability = ability_tiers[student_index % len(ability_tiers)]
+                student_term_taken = term_taken_by_student.setdefault(
+                    student.pk, []
                 )
-                tc.classwork_score = Decimal(str(base))
-                tc.midsem_score = Decimal(str(max(0, base - 3)))
-                tc.assignment_score = Decimal(str(max(0, base - 2)))
-                tc.attendance_score = Decimal("90.00")
-                tc.exam_score = Decimal(str(max(0, base - 1)))
-                tc.save()
-                data.taken_courses.append(tc)
+                for course_index, course in enumerate(term_courses):
+                    jitter = (
+                        (student_index * 3 + course_index * 5 + level_index) % 7
+                    ) - 3
+                    base = max(
+                        20, min(98, ability + term_offsets[term_name] + jitter)
+                    )
+                    # ``course.signals`` auto-enrols students in current-term
+                    # core subjects, so reuse any existing row.
+                    tc, _ = TakenCourse.objects.get_or_create(
+                        student=student,
+                        course=course,
+                        school=school,
+                    )
+                    # Keep the already-cached School instance (and its cached
+                    # grade config) attached to rows that were fetched back.
+                    tc.school = school
+                    tc.student = student
+                    tc.classwork_score = Decimal(str(min(100, base + 2)))
+                    tc.midsem_score = Decimal(str(max(0, base - 2)))
+                    tc.assignment_score = Decimal(str(base))
+                    tc.attendance_score = Decimal(
+                        str(min(100, 82 + ((student_index + course_index) % 12)))
+                    )
+                    tc.exam_score = Decimal(str(max(0, base - 1)))
+                    tc.save(update_position=False)
+                    data.taken_courses.append(tc)
+                    student_term_taken.append(tc)
 
-    for level_index, level in enumerate(levels):
-        for student in data.students[level]:
-            avg = TakenCourse.objects.filter(
-                student=student,
-                course__term=current_term.term,
-            )
-            term_average = (
-                sum(tc.total for tc in avg) / Decimal(avg.count())
-                if avg.count()
-                else Decimal("0.00")
-            )
-            result = Result.objects.create(
-                student=student,
-                term_average=round(term_average, 2),
-                term=current_term.term,
-                session=academic_year,
-                level=level,
-                school=school,
-                days_present=attendance_days - 1,
-                days_absent=1,
-                total_attendance_days=attendance_days,
-            )
-            data.results.append(result)
+            term_results = []
+            for student in data.students[level]:
+                term_taken = term_taken_by_student.get(student.pk, [])
+                term_average = (
+                    sum((tc.total for tc in term_taken), Decimal("0.00"))
+                    / Decimal(len(term_taken))
+                    if term_taken
+                    else Decimal("0.00")
+                )
+                result = Result(
+                    student=student,
+                    term_average=round(term_average, 2),
+                    term=term_name,
+                    session=academic_year,
+                    level=level,
+                    school=school,
+                    days_present=attendance_days - 1,
+                    days_absent=1,
+                    total_attendance_days=attendance_days,
+                )
+                result.save(update_position=False)
+                data.results.append(result)
+                term_results.append(result)
+            data.results_by_term.setdefault(term_name, []).extend(term_results)
 
-    # Recalculate positions after all rows exist so order-independent inserts
-    # produce correct standings.
-    for tc in data.taken_courses:
-        tc.calculate_class_position()
-    for result in data.results:
-        result.calculate_overall_position()
+    # Promotion is decided from the annual average across the three terms.
+    policy = getattr(school, "promotion_policy", None)
+    if policy:
+        results_by_student = {}
+        for result in data.results:
+            results_by_student.setdefault(result.student_id, {})[
+                result.term
+            ] = result
+
+        for level in levels:
+            for student in data.students[level]:
+                per_term = results_by_student.get(student.pk, {})
+                third_term_result = per_term.get(settings.THIRD_TERM)
+                if not third_term_result:
+                    continue
+                scores = [
+                    per_term[term_name].term_average or Decimal("0.00")
+                    for term_name in term_names
+                    if term_name in per_term
+                ]
+                annual_average = sum(scores) / Decimal(len(term_names))
+                status = policy.evaluate(annual_average)
+                third_term_result.promotion_status = status
+                third_term_result.promoted = status in (
+                    "AUTO_PASS",
+                    "MANUAL_PASS",
+                )
+                third_term_result.save(
+                    update_fields=["promotion_status", "promoted"],
+                    update_position=False,
+                )
+
+    # Recalculate positions in bulk after all rows exist so order-independent
+    # inserts produce correct standings and the seed does not issue a position
+    # query for every single row.
+    _bulk_recalculate_class_positions(data.taken_courses)
+    _bulk_recalculate_overall_positions(data.results)
 
     # ------------------------------------------------------------------
     # Attendance records and summaries
@@ -505,7 +739,9 @@ def build_demo_data(
         day_cursor -= timedelta(days=1)
 
     for level in levels:
-        teacher = data.teachers[_division_for_level(level)]
+        teacher = data.class_teachers.get(level) or data.teachers[
+            _division_for_level(level)
+        ]
         level_students = data.students[level]
         for day in attendance_dates:
             session = AttendanceSessionModel.objects.create(
@@ -704,7 +940,8 @@ def build_demo_data(
                         day_of_week=day,
                         period=period,
                         subject=course,
-                        teacher=data.teachers[division],
+                        teacher=data.class_teachers.get(level)
+                        or data.teachers[division],
                         classroom=f"Room {level}",
                         notes="Seeded timetable slot",
                     )
@@ -775,7 +1012,9 @@ def build_demo_data(
     if resources:
         for level in levels[:2]:
             course = data.courses[level][0]
-            teacher = data.teachers[_division_for_level(level)]
+            teacher = data.class_teachers.get(level) or data.teachers[
+                _division_for_level(level)
+            ]
             CourseFile.objects.create(
                 title=f"{course.title} Class Notes",
                 course=course,
@@ -801,7 +1040,9 @@ def build_demo_data(
     # ------------------------------------------------------------------
     if levels:
         first_level = levels[0]
-        teacher = data.teachers[_division_for_level(first_level)]
+        teacher = data.class_teachers.get(first_level) or data.teachers[
+            _division_for_level(first_level)
+        ]
         for week, status in [(1, "SUBMITTED"), (2, "DRAFT")]:
             LessonNote.objects.create(
                 teacher=teacher,
@@ -873,7 +1114,9 @@ def build_demo_data(
     # Workflow records: result edits and promotion requests
     # ------------------------------------------------------------------
     if data.results:
-        teacher = data.teachers[settings.DIVISION_PRIMARY]
+        teacher = data.class_teachers.get(levels[0]) or data.teachers[
+            settings.DIVISION_PRIMARY
+        ]
         first_course = data.courses[levels[0]][0]
         ResultEditRequest.objects.create(
             teacher=teacher,
@@ -886,9 +1129,24 @@ def build_demo_data(
             school=school,
         )
 
+        third_term_results = data.results_by_term.get(
+            settings.THIRD_TERM, data.results
+        )
         borderline = next(
-            (r for r in data.results if r.term_average is not None and r.term_average < Decimal("50")),
-            data.results[0],
+            (
+                result
+                for result in third_term_results
+                if result.promotion_status == "BORDERLINE"
+            ),
+            next(
+                (
+                    result
+                    for result in third_term_results
+                    if result.term_average is not None
+                    and result.term_average < Decimal("50")
+                ),
+                third_term_results[0],
+            ),
         )
         PromotionRequest.objects.create(
             student=borderline.student,
