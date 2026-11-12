@@ -9,6 +9,7 @@ from .views import (
     school_settings,
     school_settings_identity,
     school_settings_grading,
+    school_settings_student_ids,
     school_settings_promotion,
     promotion_requests_list,
     promotion_request_review,
@@ -28,6 +29,7 @@ urlpatterns = [
     path("settings/", school_settings, name="school_settings"),
     path("settings/identity/", school_settings_identity, name="school_settings_identity"),
     path("settings/grading/", school_settings_grading, name="school_settings_grading"),
+    path("settings/student-ids/", school_settings_student_ids, name="school_settings_student_ids"),
     path("settings/promotion/", school_settings_promotion, name="school_settings_promotion"),
 
     # Promotion Requests

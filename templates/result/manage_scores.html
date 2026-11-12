@@ -9,15 +9,103 @@
     <div class="row">
         <div class="col-12 mb-4">
             <h2 class="h3 mb-2 text-gray-800">{{ title }}</h2>
-            <p class="mb-4">Select a class and subject to manage student scores.</p>
+            <p class="mb-4">{% if is_admin %}{% trans 'Filter by division and class to review student scores.' %}{% else %}{% trans 'Select a class and subject to manage student scores.' %}{% endif %}</p>
         </div>
     </div>
 
+    {% if is_admin %}
+    <ul class="nav nav-pills mb-3" role="tablist" aria-label="{% trans 'Filter scores by division' %}">
+        {% for division_code, division_name in divisions %}
+        <li class="nav-item" role="presentation">
+            <a class="nav-link {% if current_division == division_code %}active{% endif %}"
+               href="?division={{ division_code }}" role="tab" aria-selected="{% if current_division == division_code %}true{% else %}false{% endif %}">
+                {{ division_name }}
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if is_admin %}
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-end">
+                <input type="hidden" name="division" value="{{ current_division }}">
+                <div class="col-md-5 col-lg-4">
+                    <label for="adminLevelSelect" class="form-label fw-semibold">{% trans 'Filter by class' %}</label>
+                    <select class="form-select" id="adminLevelSelect" name="level" onchange="this.form.submit()">
+                        <option value="">{% trans 'Choose a class' %}</option>
+                        {% for code, name in levels %}
+                        <option value="{{ code }}" {% if selected_level == code %}selected{% endif %}>{{ name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if selected_level %}
+        {% for section in score_sections %}
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div>
+                    <h3 class="h5 mb-0">{{ section.course.title }}</h3>
+                    <small class="text-muted">{{ section.course.code }} · {{ section.course.level }}</small>
+                </div>
+                <span class="badge bg-light text-dark">{{ section.rows|length }} {% trans 'students' %}</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>{% trans 'Student' %}</th>
+                                {% for component in score_configuration.components %}
+                                <th class="text-center">{{ component.label }}{% if score_configuration.valid %} ({{ component.weight }}%){% endif %}</th>
+                                {% endfor %}
+                                <th class="text-center">{% trans 'Total' %}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in section.rows %}
+                            <tr>
+                                <td>{{ forloop.counter }}</td>
+                                <td>
+                                    <div class="fw-semibold">{{ row.taken_course.student.student.get_full_name }}</div>
+                                    <small class="text-muted">{{ row.taken_course.student.student.username }}</small>
+                                </td>
+                                {% for score_input in row.inputs %}
+                                <td class="text-center">{{ score_input.value|default_if_none:'0' }}</td>
+                                {% endfor %}
+                                <td class="text-center fw-bold">{{ row.taken_course.total }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="{{ score_configuration.components|length|add:3 }}" class="text-center text-muted py-4">{% trans 'No student scores found for this subject.' %}</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="alert alert-info">{% trans 'No subjects were found for this class.' %}</div>
+        {% endfor %}
+    {% else %}
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body text-center text-muted py-5">
+            <i class="fas fa-filter fa-2x mb-3"></i>
+            <p class="mb-0">{% trans 'Choose a class to view its student scores.' %}</p>
+        </div>
+    </div>
+    {% endif %}
+
+    {% else %}
     <div class="row justify-content-center">
         <div class="col-xl-6 col-lg-8 col-md-10">
             <div class="card shadow mb-4">
                 <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-                    <h6 class="m-0 font-weight-bold text-primary">Score Entry Selection</h6>
+                    <h6 class="m-0 font-weight-bold text-primary">{% trans 'Score Entry Selection' %}</h6>
                 </div>
                 <div class="card-body">
                     {% if levels %}
@@ -30,7 +118,7 @@
                                 <option value="{{ code }}">{{ name }}</option>
                                 {% endfor %}
                             </select>
-                            <small class="text-muted">Only classes with subjects you can manage are shown.</small>
+                            <small class="text-muted">{% trans 'Only classes with subjects allocated to you are shown.' %}</small>
                         </div>
 
                         <div class="mb-4">
@@ -45,7 +133,7 @@
 
                         <div class="d-grid gap-2">
                             <button type="submit" class="btn btn-primary btn-lg">
-                                <i class="fas fa-edit me-2"></i> Enter Scores
+                                <i class="fas fa-edit me-2"></i> {% trans 'Enter Scores' %}
                             </button>
                         </div>
                     </form>
@@ -60,6 +148,7 @@
             </div>
         </div>
     </div>
+    {% endif %}
 </div>
 {% endblock content %}
 

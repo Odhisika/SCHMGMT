@@ -36,10 +36,12 @@
     {% csrf_token %}
     <div class="d-flex justify-content-between align-items-center mb-3">
         <div class="btn-group">
-            {% if not is_locked %}
+            {% if can_edit_scores and not is_locked %}
             <button title="Save Score" type="submit" class="btn btn-primary"><i class="fas fa-save"></i> {% trans 'Save Scores' %}</button>
-            {% else %}
+            {% elif can_edit_scores %}
             <button class="btn btn-secondary" disabled><i class="fas fa-lock"></i> {% trans 'Results Locked' %}</button>
+            {% else %}
+            <span class="badge bg-secondary">{% trans 'View only' %}</span>
             {% endif %}
             
             <a target="_blank" href="{% url 'result_sheet_pdf_view' id=course.id %}" class="btn btn-warning">
@@ -59,9 +61,9 @@
                     {% endif %}
                 </div>
             {% else %}
-                <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#requestEditModal">
+                {% if can_edit_scores %}<button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#requestEditModal">
                     <i class="fas fa-unlock-alt"></i> {% trans 'Request Admin to Unlock' %}
-                </button>
+                </button>{% endif %}
             {% endif %}
         {% endif %}
     </div>
@@ -105,10 +107,10 @@
                         </div>
                     </td>
                     <td>
-                        <input type="number" step="0.01" max="40" name="{{ student.id }}-class_score" value="{{ student.class_score }}" class="form-control form-control-sm" style="width: 100px;" {% if is_locked %}disabled{% endif %}>
+                        <input type="number" step="0.01" max="40" name="{{ student.id }}-class_score" value="{{ student.class_score }}" class="form-control form-control-sm" style="width: 100px;" {% if is_locked or not can_edit_scores %}disabled{% endif %}>
                     </td>
                     <td>
-                        <input type="number" step="0.01" max="60" name="{{ student.id }}-exam_score" value="{{ student.exam_score }}" class="form-control form-control-sm" style="width: 100px;" {% if is_locked %}disabled{% endif %}>
+                        <input type="number" step="0.01" max="60" name="{{ student.id }}-exam_score" value="{{ student.exam_score }}" class="form-control form-control-sm" style="width: 100px;" {% if is_locked or not can_edit_scores %}disabled{% endif %}>
                     </td>
                     <td class="fw-bold fs-6">{{ student.total }}</td>
                     <td><span class="badge {% if student.grade == '9' %}bg-danger{% elif student.grade <= '4' %}bg-success{% else %}bg-warning{% endif %}">{{ student.grade }}</span></td>
@@ -127,6 +129,7 @@
     </div>
 </form>
 
+{% if can_edit_scores %}
 <!-- Unlock Request Modal -->
 <div class="modal fade" id="requestEditModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
@@ -151,5 +154,6 @@
         </form>
     </div>
 </div>
+{% endif %}
 
 {% endblock content %}

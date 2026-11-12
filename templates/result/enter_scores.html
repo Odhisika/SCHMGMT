@@ -41,12 +41,12 @@
     <div class="card shadow mb-4">
         <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
             <h6 class="m-0 font-weight-bold text-primary">Student Scores</h6>
-            <button id="saveScoresBtn" class="btn btn-primary btn-sm" type="button">
+            {% if can_edit_scores %}<button id="saveScoresBtn" class="btn btn-primary btn-sm" type="button">
                 <i class="fas fa-save fa-sm text-white-50"></i> Save All Changes
-            </button>
+            </button>{% else %}<span class="badge bg-secondary">{% trans 'View only' %}</span>{% endif %}
         </div>
         <div class="card-body">
-            <p class="text-muted small">Enter each mark out of 100. The contribution column shows how much it adds toward that assessment's configured weight.</p>
+            {% if can_edit_scores %}<p class="text-muted small">Enter each mark out of 100. The contribution column shows how much it adds toward that assessment's configured weight.</p>{% else %}<p class="text-muted small">{% trans 'Scores are displayed in view-only mode.' %}</p>{% endif %}
             <div class="table-responsive">
                 <table class="table table-bordered table-hover" id="scoresTable" width="100%" cellspacing="0" data-weights-url="{% url 'score_weights' %}">
                     <thead class="table-light">
@@ -71,7 +71,7 @@
                             <td>
                                 <input type="number" class="form-control score-input" data-component="{{ score_input.key }}"
                                        value="{{ score_input.value }}" min="0" max="100" step="0.01" inputmode="decimal"
-                                       aria-label="{{ score_input.key }} mark for {{ row.taken_course.student }}">
+                                       aria-label="{{ score_input.key }} mark for {{ row.taken_course.student }}" {% if not can_edit_scores %}readonly{% endif %}>
                                 <small class="text-muted contribution" data-contribution="{{ score_input.key }}"></small>
                                 <small class="text-danger score-error d-none" data-error="{{ score_input.key }}">Enter a mark from 0 to 100.</small>
                             </td>
@@ -97,6 +97,7 @@
 document.addEventListener('DOMContentLoaded', function () {
     const table = document.getElementById('scoresTable');
     const saveBtn = document.getElementById('saveScoresBtn');
+    if (!table || !saveBtn) return;
     const notice = document.getElementById('weightChangeNotice');
     const csrfToken = '{{ csrf_token }}';
     let configuration = JSON.parse(document.getElementById('scoreConfiguration').textContent);

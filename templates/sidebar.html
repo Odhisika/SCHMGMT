@@ -130,7 +130,7 @@
 				{% endif %}
 				{% if request.user.is_superuser or request.user.is_school_admin or request.user.is_lecturer or request.user.is_teacher %}
 				<li class="{% if request.path == ascore or '/result/enter-scores/' in request.path %}active{% endif %}">
-					<a href="{% url 'manage_scores' %}"><i class="fas fa-table"></i>{% trans 'Manage Scores' %}</a>
+					<a href="{% url 'manage_scores' %}"><i class="fas fa-table"></i>{% if request.user.is_superuser or request.user.is_school_admin %}{% trans 'View Scores' %}{% else %}{% trans 'Manage Scores' %}{% endif %}</a>
 				</li>
 				{% endif %}
 				{% if request.user.is_superuser or request.user.is_school_admin %}

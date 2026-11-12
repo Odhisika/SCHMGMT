@@ -34,7 +34,6 @@ from accounts.forms import (
     StudentAddForm,
 )
 from accounts.models import Parent, PasswordResetAudit, Student, User, NON_TEACHING_POSITIONS
-from school.forms import StudentIDFormatForm
 from core.models import Semester
 from course.models import Course, CourseAllocation, Program
 from result.models import TakenCourse, Result
@@ -231,32 +230,12 @@ def profile_single(request, user_id):
 @login_required
 @admin_required
 def admin_panel(request):
-    student_id_format_form = None
-    student_id_next = {"Nursery": 1, "Primary": 1, "JHS": 1}
-    if request.school:
-        if request.method == "POST" and request.POST.get("action") == "save_student_id_formats":
-            student_id_format_form = StudentIDFormatForm(
-                request.POST, instance=request.school
-            )
-            if student_id_format_form.is_valid():
-                student_id_format_form.save()
-                messages.success(request, "Student ID formats saved.")
-                return redirect("admin_panel")
-            messages.error(request, "Please correct the student ID format errors below.")
-        else:
-            student_id_format_form = StudentIDFormatForm(instance=request.school)
-        for sequence in request.school.student_id_sequences.all():
-            student_id_next[sequence.division] = sequence.last_number + 1
-
     reset_events = PasswordResetAudit.objects.select_related("target_user", "performed_by")
     if not request.user.is_superuser:
         reset_events = reset_events.filter(school=request.school)
     return render(request, "setting/admin_panel.html", {
         "title": "Admin Panel",
         "password_reset_events": reset_events[:10],
-        "student_id_format_form": student_id_format_form,
-        "school_code": f"S{request.school.pk}" if request.school else "S1",
-        "student_id_next": student_id_next,
     })
 
 

@@ -12,7 +12,7 @@ from django.conf import settings
 from .models import School, GradeWeightConfig, PromotionPolicy
 from .forms import (
     SchoolForm, SchoolOnboardingForm, SchoolStatusForm,
-    SchoolIdentityForm, GradeWeightForm, PromotionPolicyForm,
+    SchoolIdentityForm, StudentIDFormatForm, GradeWeightForm, PromotionPolicyForm,
 )
 from accounts.models import User
 from core.models import Notification
@@ -183,6 +183,37 @@ def school_settings_identity(request):
         'school': school,
         'pending_count': pending_count,
         'title': _('School Settings — Identity'),
+    })
+
+
+@_school_admin_required
+def school_settings_student_ids(request):
+    """Configure school-wide student ID generation patterns."""
+    school = request.school
+    if request.method == 'POST':
+        student_id_format_form = StudentIDFormatForm(request.POST, instance=school)
+        if student_id_format_form.is_valid():
+            student_id_format_form.save()
+            messages.success(request, _("Student ID formats saved."))
+            return redirect('school_settings_student_ids')
+        messages.error(request, _("Please correct the student ID format errors below."))
+    else:
+        student_id_format_form = StudentIDFormatForm(instance=school)
+
+    student_id_next = {"Nursery": 1, "Primary": 1, "JHS": 1}
+    for sequence in school.student_id_sequences.all():
+        student_id_next[sequence.division] = sequence.last_number + 1
+
+    from result.models import PromotionRequest
+    pending_count = PromotionRequest.objects.filter(school=school, status='PENDING').count()
+    return render(request, 'school/school_settings.html', {
+        'active_tab': 'student_ids',
+        'student_id_format_form': student_id_format_form,
+        'student_id_next': student_id_next,
+        'school_code': f"S{school.pk}",
+        'school': school,
+        'pending_count': pending_count,
+        'title': _('School Settings — Student ID Formats'),
     })
 
 
