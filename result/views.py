@@ -200,6 +200,17 @@ def add_score_for(request, id):
     )
     current_session = current_term.year
     course = get_object_or_404(Course, pk=id, school=request.school)
+    is_admin = request.user.is_superuser or request.user.is_school_admin
+
+    if not is_admin and not course.allocated_course.filter(
+        teacher=request.user, teacher__school=request.school
+    ).exists():
+        messages.error(request, f"You are not authorized to view scores for {course.title}.")
+        return redirect("manage_scores")
+
+    if is_admin and request.method == "POST":
+        messages.error(request, "Administrators can view scores but cannot edit them.")
+        return redirect("add_score_for", id=id)
 
     # All normal score entry uses the weighted interface. The legacy page is
     # only retained for the post-publication amendment workflow below.
@@ -263,13 +274,15 @@ def add_score_for(request, id):
             .filter(course__term=current_term.term)
         )
         context = {
-            "title": "Submit Score",
+            "title": "View Scores" if is_admin else "Submit Score",
             "courses": courses,
             "course": course,
             "students": students,
             "current_session": current_session,
             "current_term": current_term,
             "is_locked": is_locked,
+            "can_edit_scores": not is_admin,
+            "is_admin": is_admin,
             "edit_request": edit_request,
             "allocated_teacher": allocated_teacher,
             "ResultEditRequest": ResultEditRequest,
@@ -1138,7 +1151,12 @@ def _score_rows(taken_courses, components):
             value = getattr(taken_course, component["field"])
             if component["key"] == "class_test" and not value and taken_course.quiz_score:
                 value = taken_course.quiz_score
-            inputs.append({"key": component["key"], "value": value})
+            inputs.append({
+                "key": component["key"],
+                "label": component["label"],
+                "weight": component["weight"],
+                "value": value,
+            })
         rows.append({"taken_course": taken_course, "inputs": inputs})
     return rows
 
@@ -1155,15 +1173,26 @@ def manage_scores_dashboard(request):
 
     # Get subjects taught by teacher (strictly allocated)
     is_admin = request.user.is_superuser or request.user.is_school_admin
+    divisions = [
+        (settings.DIVISION_NURSERY, _("Nursery/Pre-School")),
+        (settings.DIVISION_PRIMARY, _("Primary School")),
+        (settings.DIVISION_JHS, _("JHS")),
+    ]
     if is_admin:
-        # Admins see all courses in their school if they navigate here
+        # Admins can view courses across the school, narrowed by division.
+        current_division = request.GET.get("division", settings.DIVISION_NURSERY)
+        if current_division not in dict(divisions):
+            current_division = settings.DIVISION_NURSERY
         subjects = Course.objects.filter(school=request.school).distinct()
+        division_levels = settings.DIVISION_LEVEL_MAPPING.get(current_division, [])
+        subjects = subjects.filter(level__in=division_levels)
     else:
         # Filter strictly by teacher allocation, within this school
         subjects = Course.objects.filter(
             school=request.school,
             allocated_course__teacher=request.user,
         ).distinct()
+        current_division = None
 
     # Courses are term-specific, so the entry screen only concerns the
     # currently active term.
@@ -1178,9 +1207,34 @@ def manage_scores_dashboard(request):
     # Map levels to settings choices for labels
     levels = [l for l in settings.LEVEL_CHOICES if l[0] in allocated_levels]
 
+    selected_level = ""
+    score_configuration = None
+    score_sections = []
+    if is_admin:
+        requested_level = request.GET.get("level", "")
+        if requested_level in allocated_levels:
+            selected_level = requested_level
+            score_configuration = _score_configuration(request.school)
+            for course in subjects.filter(level=selected_level).order_by("title"):
+                taken_courses = TakenCourse.objects.filter(
+                    course=course, school=request.school
+                ).select_related("student", "student__student").order_by(
+                    "student__student__last_name", "student__student__first_name"
+                )
+                score_sections.append({
+                    "course": course,
+                    "rows": _score_rows(taken_courses, score_configuration["components"]),
+                })
+
     context = {
         "levels": levels,
         "subjects": subjects,
+        "is_admin": is_admin,
+        "divisions": divisions if is_admin else [],
+        "current_division": current_division,
+        "selected_level": selected_level,
+        "score_configuration": score_configuration,
+        "score_sections": score_sections,
         "title": "Manage Scores",
     }
     return render(request, "result/manage_scores.html", context)
@@ -1210,10 +1264,12 @@ def enter_scores(request, level):
         )
     
     # Authorization Check: Ensure teacher is allocated to this course
-    if not (request.user.is_superuser or request.user.is_school_admin):
+    is_admin = request.user.is_superuser or request.user.is_school_admin
+    if not is_admin:
         # Check if this course is in teacher's allocations
-        from course.models import CourseAllocation
-        if not course.allocated_course.filter(teacher=request.user).exists():
+        if not course.allocated_course.filter(
+            teacher=request.user, teacher__school=request.school
+        ).exists():
             messages.error(request, f"You are not authorized to enter scores for {course.title}.")
             return HttpResponseRedirect(reverse_lazy('manage_scores'))
     
@@ -1233,8 +1289,10 @@ def enter_scores(request, level):
         "taken_courses": taken_courses,
         "score_rows": _score_rows(taken_courses, score_configuration["components"]),
         "score_configuration": score_configuration,
+        "can_edit_scores": not is_admin,
+        "is_admin": is_admin,
         "current_term": current_term,
-        "title": f"Enter Scores - {course.title} ({level})",
+        "title": f"{'View' if is_admin else 'Enter'} Scores - {course.title} ({level})",
     }
     return render(request, "result/enter_scores.html", context)
 
@@ -1256,6 +1314,12 @@ def save_scores(request):
 
     if request.method != "POST":
         return JsonResponse({"status": "error", "message": "Invalid method"}, status=405)
+
+    if request.user.is_superuser or request.user.is_school_admin:
+        return JsonResponse({
+            "status": "error",
+            "message": "Administrators can view scores but cannot edit them.",
+        }, status=403)
 
     try:
         data = json.loads(request.body)
@@ -1303,7 +1367,9 @@ def save_scores(request):
         if not taken_course:
             errors.append(f"Student score row {tc_id} was not found.")
             continue
-        if not is_admin and not taken_course.course.allocated_course.filter(teacher=request.user).exists():
+        if not taken_course.course.allocated_course.filter(
+            teacher=request.user, teacher__school=request.school
+        ).exists():
             errors.append(f"You are not authorized to edit scores for {taken_course.course}.")
             continue
 

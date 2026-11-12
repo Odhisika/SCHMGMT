@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load i18n %}
+{% load crispy_forms_tags %}
 
 {% block title %}{% trans 'School Settings' %} | {{ school.name }}{% endblock %}
 
@@ -270,6 +271,9 @@
           <a class="nav-link {% if active_tab == 'grading' %}active{% endif %}" href="{% url 'school_settings_grading' %}">
             <i class="fas fa-chart-pie"></i> {% trans 'Grade Weights' %}
           </a>
+          <a class="nav-link {% if active_tab == 'student_ids' %}active{% endif %}" href="{% url 'school_settings_student_ids' %}">
+            <i class="fas fa-id-card"></i> {% trans 'Student ID Formats' %}
+          </a>
           <a class="nav-link {% if active_tab == 'promotion' %}active{% endif %}" href="{% url 'school_settings_promotion' %}">
             <i class="fas fa-stairs"></i> {% trans 'Promotion Rules' %}
           </a>
@@ -477,6 +481,40 @@
               <i class="fas fa-save me-2"></i> {% trans 'Apply Grade System' %}
             </button>
           </div>
+        </form>
+
+        {% elif active_tab == 'student_ids' %}
+        <div class="d-flex align-items-center justify-content-between mb-4">
+          <div>
+            <h3 class="fw-bold m-0 text-dark">{% trans 'Student ID Formats' %}</h3>
+            <p class="text-muted mb-0">{% trans 'Choose the prefixes and ID patterns used when new student accounts are created.' %}</p>
+          </div>
+        </div>
+        <form method="post" action="{% url 'school_settings_student_ids' %}">
+          {% csrf_token %}
+          <div class="border rounded p-3 mb-3">
+            <h5 class="h6">{% trans 'Nursery / Pre-School' %} <span class="badge text-bg-light">{% trans 'Next:' %} {{ student_id_next.Nursery }}</span></h5>
+            <div class="row g-2">
+              <div class="col-md-4">{{ student_id_format_form.student_id_nursery_prefix|as_crispy_field }}</div>
+              <div class="col-md-8">{{ student_id_format_form.student_id_nursery_pattern|as_crispy_field }}</div>
+            </div>
+          </div>
+          <div class="border rounded p-3 mb-3">
+            <h5 class="h6">{% trans 'Primary' %} <span class="badge text-bg-light">{% trans 'Next:' %} {{ student_id_next.Primary }}</span></h5>
+            <div class="row g-2">
+              <div class="col-md-4">{{ student_id_format_form.student_id_primary_prefix|as_crispy_field }}</div>
+              <div class="col-md-8">{{ student_id_format_form.student_id_primary_pattern|as_crispy_field }}</div>
+            </div>
+          </div>
+          <div class="border rounded p-3 mb-3">
+            <h5 class="h6">{% trans 'JHS' %} <span class="badge text-bg-light">{% trans 'Next:' %} {{ student_id_next.JHS }}</span></h5>
+            <div class="row g-2">
+              <div class="col-md-4">{{ student_id_format_form.student_id_jhs_prefix|as_crispy_field }}</div>
+              <div class="col-md-8">{{ student_id_format_form.student_id_jhs_pattern|as_crispy_field }}</div>
+            </div>
+          </div>
+          <p class="small text-muted">{% blocktrans with school_code=school_code %}School code for formats that include it: {{ school_code }}. Each division has its own counter, shown above. Changing a format does not reset the counter, and existing student IDs stay the same.{% endblocktrans %}</p>
+          <button class="btn btn-primary" type="submit"><i class="fas fa-save me-1"></i>{% trans 'Save ID formats' %}</button>
         </form>
 
         {% elif active_tab == 'promotion' %}
