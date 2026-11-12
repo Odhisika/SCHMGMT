@@ -56,9 +56,19 @@
         {% if students %}
         <hr>
         <h4 class="mt-4">{% trans 'Candidates from' %} {{ selected_level }}</h4>
-        <p class="text-muted">{% trans 'Pass Mark for Promotion:' %} <strong>{{ pass_mark }}%</strong></p>
+        <p class="text-muted">
+            {% trans 'Pass Mark for Promotion:' %} <strong>{{ pass_mark }}%</strong>
+            &middot;
+            {% trans 'Review band:' %} <strong>{{ failure_mark }}% &ndash; {{ pass_mark }}%</strong>
+        </p>
         
-        <form method="post">
+        <form method="post"
+              data-confirm="Are you sure you want to promote these students? This action will update their class levels."
+              data-confirm-title="Process student promotion?"
+              data-confirm-ok="Yes, promote students"
+              data-confirm-cancel="Cancel"
+              data-confirm-variant="primary"
+              data-confirm-icon="graduation-cap">
             {% csrf_token %}
             <input type="hidden" name="level" value="{{ selected_level }}">
             
@@ -72,28 +82,37 @@
                             <th>{% trans 'Term 2' %}</th>
                             <th>{% trans 'Term 3' %}</th>
                             <th>{% trans 'Annual Avg' %}</th>
+                            <th>{% trans 'Status' %}</th>
                             <th>{% trans 'Action' %}</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for item in promotion_list %}
-                        <tr {% if item.average >= pass_mark %}class="table-success"{% else %}class="table-danger"{% endif %}>
+                        <tr {% if item.promoted %}class="table-success"{% else %}class="table-danger"{% endif %}>
                             <td>{{ item.student.student.get_full_name }}</td>
                             <td>{{ item.student.student.username }}</td>
                             <td>{{ item.term1|default:"-" }}</td>
                             <td>{{ item.term2|default:"-" }}</td>
                             <td>{{ item.term3|default:"-" }}</td>
                             <td><strong>{{ item.average }}%</strong></td>
+                            <td><span class="badge bg-{{ item.status_color }}">{{ item.status_label }}</span></td>
                             <td>
-                                {% if item.average >= pass_mark %}
-                                    <span class="badge bg-success">Promote</span>
-                                    {% if item.is_graduating %}
-                                    <span class="badge bg-info">Graduate</span>
-                                    {% else %}
-                                    <i class="fas fa-arrow-right"></i> {{ item.next_level }}
-                                    {% endif %}
-                                {% else %}
-                                    <span class="badge bg-warning text-dark">Repeat</span>
+                                <div class="d-flex flex-wrap gap-1">
+                                    <button type="submit" name="student_action" value="{{ item.student.pk }}:promote"
+                                            class="btn btn-sm btn-success"
+                                            title="{% trans 'Promote this student now' %}">
+                                        <i class="fas fa-arrow-up"></i> {% trans 'Promote' %}
+                                    </button>
+                                    <button type="submit" name="student_action" value="{{ item.student.pk }}:repeat"
+                                            class="btn btn-sm btn-outline-warning"
+                                            title="{% trans 'Keep this student in the same class' %}">
+                                        <i class="fas fa-rotate-left"></i> {% trans 'Repeat' %}
+                                    </button>
+                                </div>
+                                {% if item.promoted %}
+                                <small class="text-success d-block mt-1">
+                                    {% if item.is_graduating %}{% trans 'Will graduate' %}{% else %}{% trans 'Next:' %} {{ item.next_level }}{% endif %}
+                                </small>
                                 {% endif %}
                             </td>
                         </tr>
@@ -104,7 +123,7 @@
 
             {% if is_third_term %}
             <div class="mt-3">
-                <button type="submit" class="btn btn-primary" onclick="return confirm('Are you sure you want to promote these students? This action will update their class levels.')">
+                <button type="submit" class="btn btn-primary">
                     <i class="fas fa-check-circle"></i> {% trans 'Process Promotion' %}
                 </button>
             </div>

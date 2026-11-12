@@ -1,0 +1,69 @@
+{% load i18n %}
+<div id="notification-widget"
+     class="dropdown notification-widget"
+     hx-get="{% url 'notification_widget' %}"
+     hx-trigger="every 60s [!document.querySelector('#notification-widget .dropdown-menu.show')]"
+     hx-swap="outerHTML">
+
+    <button class="notification-bell" type="button" data-bs-toggle="dropdown"
+            data-bs-auto-close="outside" data-bs-display="static" aria-expanded="false"
+            aria-label="{% trans 'Notifications' %}">
+        <i class="fas fa-bell"></i>
+        {% if unread_notifications_count %}
+        <span class="notification-badge">{{ unread_notifications_count }}</span>
+        {% endif %}
+    </button>
+
+    <div class="dropdown-menu dropdown-menu-end notification-dropdown">
+        <div class="notification-header">
+            <div class="d-flex align-items-center gap-2">
+                <span class="fw-semibold">{% trans 'Notifications' %}</span>
+                {% if unread_notifications_count %}
+                <span class="badge bg-danger">{{ unread_notifications_count }}</span>
+                {% endif %}
+            </div>
+            {% if unread_notifications_count %}
+            <form method="post" action="{% url 'notification_mark_all_read' %}"
+                  hx-post="{% url 'notification_mark_all_read' %}"
+                  hx-target="#notification-widget" hx-swap="outerHTML">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-link btn-sm notification-link-button">
+                    {% trans 'Mark all read' %}
+                </button>
+            </form>
+            {% endif %}
+        </div>
+
+        <div class="notification-list">
+            {% for notification in recent_notifications %}
+            <a href="{% url 'notification_open' notification.pk %}"
+               class="notification-item{% if not notification.is_read %} unread{% endif %}">
+                <span class="notification-icon text-{{ notification.get_color_class }}">
+                    <i class="fas fa-{{ notification.get_icon }}"></i>
+                </span>
+                <span class="notification-copy">
+                    <span class="notification-title">{{ notification.title }}</span>
+                    {% if notification.message %}
+                    <span class="notification-message">{{ notification.message|truncatechars:80 }}</span>
+                    {% endif %}
+                    <span class="notification-time">{{ notification.created_at|timesince }} {% trans 'ago' %}</span>
+                </span>
+                {% if not notification.is_read %}
+                <span class="notification-dot" aria-label="{% trans 'Unread' %}"></span>
+                {% endif %}
+            </a>
+            {% empty %}
+            <div class="notification-empty">
+                <i class="far fa-bell-slash"></i>
+                <p class="mb-0">{% trans 'You are all caught up.' %}</p>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="notification-footer">
+            <a href="{% url 'notification_list' %}" class="notification-view-all">
+                {% trans 'View all notifications' %} <i class="fas fa-arrow-right ms-1"></i>
+            </a>
+        </div>
+    </div>
+</div>

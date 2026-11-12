@@ -3,7 +3,6 @@ from . import views
 
 urlpatterns = [
     path("", views.PaymentGetwaysView.as_view(), name="payment_gateways"),
-    path("paypal/", views.payment_paypal, name="paypal"),
     path("stripe/", views.payment_stripe, name="stripe"),
     path("coinbase/", views.payment_coinbase, name="coinbase"),
     path("paylike/", views.payment_paylike, name="paylike"),

@@ -15,10 +15,6 @@ from gopay.enums import Recurrence, PaymentInstrument, BankSwiftCode, Currency, 
 from .models import Invoice
 
 
-def payment_paypal(request):
-    return render(request, "payments/paypal.html", context={})
-
-
 def payment_stripe(request):
     return render(request, "payments/stripe.html", context={})
 

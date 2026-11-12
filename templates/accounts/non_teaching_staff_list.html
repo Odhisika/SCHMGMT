@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}{{ title }} | {{ block.super }}{% endblock %}
+
+{% block content %}
+<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'home' %}">{% trans 'Home' %}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'admin_panel' %}">{% trans 'Administration' %}</a></li>
+        <li class="breadcrumb-item active" aria-current="page">{% trans 'Non-teaching Staff' %}</li>
+    </ol>
+</nav>
+
+{% include 'snippets/messages.html' %}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+    <div>
+        <h1 class="h3 mb-1"><i class="fas fa-user-gear text-primary me-2"></i>{% trans 'Non-teaching Staff' %}</h1>
+        <p class="text-muted mb-0">{% trans 'Manage cleaners, drivers, canteen staff, and other school employees.' %}</p>
+    </div>
+    <a class="btn btn-primary" href="{% url 'non_teaching_staff_add' %}">
+        <i class="fas fa-user-plus me-1"></i>{% trans 'Add staff member' %}
+    </a>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body">
+        <form method="get" class="row g-2 mb-3">
+            <div class="col-sm-8 col-md-6">
+                <label class="visually-hidden" for="staff-search">{% trans 'Search staff' %}</label>
+                <input id="staff-search" class="form-control" type="search" name="q" value="{{ search_query }}"
+                       placeholder="{% trans 'Search name, username, or position' %}">
+            </div>
+            <div class="col-auto"><button class="btn btn-outline-primary" type="submit">{% trans 'Search' %}</button></div>
+            {% if search_query %}<div class="col-auto"><a class="btn btn-light" href="{% url 'non_teaching_staff_list' %}">{% trans 'Clear' %}</a></div>{% endif %}
+        </form>
+
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>{% trans 'Name' %}</th>
+                        <th>{% trans 'Position' %}</th>
+                        <th>{% trans 'Username' %}</th>
+                        <th>{% trans 'Phone' %}</th>
+                        <th>{% trans 'Email' %}</th>
+                        <th class="text-end">{% trans 'Actions' %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for staff_member in staff_members %}
+                    <tr>
+                        <td class="fw-semibold">{{ staff_member.get_full_name }}</td>
+                        <td><span class="badge rounded-pill text-bg-light border">{{ staff_member.get_non_teaching_position_display }}</span></td>
+                        <td>{{ staff_member.username }}</td>
+                        <td>{{ staff_member.phone|default:'—' }}</td>
+                        <td>{{ staff_member.email }}</td>
+                        <td class="text-end text-nowrap">
+                            <a class="btn btn-sm btn-outline-secondary" href="{% url 'non_teaching_staff_edit' staff_member.pk %}" aria-label="{% trans 'Edit' %}">
+                                <i class="fas fa-pen"></i>
+                            </a>
+                            <form method="post" action="{% url 'non_teaching_staff_delete' staff_member.pk %}" class="d-inline"
+                                  data-confirm="{% trans 'This staff account will be permanently removed.' %}"
+                                  data-confirm-title="{% trans 'Remove staff member?' %}"
+                                  data-confirm-ok="{% trans 'Remove account' %}"
+                                  data-confirm-variant="danger" data-confirm-icon="trash">
+                                {% csrf_token %}
+                                <button class="btn btn-sm btn-outline-danger" type="submit" aria-label="{% trans 'Delete' %}">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="6" class="text-center py-5 text-muted">
+                        <i class="fas fa-user-gear fa-2x mb-3 d-block"></i>
+                        {% trans 'No non-teaching staff accounts found.' %}
+                    </td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

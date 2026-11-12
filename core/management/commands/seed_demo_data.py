@@ -63,8 +63,8 @@ class Command(BaseCommand):
         parser.add_argument(
             "--students",
             type=int,
-            default=3,
-            help="Number of students to create per class/level (default: 3).",
+            default=8,
+            help="Number of students to create per class/level (default: 8).",
         )
         parser.add_argument(
             "--attendance-days",
@@ -168,22 +168,53 @@ class Command(BaseCommand):
         self.stdout.write(f"  License:   {data.school.slug}")
         self.stdout.write(f"  Term:      {data.current_term}")
         self.stdout.write(f"  Levels:    {len(data.courses)}")
-        self.stdout.write(f"  Courses:   {sum(len(v) for v in data.courses.values())}")
-        self.stdout.write(f"  Students:  {sum(len(v) for v in data.students.values())}")
-        self.stdout.write(f"  Results:   {len(data.results)}")
+        current_courses = sum(len(v) for v in data.courses.values())
+        total_courses = sum(
+            len(term_courses)
+            for level_courses in data.courses_by_term.values()
+            for term_courses in level_courses.values()
+        )
+        self.stdout.write(
+            f"  Courses:   {current_courses} (current term), "
+            f"{total_courses} across all terms"
+        )
+        self.stdout.write(
+            f"  Students:  {sum(len(v) for v in data.students.values())} "
+            f"({len(data.students)} classes)"
+        )
+        self.stdout.write(
+            f"  Teachers:  {len(data.teachers)} coordinators + "
+            f"{len(data.class_teachers)} class teachers"
+        )
+        for term_name, results in data.results_by_term.items():
+            self.stdout.write(
+                f"  {term_name + ' term:':<10} {len(results)} results"
+            )
         self.stdout.write(f"  Quizzes:   {len(data.quizzes)}")
         self.stdout.write("")
         self.stdout.write(self.style.MIGRATE_HEADING("Login credentials"))
         self.stdout.write(f"  Superuser:    root / {DEMO_PASSWORD}")
         self.stdout.write(f"  School admin: admin / {DEMO_PASSWORD}")
         self.stdout.write(f"  Teacher:      teacher.primary / {DEMO_PASSWORD}")
-        self.stdout.write(f"  Class teacher:class.teacher / {DEMO_PASSWORD}")
-        first_level_code = next(iter(data.students))
+        first_level_code = next(iter(data.class_teachers))
+        first_class_teacher = data.class_teachers[first_level_code]
+        self.stdout.write(
+            f"  Class teacher:{first_class_teacher.username} / {DEMO_PASSWORD}"
+        )
         first_student = data.students[first_level_code][0].student
         self.stdout.write(f"  Student:      {first_student.username} / {DEMO_PASSWORD}")
         first_parent_level = next(iter(data.parents))
         parent_user = data.parents[first_parent_level].user
         self.stdout.write(f"  Parent:       {parent_user.username} / {DEMO_PASSWORD}")
+        self.stdout.write("")
+        self.stdout.write(
+            "  Every class has its own class teacher and students. "
+            "Results exist for First, Second and Third Term."
+        )
+        self.stdout.write(
+            "  Run 'python manage.py promote_students --dry-run' to preview "
+            "the annual promotion decision."
+        )
         self.stdout.write("")
         self.stdout.write(
             self.style.HTTP_INFO(

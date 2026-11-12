@@ -303,3 +303,126 @@ class QuizViewTests(DemoDataTestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, reverse("home"))
+
+    def test_question_workspace_is_available_to_teachers_and_admins(self):
+        quiz = self.demo.quizzes[0]
+        url = reverse(
+            "quiz_questions",
+            kwargs={"slug": quiz.course.slug, "quiz_id": quiz.pk},
+        )
+
+        for user in (self.teacher, self.admin, self.superuser):
+            with self.subTest(user=user.username):
+                self.client.force_login(user)
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.context["quiz"], quiz)
+
+    def test_teacher_can_add_true_false_and_fill_blank_questions(self):
+        quiz = self.demo.quizzes[0]
+        self.client.force_login(self.teacher)
+
+        tf_response = self.client.post(
+            reverse(
+                "question_create",
+                kwargs={
+                    "slug": quiz.course.slug,
+                    "quiz_id": quiz.pk,
+                    "qtype": "truefalse",
+                },
+            ),
+            {
+                "content": "The sky is blue.",
+                "explanation": "",
+                "correct_answer": "on",
+            },
+        )
+        self.assertRedirects(
+            tf_response,
+            reverse(
+                "quiz_questions",
+                kwargs={"slug": quiz.course.slug, "quiz_id": quiz.pk},
+            ),
+        )
+
+        fill_response = self.client.post(
+            reverse(
+                "question_create",
+                kwargs={
+                    "slug": quiz.course.slug,
+                    "quiz_id": quiz.pk,
+                    "qtype": "fillblank",
+                },
+            ),
+            {
+                "content": "Capital of Ghana: ____",
+                "explanation": "",
+                "correct_answer": "Accra",
+            },
+        )
+        self.assertRedirects(
+            fill_response,
+            reverse(
+                "quiz_questions",
+                kwargs={"slug": quiz.course.slug, "quiz_id": quiz.pk},
+            ),
+        )
+
+        self.assertTrue(
+            TrueFalseQuestion.objects.filter(
+                content="The sky is blue.", quiz=quiz
+            ).exists()
+        )
+        self.assertTrue(
+            FillInTheBlankQuestion.objects.filter(
+                content="Capital of Ghana: ____", quiz=quiz
+            ).exists()
+        )
+
+    def test_teacher_can_delete_a_question_from_a_quiz(self):
+        quiz = self.demo.quizzes[0]
+        question = TrueFalseQuestion.objects.create(
+            content="Temporary question", correct_answer=True
+        )
+        question.quiz.add(quiz)
+        self.client.force_login(self.teacher)
+
+        response = self.client.post(
+            reverse(
+                "question_delete",
+                kwargs={
+                    "slug": quiz.course.slug,
+                    "quiz_id": quiz.pk,
+                    "pk": question.pk,
+                },
+            )
+        )
+
+        self.assertRedirects(
+            response,
+            reverse(
+                "quiz_questions",
+                kwargs={"slug": quiz.course.slug, "quiz_id": quiz.pk},
+            ),
+        )
+        self.assertFalse(TrueFalseQuestion.objects.filter(pk=question.pk).exists())
+
+    def test_teacher_outside_division_cannot_manage_questions(self):
+        quiz = self.demo.quizzes[1]
+        self.client.force_login(self.teacher)
+
+        response = self.client.get(
+            reverse(
+                "quiz_questions",
+                kwargs={"slug": quiz.course.slug, "quiz_id": quiz.pk},
+            )
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_school_admin_can_open_the_marking_list(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse("quiz_marking"))
+
+        self.assertEqual(response.status_code, 200)

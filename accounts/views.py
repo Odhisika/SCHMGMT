@@ -8,10 +8,12 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import NoReverseMatch, reverse
 from django.template.loader import get_template, render_to_string
 from django.utils.decorators import method_decorator
+from django.views.decorators.http import require_POST
 from django.views.generic import CreateView
 from django_filters.views import FilterView
 from xhtml2pdf import pisa
 from django.conf import settings
+from django.db.models import Q
 
 from accounts.decorators import admin_required, lecturer_required
 from accounts.filters import LecturerFilter, StudentFilter
@@ -19,6 +21,8 @@ from accounts.forms import (
     ParentAddForm,
     ProfileUpdateForm,
     ProgramUpdateForm,
+    NonTeachingStaffAddForm,
+    NonTeachingStaffUpdateForm,
     StaffAddForm,
     StudentAddForm,
 )
@@ -325,6 +329,87 @@ class LecturerFilterView(FilterView):
         context["other_teachers"] = filtered_qs.filter(division__isnull=True)
         
         return context
+
+
+@login_required
+@admin_required
+def non_teaching_staff_list(request):
+    staff = User.objects.filter(
+        school=request.school,
+        is_non_teaching_staff=True,
+    ).order_by("first_name", "last_name", "username")
+    query = request.GET.get("q", "").strip()
+    if query:
+        staff = staff.filter(
+            Q(first_name__icontains=query)
+            | Q(last_name__icontains=query)
+            | Q(username__icontains=query)
+            | Q(non_teaching_position__icontains=query)
+        )
+    return render(request, "accounts/non_teaching_staff_list.html", {
+        "title": "Non-teaching Staff",
+        "staff_members": staff,
+        "search_query": query,
+    })
+
+
+@login_required
+@admin_required
+def non_teaching_staff_add(request):
+    form = NonTeachingStaffAddForm(
+        request.POST or None,
+        school=request.school,
+    )
+    if request.method == "POST" and form.is_valid():
+        staff_member = form.save()
+        messages.success(
+            request,
+            f"Account for {staff_member.get_full_name} ({staff_member.get_non_teaching_position_display()}) has been created.",
+        )
+        return redirect("non_teaching_staff_list")
+    return render(request, "accounts/non_teaching_staff_form.html", {
+        "title": "Add Non-teaching Staff",
+        "form": form,
+        "is_edit": False,
+    })
+
+
+@login_required
+@admin_required
+def non_teaching_staff_edit(request, pk):
+    staff_member = get_object_or_404(
+        User,
+        pk=pk,
+        school=request.school,
+        is_non_teaching_staff=True,
+    )
+    form = NonTeachingStaffUpdateForm(request.POST or None, instance=staff_member)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, f"{staff_member.get_full_name} has been updated.")
+        return redirect("non_teaching_staff_list")
+    return render(request, "accounts/non_teaching_staff_form.html", {
+        "title": "Edit Non-teaching Staff",
+        "form": form,
+        "is_edit": True,
+        "staff_member": staff_member,
+    })
+
+
+@login_required
+@admin_required
+@require_POST
+def non_teaching_staff_delete(request, pk):
+    staff_member = get_object_or_404(
+        User,
+        pk=pk,
+        school=request.school,
+        is_non_teaching_staff=True,
+    )
+    name = staff_member.get_full_name
+    staff_member.delete()
+    messages.success(request, f"{name} has been removed from non-teaching staff.")
+    return redirect("non_teaching_staff_list")
 
 
 @login_required

@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.views.generic import ListView, CreateView, UpdateView
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.contrib import messages
 from django.utils.decorators import method_decorator
 from django.utils.translation import gettext_lazy as _
@@ -15,6 +15,8 @@ from .forms import (
     SchoolIdentityForm, GradeWeightForm, PromotionPolicyForm,
 )
 from accounts.models import User
+from core.models import Notification
+from core.notifications import notify, notify_admins
 
 
 def is_superuser(user):
@@ -295,6 +297,18 @@ def promotion_request_review(request, pk):
         elif action == 'reject':
             promo_request.reject(request.user, notes)
             messages.warning(request, _("Request rejected."))
+        if action in ('approve', 'reject'):
+            notify(
+                school=school,
+                recipient=promo_request.requested_by,
+                title=f"Promotion request {promo_request.status.lower()}",
+                message=f"The request for {promo_request.student} was {promo_request.status.lower()}.",
+                link=reverse('promotion_requests_list'),
+                notification_type=(
+                    Notification.TYPE_SUCCESS if action == 'approve' else Notification.TYPE_WARNING
+                ),
+                actor=request.user,
+            )
         return redirect('promotion_requests_list')
 
     return render(request, 'school/promotion_request_detail.html', {
@@ -334,13 +348,20 @@ def submit_promotion_request(request, result_pk):
             if existing:
                 messages.warning(request, _("A pending request already exists for this student."))
             else:
-                PromotionRequest.objects.create(
+                promo_request = PromotionRequest.objects.create(
                     student=student,
                     result=result,
                     request_type=request_type,
                     requested_by=request.user,
                     reason=reason,
                     school=request.school,
+                )
+                notify_admins(
+                    request.school,
+                    title="Promotion request needs review",
+                    message=f"{request.user.get_full_name} requested a promotion decision for {student}.",
+                    link=reverse('promotion_request_review', args=[promo_request.pk]),
+                    actor=request.user,
                 )
                 messages.success(request, _("Promotion request submitted. Awaiting admin review."))
                 return redirect('dashboard')

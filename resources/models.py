@@ -5,9 +5,14 @@ from django.db.models.signals import post_save, post_delete, pre_save
 from django.dispatch import receiver
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
+from urllib.parse import parse_qs, urlparse
+import re
 
 from core.models import ActivityLog
 from core.utils import unique_slug_generator
+
+
+YOUTUBE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{11}$")
 
 
 class CourseFile(models.Model):
@@ -114,7 +119,14 @@ class CourseVideo(models.Model):
                 "mp4", "mkv", "wmv", "3gp", "f4v", "avi", "mp3", "webm"
             ])
         ],
-        verbose_name=_("Video File")
+        verbose_name=_("Video File"),
+        blank=True,
+        null=True,
+    )
+    youtube_url = models.URLField(
+        blank=True,
+        verbose_name=_("YouTube Link"),
+        help_text=_("Paste a YouTube or YouTube Shorts link to use instead of uploading a video file."),
     )
     thumbnail = models.ImageField(
         upload_to='course_resources/thumbnails/%Y/%m/',
@@ -168,6 +180,60 @@ class CourseVideo(models.Model):
             "video_slug": self.slug
         })
 
+    def get_youtube_id(self):
+        """Extract the video id from common YouTube URL formats.
+
+        Supports ``youtu.be/<id>``, ``youtube.com/watch?v=<id>``,
+        ``youtube.com/embed/<id>``, ``youtube.com/shorts/<id>`` and a bare
+        11-character video id.
+        """
+        value = (self.youtube_url or "").strip()
+        if not value:
+            return ""
+        if YOUTUBE_ID_PATTERN.match(value):
+            return value
+
+        parsed = urlparse(value)
+        host = parsed.netloc.lower()
+        if host.startswith("www."):
+            host = host[4:]
+
+        candidate = ""
+        if host in {"youtu.be", "www.youtu.be"}:
+            candidate = parsed.path.strip("/").split("/")[0]
+        elif host in {
+            "youtube.com",
+            "m.youtube.com",
+            "music.youtube.com",
+            "youtube-nocookie.com",
+            "www.youtube-nocookie.com",
+        }:
+            if parsed.path.startswith(("/embed/", "/shorts/", "/v/", "/live/")):
+                parts = parsed.path.strip("/").split("/")
+                candidate = parts[1] if len(parts) > 1 else ""
+            else:
+                candidate = parse_qs(parsed.query).get("v", [""])[0]
+
+        return candidate if YOUTUBE_ID_PATTERN.match(candidate) else ""
+
+    @property
+    def is_youtube(self):
+        return bool(self.get_youtube_id())
+
+    @property
+    def youtube_embed_url(self):
+        video_id = self.get_youtube_id()
+        if not video_id:
+            return ""
+        return f"https://www.youtube-nocookie.com/embed/{video_id}"
+
+    @property
+    def youtube_thumbnail_url(self):
+        video_id = self.get_youtube_id()
+        if not video_id:
+            return ""
+        return f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"
+
     def increment_views(self):
         """Increment view counter"""
         self.views += 1
@@ -175,7 +241,8 @@ class CourseVideo(models.Model):
 
     def delete(self, *args, **kwargs):
         # Delete the video and thumbnail from storage
-        self.video.delete(save=False)
+        if self.video:
+            self.video.delete(save=False)
         if self.thumbnail:
             self.thumbnail.delete(save=False)
         super().delete(*args, **kwargs)

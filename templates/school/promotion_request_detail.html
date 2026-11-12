@@ -93,12 +93,20 @@
           <div class="d-flex gap-3">
             <button type="submit" name="action" value="approve"
                     class="btn btn-success px-4"
-                    onclick="return confirm('{% trans 'Approve this request?' %}')">
+                    data-confirm="{% trans 'Approve this request?' %}"
+                    data-confirm-title="{% trans 'Approve promotion request?' %}"
+                    data-confirm-ok="{% trans 'Approve' %}"
+                    data-confirm-variant="success"
+                    data-confirm-icon="check">
               <i class="fas fa-check me-2"></i>{% trans 'Approve' %}
             </button>
             <button type="submit" name="action" value="reject"
                     class="btn btn-outline-danger px-4"
-                    onclick="return confirm('{% trans 'Reject this request?' %}')">
+                    data-confirm="{% trans 'Reject this request?' %}"
+                    data-confirm-title="{% trans 'Reject promotion request?' %}"
+                    data-confirm-ok="{% trans 'Reject' %}"
+                    data-confirm-variant="danger"
+                    data-confirm-icon="xmark">
               <i class="fas fa-times me-2"></i>{% trans 'Reject' %}
             </button>
             <a href="{% url 'promotion_requests_list' %}" class="btn btn-outline-secondary ms-auto">

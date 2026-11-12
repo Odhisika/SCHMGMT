@@ -1,10 +1,12 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
 from django.db import transaction
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.decorators import method_decorator
 from django.utils.timezone import now
+from django.utils.translation import gettext as _
 from django.views.generic import (
     CreateView,
     DetailView,
@@ -15,14 +17,18 @@ from django.views.generic import (
 )
 
 from accounts.decorators import lecturer_required
+from accounts.models import User
 from .forms import (
     EssayForm,
-    TrueFalseForm,
+    EssayQuestionForm,
     FillInTheBlankForm,
+    FillInTheBlankQuestionForm,
     MCQuestionForm,
     MCQuestionFormSet,
     QuestionForm,
     QuizAddForm,
+    TrueFalseForm,
+    TrueFalseQuestionForm,
 )
 from .models import (
     Course,
@@ -120,8 +126,27 @@ def quiz_toggle_draft(request, pk):
         return JsonResponse({'error': 'POST required'}, status=405)
     
     quiz = get_object_or_404(Quiz, pk=pk)
+    was_draft = quiz.draft
     quiz.draft = not quiz.draft
     quiz.save(update_fields=['draft'])
+
+    if was_draft and not quiz.draft:
+        from core.notifications import notify
+        from result.models import TakenCourse
+        student_ids = TakenCourse.objects.filter(
+            course=quiz.course, school=quiz.course.school
+        ).values_list("student__student_id", flat=True).distinct()
+        for student in User.objects.filter(
+            pk__in=student_ids, school=quiz.course.school, is_active=True
+        ):
+            notify(
+                school=quiz.course.school,
+                recipient=student,
+                title=f"New quiz: {quiz.title}",
+                message=f"A quiz is available for {quiz.course.title}.",
+                link=f"/quiz/{quiz.course.pk}/{quiz.slug}/take/",
+                actor=request.user,
+            )
     
     return JsonResponse({
         'draft': quiz.draft,
@@ -386,6 +411,152 @@ def teacher_quiz_report(request):
 
 
 # ########################################################
+# Question Management Views
+# ########################################################
+
+
+# Question types that can be added from the quiz workspace. Multiple-choice
+# questions are handled separately because they need an inline choice formset.
+QUESTION_TYPE_FORMS = {
+    "truefalse": (TrueFalseQuestionForm, _("True/False")),
+    "fillblank": (FillInTheBlankQuestionForm, _("Fill in the Blank")),
+    "essay": (EssayQuestionForm, _("Essay")),
+}
+
+
+def _get_manageable_quiz(request, slug, quiz_id):
+    """Return the course/quiz pair, enforcing course-level access."""
+    course = get_object_or_404(Course, slug=slug)
+    quiz = get_object_or_404(Quiz, pk=quiz_id, course=course)
+
+    if not (request.user.is_superuser or request.user.is_school_admin):
+        if not request.user.can_access_level(course.level):
+            raise PermissionDenied(
+                "You cannot manage quizzes for courses outside your division."
+            )
+    return course, quiz
+
+
+@login_required
+@lecturer_required
+def quiz_questions(request, slug, quiz_id):
+    """Workspace for viewing and adding all questions in a quiz."""
+    course, quiz = _get_manageable_quiz(request, slug, quiz_id)
+    questions = list(quiz.get_questions())
+
+    for question in questions:
+        class_name = question.__class__.__name__
+        question.type_label = {
+            "MCQuestion": _("Multiple Choice"),
+            "TrueFalseQuestion": _("True/False"),
+            "FillInTheBlankQuestion": _("Fill in the Blank"),
+            "EssayQuestion": _("Essay"),
+        }.get(class_name, _("Question"))
+        question.can_edit_here = class_name in {
+            "TrueFalseQuestion",
+            "FillInTheBlankQuestion",
+            "EssayQuestion",
+        }
+        question.is_mc = class_name == "MCQuestion"
+        question.is_truefalse = class_name == "TrueFalseQuestion"
+        question.is_fillblank = class_name == "FillInTheBlankQuestion"
+        question.is_essay = class_name == "EssayQuestion"
+        if question.is_mc:
+            question.choices = list(question.get_choices())
+
+    return render(request, "quiz/quiz_questions.html", {
+        "course": course,
+        "quiz": quiz,
+        "questions": questions,
+    })
+
+
+@login_required
+@lecturer_required
+def question_create(request, slug, quiz_id, qtype):
+    """Create a true/false, fill-in-the-blank or essay question."""
+    if qtype not in QUESTION_TYPE_FORMS:
+        raise Http404("Unknown question type.")
+
+    course, quiz = _get_manageable_quiz(request, slug, quiz_id)
+    form_class, type_label = QUESTION_TYPE_FORMS[qtype]
+
+    form = form_class(request.POST or None, request.FILES or None)
+    if request.method == "POST" and form.is_valid():
+        question = form.save()
+        question.quiz.add(quiz)
+        messages.success(request, f"{type_label} question added to {quiz.title}.")
+        if "another" in request.POST:
+            return redirect(
+                "question_create",
+                slug=course.slug,
+                quiz_id=quiz.pk,
+                qtype=qtype,
+            )
+        return redirect("quiz_questions", slug=course.slug, quiz_id=quiz.pk)
+
+    return render(request, "quiz/question_form.html", {
+        "course": course,
+        "quiz": quiz,
+        "form": form,
+        "type_label": type_label,
+        "qtype": qtype,
+    })
+
+
+@login_required
+@lecturer_required
+def question_edit(request, slug, quiz_id, pk):
+    """Edit a non-multiple-choice question."""
+    course, quiz = _get_manageable_quiz(request, slug, quiz_id)
+    base_question = get_object_or_404(Question, pk=pk, quiz=quiz)
+    question = Question.objects.get_subclass(pk=base_question.pk)
+
+    qtype = {
+        "TrueFalseQuestion": "truefalse",
+        "FillInTheBlankQuestion": "fillblank",
+        "EssayQuestion": "essay",
+    }.get(question.__class__.__name__)
+
+    if qtype is None:
+        messages.info(
+            request,
+            "Multiple-choice questions can be edited from the admin site.",
+        )
+        return redirect("quiz_questions", slug=course.slug, quiz_id=quiz.pk)
+
+    form_class, type_label = QUESTION_TYPE_FORMS[qtype]
+    form = form_class(request.POST or None, request.FILES or None, instance=question)
+
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, f"{type_label} question updated.")
+        return redirect("quiz_questions", slug=course.slug, quiz_id=quiz.pk)
+
+    return render(request, "quiz/question_form.html", {
+        "course": course,
+        "quiz": quiz,
+        "form": form,
+        "type_label": type_label,
+        "qtype": qtype,
+        "question": question,
+    })
+
+
+@login_required
+@lecturer_required
+def question_delete(request, slug, quiz_id, pk):
+    """Remove a question from a quiz after confirmation."""
+    course, quiz = _get_manageable_quiz(request, slug, quiz_id)
+    question = get_object_or_404(Question, pk=pk, quiz=quiz)
+
+    if request.method == "POST":
+        question.delete()
+        messages.success(request, "Question deleted.")
+    return redirect("quiz_questions", slug=course.slug, quiz_id=quiz.pk)
+
+
+# ########################################################
 # Multiple Choice Question Views
 # ########################################################
 
@@ -427,7 +598,11 @@ class MCQuestionCreate(CreateView):
                         slug=self.kwargs["slug"],
                         quiz_id=self.kwargs["quiz_id"],
                     )
-                return redirect("quiz_index", slug=self.kwargs["slug"])
+                return redirect(
+                    "quiz_questions",
+                    slug=self.kwargs["slug"],
+                    quiz_id=self.kwargs["quiz_id"],
+                )
         else:
             return self.form_invalid(form)
 
@@ -456,8 +631,14 @@ class QuizMarkingList(ListView):
     template_name = "quiz/quiz_marking_list.html"
 
     def get_queryset(self):
-        queryset = Sitting.objects.filter(complete=True)
-        if not self.request.user.is_superuser:
+        queryset = Sitting.objects.filter(
+            complete=True,
+            course__school=self.request.school,
+        )
+        if not (
+            self.request.user.is_superuser
+            or self.request.user.is_school_admin
+        ):
             queryset = queryset.filter(
                 quiz__course__allocated_course__teacher__pk=self.request.user.id
             )
@@ -623,6 +804,24 @@ class QuizTake(FormView):
 
     def final_result_user(self):
         self.sitting.mark_quiz_complete()
+        if self.quiz.exam_paper and self.request.user.is_student:
+            from core.notifications import notify
+            from course.models import CourseAllocation
+
+            teacher_ids = CourseAllocation.objects.filter(
+                courses=self.course
+            ).values_list("teacher_id", flat=True).distinct()
+            for teacher in User.objects.filter(
+                pk__in=teacher_ids, school=self.course.school
+            ):
+                notify(
+                    school=self.course.school,
+                    recipient=teacher,
+                    title=f"Quiz submitted: {self.quiz.title}",
+                    message=f"{self.request.user.get_full_name} submitted {self.quiz.title} and it may need marking.",
+                    link="/quiz/marking_list/",
+                    actor=self.request.user,
+                )
         results = {
             "course": self.course,
             "quiz": self.quiz,
@@ -640,7 +839,9 @@ class QuizTake(FormView):
         if (
             not self.quiz.exam_paper
             or self.request.user.is_superuser
+            or self.request.user.is_school_admin
             or self.request.user.is_lecturer
+            or self.request.user.is_teacher
         ):
             self.sitting.delete()
 

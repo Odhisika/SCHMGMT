@@ -61,6 +61,16 @@ class CustomUserManager(UserManager):
 
 GENDERS = ((_("M"), _("Male")), (_("F"), _("Female")))
 
+NON_TEACHING_POSITIONS = (
+    ("CLEANER", _("Cleaner")),
+    ("DRIVER", _("Driver")),
+    ("CANTEEN", _("Canteen Staff")),
+    ("SECURITY", _("Security")),
+    ("LIBRARIAN", _("Librarian")),
+    ("MAINTENANCE", _("Maintenance")),
+    ("OTHER", _("Other Staff")),
+)
+
 
 class User(AbstractUser):
     is_student = models.BooleanField(default=False)
@@ -70,6 +80,10 @@ class User(AbstractUser):
     is_dep_head = models.BooleanField(default=False)
     is_class_teacher = models.BooleanField(default=False)
     is_school_admin = models.BooleanField(default=False)
+    is_non_teaching_staff = models.BooleanField(default=False)
+    non_teaching_position = models.CharField(
+        max_length=30, choices=NON_TEACHING_POSITIONS, blank=True
+    )
     gender = models.CharField(max_length=1, choices=GENDERS, blank=True, null=True)
     phone = models.CharField(max_length=60, blank=True, null=True)
     address = models.CharField(max_length=60, blank=True, null=True)
@@ -127,6 +141,8 @@ class User(AbstractUser):
             role = _("School Admin")
         elif self.is_student:
             role = _("Student")
+        elif self.is_non_teaching_staff:
+            role = self.get_non_teaching_position_display() or _("Non-teaching Staff")
         elif self.is_teacher or self.is_lecturer:
             if self.is_class_teacher:
                 role = _("Class Teacher")
@@ -146,6 +162,16 @@ class User(AbstractUser):
     @property
     def can_manage_school(self):
         return self.is_superuser or self.is_school_admin
+
+    @property
+    def can_manage_quizzes(self):
+        """Teachers, lecturers and admins can create and manage quizzes."""
+        return (
+            self.is_superuser
+            or self.is_school_admin
+            or self.is_lecturer
+            or self.is_teacher
+        )
     
     def get_division_levels(self):
         """Return all levels in this teacher's division"""

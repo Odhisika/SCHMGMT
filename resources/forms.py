@@ -41,11 +41,16 @@ class CourseFileForm(forms.ModelForm):
 
 
 class CourseVideoForm(forms.ModelForm):
-    """Form for uploading course resource videos"""
+    """Form for uploading course resource videos.
+
+    A local video file or a YouTube link is required, but not both. The
+    YouTube link takes priority when both are supplied so teachers can move a
+    large upload to YouTube without deleting the original file first.
+    """
     
     class Meta:
         model = CourseVideo
-        fields = ['title', 'video', 'thumbnail', 'description']
+        fields = ['title', 'video', 'youtube_url', 'thumbnail', 'description']
         widgets = {
             'title': forms.TextInput(attrs={
                 'class': 'form-control',
@@ -54,6 +59,11 @@ class CourseVideoForm(forms.ModelForm):
             'video': forms.FileInput(attrs={
                 'class': 'form-control',
                 'accept': 'video/*,.mp4,.mkv,.wmv,.3gp,.f4v,.avi,.mp3,.webm'
+            }),
+            'youtube_url': forms.URLInput(attrs={
+                'class': 'form-control',
+                'placeholder': _('https://www.youtube.com/watch?v=... or https://youtu.be/...'),
+                'inputmode': 'url',
             }),
             'thumbnail': forms.FileInput(attrs={
                 'class': 'form-control',
@@ -67,17 +77,46 @@ class CourseVideoForm(forms.ModelForm):
         }
         labels = {
             'title': _('Video Title'),
-            'video': _('Select Video'),
+            'video': _('Video File'),
+            'youtube_url': _('YouTube Link'),
             'thumbnail': _('Thumbnail Image (Optional)'),
             'description': _('Description'),
         }
         help_texts = {
             'video': _('Allowed formats: MP4, MKV, WMV, 3GP, F4V, AVI, MP3, WEBM'),
+            'youtube_url': _('Paste a YouTube or YouTube Shorts link. Used instead of a local video file.'),
             'thumbnail': _('Upload a thumbnail image for the video preview'),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Make optional fields
+        self.fields['video'].required = False
+        self.fields['youtube_url'].required = False
         self.fields['thumbnail'].required = False
         self.fields['description'].required = False
+
+    def clean(self):
+        cleaned = super().clean()
+        has_local_video = bool(
+            cleaned.get('video') or (self.instance.pk and self.instance.video)
+        )
+        has_youtube = bool(
+            cleaned.get('youtube_url') or (self.instance.pk and self.instance.youtube_url)
+        )
+
+        if not has_local_video and not has_youtube:
+            raise forms.ValidationError(
+                _('Select a video file or paste a YouTube link.')
+            )
+
+        youtube_url = cleaned.get('youtube_url')
+        if youtube_url:
+            probe = CourseVideo(youtube_url=youtube_url)
+            if not probe.get_youtube_id():
+                self.add_error(
+                    'youtube_url',
+                    _('Enter a valid YouTube link (for example https://youtu.be/VIDEO_ID).'),
+                )
+
+        return cleaned

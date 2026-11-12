@@ -1,9 +1,11 @@
 from datetime import timedelta
 
+from django.db.models import Q
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from accounts.models import User
 from core.models import NewsAndEvents, Term, TermWeek
 from core.testing import DemoDataTestCase
 from school.models import School
@@ -55,6 +57,25 @@ class HomeViewTests(DemoDataTestCase):
         self.assertEqual(response.status_code, 200)
         self.assert_post_titles(response, ["Welcome Back to School"])
 
+    def test_sidebar_exposes_score_entry_to_admins_and_teachers(self):
+        for user in (self.admin, self.teacher):
+            with self.subTest(user=user.username):
+                self.client.force_login(user)
+                response = self.client.get(reverse("home"))
+                self.assertContains(response, reverse("manage_scores"))
+
+        self.client.force_login(self.student_user)
+        response = self.client.get(reverse("home"))
+        self.assertNotContains(response, reverse("manage_scores"))
+
+    def test_sidebar_exposes_quiz_tools_to_admins_and_teachers(self):
+        for user in (self.admin, self.teacher):
+            with self.subTest(user=user.username):
+                self.client.force_login(user)
+                response = self.client.get(reverse("home"))
+                self.assertContains(response, reverse("teacher_quiz_report"))
+                self.assertContains(response, reverse("quiz_marking"))
+
     def test_current_term_and_weeks_are_exposed_to_the_template(self):
         self.client.force_login(self.admin)
 
@@ -65,15 +86,69 @@ class HomeViewTests(DemoDataTestCase):
         self.assertIsNotNone(response.context["current_week"])
 
 
+class PostDetailTests(DemoDataTestCase):
+    def test_detail_page_shows_the_full_announcement(self):
+        long_summary = "Detailed announcement. " * 40 + "FINAL SENTENCE."
+        post = NewsAndEvents.objects.create(
+            title="Long Notice",
+            summary=long_summary,
+            posted_as="News",
+            school=self.school,
+            target_role="ALL",
+        )
+        self.client.force_login(self.student_user)
+
+        response = self.client.get(reverse("post_detail", args=[post.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["post"], post)
+        self.assertContains(response, "FINAL SENTENCE.")
+        self.assertContains(response, "Long Notice")
+
+    def test_student_cannot_open_a_post_targeted_elsewhere(self):
+        post = NewsAndEvents.objects.create(
+            title="Parents Only",
+            summary="This is for parents.",
+            posted_as="News",
+            school=self.school,
+            target_role="PARENTS",
+        )
+        self.client.force_login(self.student_user)
+
+        response = self.client.get(reverse("post_detail", args=[post.pk]))
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_school_admin_can_open_every_post_detail(self):
+        post = NewsAndEvents.objects.create(
+            title="Parents Only",
+            summary="This is for parents.",
+            posted_as="News",
+            school=self.school,
+            target_role="PARENTS",
+        )
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse("post_detail", args=[post.pk]))
+
+        self.assertEqual(response.status_code, 200)
+
+
 class DashboardViewTests(DemoDataTestCase):
     def test_school_admin_can_view_the_dashboard(self):
         self.client.force_login(self.admin)
 
         response = self.client.get(reverse("dashboard"))
 
+        expected_lecturers = User.objects.filter(
+            school=self.school, is_active=True
+        ).filter(Q(is_lecturer=True) | Q(is_teacher=True))
+
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["student_count"], 4)
-        self.assertEqual(response.context["lecturer_count"], 5)
+        self.assertEqual(
+            response.context["lecturer_count"], expected_lecturers.count()
+        )
         self.assertEqual(response.context["males_count"], 2)
         self.assertEqual(response.context["females_count"], 2)
 
@@ -87,13 +162,14 @@ class DashboardViewTests(DemoDataTestCase):
         self.assertEqual(response.context["lecturer_count"], 2)
         self.assertEqual(response.context["selected_division"], "Primary")
 
-    def test_teacher_is_denied_the_admin_dashboard(self):
+    def test_teacher_is_denied_the_admin_dashboard_without_a_redirect_loop(self):
         self.client.force_login(self.teacher)
 
         response = self.client.get(reverse("dashboard"))
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.url, "/dashboard/")
+        # The dashboard is itself admin-only; bouncing back to it would loop.
+        self.assertEqual(response.url, "/")
 
 
 class SemesterViewTests(DemoDataTestCase):
@@ -300,7 +376,10 @@ class TargetingApiTests(DemoDataTestCase):
 
         self.assertEqual(response.status_code, 200)
         results = response.json()["results"]
-        self.assertEqual(len(results), 2)
+        parent_count = User.objects.filter(
+            school=self.school, is_parent=True
+        ).count()
+        self.assertEqual(len(results), parent_count)
         self.assertTrue(all("parent" in row["text"].lower() for row in results))
 
 
@@ -364,3 +443,40 @@ class PostManagementTests(DemoDataTestCase):
             self.assertEqual(response.url, "/dashboard/")
         post.refresh_from_db()
         self.assertEqual(post.title, "Welcome Back to School")
+
+
+class UniqueMessagesFilterTests(TestCase):
+    class Message:
+        def __init__(self, level, text):
+            self.level = level
+            self.text = text
+
+        def __str__(self):
+            return self.text
+
+    def test_duplicate_messages_are_collapsed_in_order(self):
+        from core.templatetags.custom_filters import unique_messages
+
+        messages = [
+            self.Message(40, "Access denied."),
+            self.Message(40, "Access denied."),
+            self.Message(25, "Scores saved."),
+            self.Message(40, "Access denied."),
+        ]
+
+        result = unique_messages(messages)
+
+        self.assertEqual([str(message) for message in result], [
+            "Access denied.",
+            "Scores saved.",
+        ])
+
+    def test_same_text_at_different_levels_is_kept(self):
+        from core.templatetags.custom_filters import unique_messages
+
+        messages = [
+            self.Message(40, "Please review."),
+            self.Message(25, "Please review."),
+        ]
+
+        self.assertEqual(len(unique_messages(messages)), 2)

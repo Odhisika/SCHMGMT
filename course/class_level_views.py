@@ -14,6 +14,7 @@ def class_level_detail(request, level_code):
     from django.conf import settings
     from course.models import Course, CourseAllocation
     from accounts.models import User
+    from core.models import Term
     
     # Get the display name for this level
     level_name = None
@@ -42,11 +43,18 @@ def class_level_detail(request, level_code):
         messages.error(request, "Invalid class level.")
         return redirect("programs")
     
-    # Get all courses for this level
+    # Get the current term's courses for this level. Courses are term-specific,
+    # so showing every term here would repeat each subject three times.
+    current_term = Term.objects.filter(
+        school=request.school, is_current_term=True
+    ).first()
     courses = Course.objects.filter(
         level=level_code,
         school=request.school
-    ).select_related('program').order_by('title')
+    )
+    if current_term:
+        courses = courses.filter(term=current_term.term)
+    courses = courses.select_related('program').order_by('title')
     
     # Get teacher allocations for these courses
     allocations = CourseAllocation.objects.filter(

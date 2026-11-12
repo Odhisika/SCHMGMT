@@ -3,6 +3,22 @@ from django.contrib import messages
 from functools import wraps
 
 
+def _deny(request, message, redirect_to):
+    """Add one denial notice and redirect without looping back to itself.
+
+    Permission decorators historically pointed at ``/dashboard/``, which is
+    itself admin-only. A denied teacher/student would bounce between the
+    protected page and the dashboard, stacking "Access denied" messages on
+    every hop. If the redirect target is the page already being requested we
+    fall back to the public home page instead. The comparison ignores the
+    active language prefix (for example ``/en/dashboard/``).
+    """
+    messages.error(request, message)
+    if request.path.rstrip("/").endswith(redirect_to.rstrip("/")):
+        redirect_to = "/"
+    return redirect(redirect_to)
+
+
 def admin_required(
     function=None,
     redirect_to="/dashboard/",
@@ -22,8 +38,11 @@ def admin_required(
             # Call the original function if the user passes the test
             return function(request, *args, **kwargs) if function else None
         # Redirect to the specified URL if the user fails the test
-        messages.error(request, "Access denied. School administrator required.")
-        return redirect(redirect_to)
+        return _deny(
+            request,
+            "Access denied. School administrator required.",
+            redirect_to,
+        )
 
     return wrapper if function else test_func
 
@@ -47,8 +66,11 @@ def lecturer_required(
             # Call the original function if the user passes the test
             return function(request, *args, **kwargs) if function else None
         # Redirect to the specified URL if the user fails the test
-        messages.error(request, "Access denied. Lecturer or school admin required.")
-        return redirect(redirect_to)
+        return _deny(
+            request,
+            "Access denied. Lecturer or school admin required.",
+            redirect_to,
+        )
 
     return wrapper if function else test_func
 
@@ -63,16 +85,22 @@ def school_admin_required(function=None, redirect_to="/dashboard/"):
     
     def wrapper(request, *args, **kwargs):
         if not test_func(request.user):
-            messages.error(request, "Access denied. School admin required.")
-            return redirect(redirect_to)
+            return _deny(
+                request,
+                "Access denied. School admin required.",
+                redirect_to,
+            )
         
         # For school admins, ensure they're accessing their own school's data
         if (hasattr(request, 'school') and 
             request.user.is_school_admin and 
             not request.user.is_superuser and
             request.school != request.user.school):
-            messages.error(request, "Access denied to other school's data.")
-            return redirect(redirect_to)
+            return _deny(
+                request,
+                "Access denied to other school's data.",
+                redirect_to,
+            )
             
         return function(request, *args, **kwargs) if function else None
     
@@ -89,8 +117,11 @@ def school_staff_required(function=None, redirect_to="/dashboard/"):
     
     def wrapper(request, *args, **kwargs):
         if not test_func(request.user):
-            messages.error(request, "Access denied. School staff required.")
-            return redirect(redirect_to)
+            return _deny(
+                request,
+                "Access denied. School staff required.",
+                redirect_to,
+            )
         return function(request, *args, **kwargs) if function else None
     
     return wrapper if function else test_func
@@ -106,8 +137,11 @@ def can_manage_school_required(function=None, redirect_to="/dashboard/"):
     
     def wrapper(request, *args, **kwargs):
         if not test_func(request.user):
-            messages.error(request, "Access denied. School management permissions required.")
-            return redirect(redirect_to)
+            return _deny(
+                request,
+                "Access denied. School management permissions required.",
+                redirect_to,
+            )
         return function(request, *args, **kwargs) if function else None
     
     return wrapper if function else test_func
@@ -132,7 +166,10 @@ def student_required(
             # Call the original function if the user passes the test
             return function(request, *args, **kwargs) if function else None
         # Redirect to the specified URL if the user fails the test
-        messages.error(request, "Access denied. Student or school admin required.")
-        return redirect(redirect_to)
+        return _deny(
+            request,
+            "Access denied. Student or school admin required.",
+            redirect_to,
+        )
 
     return wrapper if function else test_func

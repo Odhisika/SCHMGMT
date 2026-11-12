@@ -1,8 +1,15 @@
 from django.urls import path
 
+from .notification_views import (
+    notification_list,
+    notification_mark_all_read,
+    notification_open,
+    notification_widget,
+)
 from .views import (
     home_view,
     post_add,
+    post_detail,
     edit_post,
     delete_post,
     semester_list_view,
@@ -23,6 +30,7 @@ urlpatterns = [
     # Accounts url
     path("", home_view, name="home"),
     path("add_item/", post_add, name="add_item"),
+    path("item/<int:pk>/", post_detail, name="post_detail"),
     path("item/<int:pk>/edit/", edit_post, name="edit_post"),
     path("item/<int:pk>/delete/", delete_post, name="delete_post"),
     path("semester/", semester_list_view, name="semester_list"),
@@ -30,6 +38,12 @@ urlpatterns = [
     path("semester/<int:pk>/edit/", semester_update_view, name="edit_semester"),
     path("semester/<int:pk>/delete/", semester_delete_view, name="delete_semester"),
     path("dashboard/", dashboard_view, name="dashboard"),
+
+    # Notification center
+    path("notifications/", notification_list, name="notification_list"),
+    path("notifications/widget/", notification_widget, name="notification_widget"),
+    path("notifications/<int:pk>/open/", notification_open, name="notification_open"),
+    path("notifications/mark-all-read/", notification_mark_all_read, name="notification_mark_all_read"),
     
     # Term Weeks
     path("semester/<int:term_pk>/weeks/", term_week_list_view, name="term_week_list"),

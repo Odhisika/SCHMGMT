@@ -197,3 +197,246 @@ document.body.addEventListener('htmx:afterOnLoad', function (evt) {
   document.body.addEventListener('htmx:afterSwap', initSidebarResizeSync);
   document.body.addEventListener('htmx:historyRestore', initSidebarResizeSync);
 })();
+
+// ##################################
+// Custom confirmation dialog and toast notifications.
+// Replaces the browser's native confirm()/alert() prompts with the app's
+// own Bootstrap-styled modal so every action looks consistent.
+(function () {
+  var modalEl = document.getElementById("appConfirmModal");
+  if (!modalEl || typeof bootstrap === "undefined") return;
+
+  var modal = new bootstrap.Modal(modalEl);
+  var iconWrap = document.getElementById("appConfirmIcon");
+  var iconEl = iconWrap ? iconWrap.querySelector("i") : null;
+  var titleEl = document.getElementById("appConfirmTitle");
+  var messageEl = document.getElementById("appConfirmMessage");
+  var okBtn = document.getElementById("appConfirmOk");
+  var cancelBtn = document.getElementById("appConfirmCancel");
+
+  var activeResolve = null;
+  var activeSettled = true;
+
+  function settle(result) {
+    if (activeSettled) return;
+    activeSettled = true;
+    var resolve = activeResolve;
+    activeResolve = null;
+    if (resolve) resolve(result);
+  }
+
+  function variantStyles(variant) {
+    switch (variant) {
+      case "danger":
+        return { wrap: "is-danger", button: "btn-danger", icon: "fa-triangle-exclamation" };
+      case "warning":
+        return { wrap: "is-warning", button: "btn-warning", icon: "fa-exclamation-circle" };
+      case "success":
+        return { wrap: "is-success", button: "btn-success", icon: "fa-check-circle" };
+      default:
+        return { wrap: "is-primary", button: "btn-primary", icon: "fa-circle-question" };
+    }
+  }
+
+  function resolveIcon(icon, fallback) {
+    if (!icon) return fallback;
+    return icon.indexOf("fa-") === 0 ? icon : "fa-" + icon;
+  }
+
+  window.appConfirm = function (options) {
+    if (typeof options === "string") options = { message: options };
+    options = options || {};
+
+    if (activeResolve) settle(false);
+
+    var styles = variantStyles(options.variant);
+    if (iconWrap) iconWrap.className = "app-confirm-icon mx-auto mb-3 " + styles.wrap;
+    if (iconEl) iconEl.className = "fas " + resolveIcon(options.icon, styles.icon);
+    if (titleEl) titleEl.textContent = options.title || "Please confirm";
+    if (messageEl) messageEl.textContent = options.message || "Are you sure you want to continue?";
+    if (okBtn) {
+      okBtn.textContent = options.okText || "Confirm";
+      okBtn.className = "btn " + styles.button + " px-4";
+    }
+    if (cancelBtn) cancelBtn.textContent = options.cancelText || "Cancel";
+
+    return new Promise(function (resolve) {
+      activeResolve = resolve;
+      activeSettled = false;
+      modal.show();
+    });
+  };
+
+  if (okBtn) {
+    okBtn.addEventListener("click", function () {
+      settle(true);
+      modal.hide();
+    });
+  }
+
+  modalEl.addEventListener("hidden.bs.modal", function () {
+    settle(false);
+  });
+
+  function confirmOptionsFromData(element) {
+    return {
+      message: element.getAttribute("data-confirm"),
+      title: element.getAttribute("data-confirm-title"),
+      okText: element.getAttribute("data-confirm-ok"),
+      cancelText: element.getAttribute("data-confirm-cancel"),
+      variant: element.getAttribute("data-confirm-variant"),
+      icon: element.getAttribute("data-confirm-icon"),
+    };
+  }
+
+  // Declarative links and buttons: <a data-confirm="..."> or
+  // <button data-confirm="..." data-confirm-variant="danger">.
+  document.addEventListener(
+    "click",
+    function (event) {
+      var trigger = event.target.closest("[data-confirm]");
+      if (!trigger) return;
+
+      if (trigger.getAttribute("data-confirm-bypass") === "true") {
+        trigger.removeAttribute("data-confirm-bypass");
+        return;
+      }
+
+      event.preventDefault();
+      event.stopImmediatePropagation();
+
+      window.appConfirm(confirmOptionsFromData(trigger)).then(function (confirmed) {
+        if (!confirmed) return;
+        trigger.setAttribute("data-confirm-bypass", "true");
+        trigger.click();
+      });
+    },
+    true
+  );
+
+  // Declarative forms: <form method="post" data-confirm="...">.
+  document.addEventListener(
+    "submit",
+    function (event) {
+      var form = event.target;
+      if (!form || form.tagName !== "FORM" || !form.hasAttribute("data-confirm")) return;
+
+      if (form.getAttribute("data-confirm-bypass") === "true") {
+        form.removeAttribute("data-confirm-bypass");
+        return;
+      }
+
+      event.preventDefault();
+      event.stopImmediatePropagation();
+
+      window.appConfirm(confirmOptionsFromData(form)).then(function (confirmed) {
+        if (!confirmed) return;
+        form.setAttribute("data-confirm-bypass", "true");
+        if (typeof form.requestSubmit === "function") {
+          form.requestSubmit();
+        } else {
+          form.submit();
+        }
+      });
+    },
+    true
+  );
+
+  window.appNotify = function (message, variant, title) {
+    var container = document.getElementById("appToastContainer");
+    if (!container || typeof bootstrap === "undefined") {
+      if (message) console.info(message);
+      return;
+    }
+
+    variant = variant || "success";
+    var icons = {
+      success: "fa-circle-check",
+      danger: "fa-circle-exclamation",
+      warning: "fa-triangle-exclamation",
+      info: "fa-circle-info",
+    };
+
+    var toastEl = document.createElement("div");
+    toastEl.className = "toast align-items-center border-0 app-toast text-bg-" + variant;
+    toastEl.setAttribute("role", "alert");
+    toastEl.setAttribute("aria-live", "assertive");
+    toastEl.setAttribute("aria-atomic", "true");
+
+    var wrapper = document.createElement("div");
+    wrapper.className = "d-flex";
+
+    var body = document.createElement("div");
+    body.className = "toast-body d-flex align-items-start gap-2";
+
+    var icon = document.createElement("i");
+    icon.className = "fas " + (icons[variant] || icons.info) + " mt-1";
+    body.appendChild(icon);
+
+    var copy = document.createElement("div");
+    if (title) {
+      var heading = document.createElement("div");
+      heading.className = "fw-semibold";
+      heading.textContent = title;
+      copy.appendChild(heading);
+    }
+    var text = document.createElement("div");
+    text.textContent = message;
+    copy.appendChild(text);
+    body.appendChild(copy);
+
+    var close = document.createElement("button");
+    close.type = "button";
+    close.className = "btn-close btn-close-white me-2 m-auto";
+    close.setAttribute("data-bs-dismiss", "toast");
+    close.setAttribute("aria-label", "Close");
+
+    wrapper.appendChild(body);
+    wrapper.appendChild(close);
+    toastEl.appendChild(wrapper);
+    container.appendChild(toastEl);
+
+    toastEl.addEventListener("hidden.bs.toast", function () {
+      toastEl.remove();
+    });
+
+    new bootstrap.Toast(toastEl, { delay: 4500 }).show();
+  };
+})();
+
+// Keep the notification panel inside the viewport on narrow screens. Bootstrap
+// uses static dropdown positioning for this widget; here we align the panel to
+// the viewport edge and place it just below the bell after it opens.
+document.addEventListener("shown.bs.dropdown", function (event) {
+  var widget = event.target && event.target.closest
+    ? event.target.closest(".notification-widget")
+    : null;
+  if (!widget) return;
+  if (window.innerWidth > 575.98) return;
+
+  var bell = widget.querySelector(".notification-bell");
+  var menu = widget.querySelector(".notification-dropdown");
+  if (!bell || !menu) return;
+
+  var bellRect = bell.getBoundingClientRect();
+  var top = Math.min(bellRect.bottom + 8, Math.max(8, window.innerHeight - 180));
+  menu.style.top = top + "px";
+  menu.style.right = "8px";
+  menu.style.left = "auto";
+  menu.style.width = Math.min(370, window.innerWidth - 16) + "px";
+  menu.style.maxHeight = Math.max(150, window.innerHeight - top - 8) + "px";
+});
+
+document.addEventListener("hidden.bs.dropdown", function (event) {
+  var widget = event.target && event.target.closest
+    ? event.target.closest(".notification-widget")
+    : null;
+  if (!widget) return;
+  var menu = widget.querySelector(".notification-dropdown");
+  if (!menu) return;
+  menu.style.removeProperty("top");
+  menu.style.removeProperty("right");
+  menu.style.removeProperty("left");
+  menu.style.removeProperty("width");
+  menu.style.removeProperty("max-height");
+});

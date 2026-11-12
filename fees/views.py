@@ -11,6 +11,8 @@ from decimal import Decimal
 from accounts.decorators import admin_required, student_required
 from accounts.models import Student
 from core.models import Term
+from core.models import Notification
+from core.notifications import notify
 from .models import FeeStructure, StudentFeeAssignment, Payment, SchoolBankAccount, StudentPaymentReference
 
 
@@ -447,10 +449,28 @@ def verify_payment(request, payment_id):
             from django.utils import timezone
             payment.verified_at = timezone.now()
             payment.save()
+            notify(
+                school=request.school,
+                recipient=payment.student.student,
+                title="Fee payment verified",
+                message=f"Your payment of GH₵{payment.amount} has been verified.",
+                link="/fees/",
+                notification_type=Notification.TYPE_SUCCESS,
+                actor=request.user,
+            )
             messages.success(request, _("Payment verified successfully!"))
         elif action == 'reject':
             payment.status = 'FAILED'
             payment.save()
+            notify(
+                school=request.school,
+                recipient=payment.student.student,
+                title="Fee payment needs attention",
+                message=f"Your payment of GH₵{payment.amount} was not verified. Please contact the school office.",
+                link="/fees/",
+                notification_type=Notification.TYPE_WARNING,
+                actor=request.user,
+            )
             messages.info(request, _("Payment marked as failed."))
         
         return redirect('fees:dashboard')

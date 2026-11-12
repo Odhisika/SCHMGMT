@@ -20,6 +20,7 @@
                     <h6 class="m-0 font-weight-bold text-primary">Score Entry Selection</h6>
                 </div>
                 <div class="card-body">
+                    {% if levels %}
                     <form id="scoreSelectionForm">
                         <div class="mb-3">
                             <label for="levelSelect" class="form-label">Select Class/Level</label>
@@ -29,15 +30,15 @@
                                 <option value="{{ code }}">{{ name }}</option>
                                 {% endfor %}
                             </select>
-                            <small class="text-muted">Only classes in your division are shown.</small>
+                            <small class="text-muted">Only classes with subjects you can manage are shown.</small>
                         </div>
 
                         <div class="mb-4">
                             <label for="subjectSelect" class="form-label">Select Subject</label>
-                            <select class="form-select" id="subjectSelect" required>
-                                <option value="">Choose...</option>
+                            <select class="form-select" id="subjectSelect" required disabled>
+                                <option value="">Choose a class first...</option>
                                 {% for subject in subjects %}
-                                <option value="{{ subject.id }}">{{ subject.title }} ({{ subject.code }}) - {{ subject.level }}</option>
+                                <option value="{{ subject.id }}" data-level="{{ subject.level }}">{{ subject.title }} ({{ subject.code }}) - {{ subject.level }}</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -48,6 +49,13 @@
                             </button>
                         </div>
                     </form>
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-inbox fa-2x mb-2"></i>
+                        <p class="mb-1">{% trans 'No subjects are allocated to you for the current term.' %}</p>
+                        <p class="small mb-0">{% trans 'Ask a school administrator to allocate subjects before entering scores.' %}</p>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -57,18 +65,51 @@
 
 {% block js %}
 <script>
-    document.getElementById('scoreSelectionForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        
-        const level = document.getElementById('levelSelect').value;
-        const subject = document.getElementById('subjectSelect').value;
-        
-        if (level && subject) {
-            // Construct URL: /result/enter-scores/LEVEL/?subject=ID
-            // Note: We need the base URL from Django
-            const baseUrl = "{% url 'enter_scores' 'PLACEHOLDER' %}".replace('PLACEHOLDER', level);
-            window.location.href = `${baseUrl}?subject=${subject}`;
+    (function () {
+        const form = document.getElementById('scoreSelectionForm');
+        if (!form) return;
+
+        const levelSelect = document.getElementById('levelSelect');
+        const subjectSelect = document.getElementById('subjectSelect');
+        const allSubjectOptions = Array.from(subjectSelect.querySelectorAll('option[data-level]'));
+
+        function filterSubjects() {
+            const level = levelSelect.value;
+            const previousValue = subjectSelect.value;
+            subjectSelect.innerHTML = '';
+
+            if (!level) {
+                subjectSelect.appendChild(new Option('Choose a class first...', ''));
+                subjectSelect.disabled = true;
+                return;
+            }
+
+            subjectSelect.appendChild(new Option('Choose...', ''));
+            allSubjectOptions.forEach(function (option) {
+                if (option.dataset.level === level) {
+                    subjectSelect.appendChild(option.cloneNode(true));
+                }
+            });
+            subjectSelect.disabled = false;
+            if (Array.from(subjectSelect.options).some(function (option) { return option.value === previousValue; })) {
+                subjectSelect.value = previousValue;
+            }
         }
-    });
+
+        levelSelect.addEventListener('change', filterSubjects);
+        filterSubjects();
+
+        form.addEventListener('submit', function (event) {
+            event.preventDefault();
+            const level = levelSelect.value;
+            const subject = subjectSelect.value;
+
+            if (level && subject) {
+                // Construct URL: /result/enter-scores/LEVEL/?subject=ID
+                const baseUrl = "{% url 'enter_scores' 'PLACEHOLDER' %}".replace('PLACEHOLDER', level);
+                window.location.href = `${baseUrl}?subject=${subject}`;
+            }
+        });
+    })();
 </script>
 {% endblock js %}

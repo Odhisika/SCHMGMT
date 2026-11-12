@@ -1,6 +1,7 @@
 
+{% load custom_filters %}
 {% if messages %}
-    {% for message in messages %}
+    {% for message in messages|unique_messages %}
         {% if message.tags == 'error' %}
             <div class="alert py-2 alert-danger d-flex align-items-center">
                 <i class="fas fa-exclamation-circle me-2" style="min-width: 35px;"></i><span>{{ message }}</span>

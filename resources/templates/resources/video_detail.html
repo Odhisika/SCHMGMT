@@ -20,10 +20,25 @@
     <div class="col-lg-8">
         <div class="card mb-3">
             <div class="card-body p-0">
+                {% if video.is_youtube %}
+                <div class="ratio ratio-16x9">
+                    <iframe src="{{ video.youtube_embed_url }}"
+                            title="{{ video.title }}"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                            referrerpolicy="strict-origin-when-cross-origin"
+                            allowfullscreen></iframe>
+                </div>
+                {% elif video.video %}
                 <video width="100%" height="auto" controls controlsList="nodownload" style="max-height: 500px;">
                     <source src="{{ video.video.url }}" type="video/mp4">
                     {% trans 'Your browser does not support the video tag.' %}
                 </video>
+                {% else %}
+                <div class="p-5 text-center text-muted">
+                    <i class="fas fa-video-slash fa-2x mb-2"></i>
+                    <p class="mb-0">{% trans 'No video source is available for this resource.' %}</p>
+                </div>
+                {% endif %}
             </div>
         </div>
 
@@ -36,6 +51,11 @@
                         <span class="badge bg-info me-2">
                             <i class="fas fa-eye"></i> {{ video.views }} {% trans 'views' %}
                         </span>
+                        {% if video.is_youtube %}
+                        <span class="badge bg-danger me-2">
+                            <i class="fab fa-youtube"></i> {% trans 'YouTube' %}
+                        </span>
+                        {% endif %}
                         {% if video.duration %}
                         <span class="badge bg-secondary me-2">
                             <i class="fas fa-clock"></i> {{ video.duration }}
@@ -50,7 +70,11 @@
                         <a href="{% url 'resources:video_edit' course.slug video.slug %}" class="btn btn-sm btn-warning">
                             <i class="fas fa-edit"></i> {% trans 'Edit' %}
                         </a>
-                        <form method="post" action="{% url 'resources:video_delete' course.slug video.slug %}" class="d-inline" onsubmit="return confirm('{% trans 'Are you sure you want to delete this video?' %}');">
+                        <form method="post" action="{% url 'resources:video_delete' course.slug video.slug %}" class="d-inline"
+                              data-confirm="{% trans 'This video will be permanently deleted.' %}"
+                              data-confirm-title="{% trans 'Delete this video?' %}"
+                              data-confirm-ok="{% trans 'Delete video' %}"
+                              data-confirm-variant="danger" data-confirm-icon="trash">
                             {% csrf_token %}
                             <button type="submit" class="btn btn-sm btn-danger">
                                 <i class="fas fa-trash"></i> {% trans 'Delete' %}
@@ -59,6 +83,14 @@
                     </div>
                     {% endif %}
                 </div>
+
+                {% if video.is_youtube %}
+                <div class="mb-3">
+                    <a href="{{ video.youtube_url }}" target="_blank" rel="noopener noreferrer" class="small">
+                        <i class="fab fa-youtube text-danger me-1"></i>{% trans 'Open on YouTube' %}
+                    </a>
+                </div>
+                {% endif %}
 
                 {% if video.uploaded_by %}
                 <div class="mb-3">
@@ -102,6 +134,8 @@
                         <div class="d-flex align-items-center">
                             {% if other_video.thumbnail %}
                             <img src="{{ other_video.thumbnail.url }}" alt="{{ other_video.title }}" class="me-2" style="width: 80px; height: 45px; object-fit: cover;">
+                            {% elif other_video.is_youtube %}
+                            <img src="{{ other_video.youtube_thumbnail_url }}" alt="{{ other_video.title }}" class="me-2" style="width: 80px; height: 45px; object-fit: cover;">
                             {% else %}
                             <div class="bg-secondary text-white d-flex align-items-center justify-content-center me-2" style="width: 80px; height: 45px;">
                                 <i class="fas fa-video"></i>

@@ -139,7 +139,7 @@ class CourseResourceModelTests(DemoDataTestCase):
 
 class LessonNoteModelTests(DemoDataTestCase):
     def test_draft_lesson_note_can_be_edited_and_submitted(self):
-        note = LessonNote.objects.get(teacher=self.teacher, week_number=2)
+        note = LessonNote.objects.get(teacher=self.class_teacher, week_number=2)
 
         self.assertEqual(note.status, "DRAFT")
         self.assertTrue(note.can_edit())
@@ -147,7 +147,7 @@ class LessonNoteModelTests(DemoDataTestCase):
         self.assertEqual(note.get_status_display_class(), "secondary")
 
     def test_submitted_lesson_note_is_read_only(self):
-        note = LessonNote.objects.get(teacher=self.teacher, week_number=1)
+        note = LessonNote.objects.get(teacher=self.class_teacher, week_number=1)
 
         self.assertEqual(note.status, "SUBMITTED")
         self.assertFalse(note.can_edit())
@@ -186,8 +186,8 @@ class CourseViewTests(DemoDataTestCase):
         self.assertEqual(response.context["course"], self.primary_course)
 
     def test_lesson_note_workflow_submit_and_delete(self):
-        self.client.force_login(self.teacher)
-        draft = LessonNote.objects.get(teacher=self.teacher, week_number=2)
+        self.client.force_login(self.class_teacher)
+        draft = LessonNote.objects.get(teacher=self.class_teacher, week_number=2)
 
         response = self.client.get(reverse("lesson_note_list"))
         self.assertEqual(response.status_code, 200)

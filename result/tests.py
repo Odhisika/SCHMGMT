@@ -1,7 +1,9 @@
 """Tests for results, grading weights, positions and promotion workflows."""
 
 from decimal import Decimal
+from io import StringIO
 
+from django.core.management import call_command
 from django.urls import reverse
 
 from core.testing import DemoDataTestCase
@@ -13,6 +15,7 @@ from result.models import (
     ResultEditRequest,
     TakenCourse,
 )
+from result.promotion import apply_promotion, build_candidates, next_level
 from school.models import School
 
 
@@ -243,6 +246,86 @@ class PromotionRequestTests(DemoDataTestCase):
         self.assertEqual(result.promotion_status, original_status)
 
 
+class PromotionEngineTests(DemoDataTestCase):
+    def _candidates(self, level=None):
+        return build_candidates(
+            level or self.demo_levels[0],
+            self.current_term.year,
+            self.school,
+        )
+
+    def test_candidates_use_the_three_term_average(self):
+        candidates = self._candidates()
+
+        self.assertTrue(any(candidate.promoted for candidate in candidates))
+        self.assertTrue(any(not candidate.promoted for candidate in candidates))
+
+        for candidate in candidates:
+            expected = round(
+                (candidate.term1 + candidate.term2 + candidate.term3)
+                / Decimal("3"),
+                2,
+            )
+            self.assertEqual(candidate.average, expected)
+            self.assertEqual(candidate.next_level, next_level(candidate.level))
+
+    def test_applying_promotion_moves_passers_and_holds_failers(self):
+        level = self.demo_levels[0]
+        candidates = self._candidates(level)
+        passers = [candidate for candidate in candidates if candidate.promoted]
+        repeaters = [
+            candidate for candidate in candidates if not candidate.promoted
+        ]
+        self.assertTrue(passers)
+        self.assertTrue(repeaters)
+
+        summary = apply_promotion(candidates)
+
+        self.assertEqual(summary["promoted"], len(passers))
+        self.assertEqual(summary["held_back"], len(repeaters))
+
+        for candidate in passers:
+            candidate.student.refresh_from_db()
+            self.assertEqual(candidate.student.level, next_level(level))
+            candidate.result.refresh_from_db()
+            self.assertEqual(
+                candidate.result.promotion_status, candidate.status
+            )
+
+        for candidate in repeaters:
+            candidate.student.refresh_from_db()
+            self.assertEqual(candidate.student.level, level)
+
+    def test_promote_students_command_dry_run_changes_nothing(self):
+        before = {
+            student.pk: student.level
+            for student in self.demo.students[self.demo_levels[0]]
+        }
+        stdout = StringIO()
+
+        call_command("promote_students", "--dry-run", stdout=stdout)
+
+        output = stdout.getvalue()
+        self.assertIn("DRY RUN", output)
+        self.assertIn(self.demo_levels[0], output)
+        for student in self.demo.students[self.demo_levels[0]]:
+            student.refresh_from_db()
+            self.assertEqual(student.level, before[student.pk])
+
+    def test_promote_students_command_evaluates_each_student_once(self):
+        stdout = StringIO()
+        total_students = sum(
+            len(students) for students in self.demo.students.values()
+        )
+
+        call_command("promote_students", stdout=stdout)
+
+        output = stdout.getvalue()
+        # Promoted students must not be re-evaluated in their new class during
+        # the same run.
+        self.assertIn(f"Evaluated {total_students} students", output)
+
+
 class BECEMockResultTests(DemoDataTestCase):
     def test_grade_is_derived_from_score(self):
         exam = BECEMockExam.objects.create(
@@ -295,6 +378,34 @@ class ResultViewTests(DemoDataTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["course"], self.primary_course)
+
+    def test_school_admin_can_open_manage_scores(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse("manage_scores"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(self.primary_course, response.context["subjects"])
+
+    def test_legacy_add_score_redirects_to_manage_scores(self):
+        self.client.force_login(self.teacher)
+
+        response = self.client.get(reverse("add_score"))
+
+        self.assertRedirects(response, reverse("manage_scores"))
+
+    def test_legacy_add_score_for_redirects_to_weighted_entry(self):
+        self.client.force_login(self.teacher)
+
+        response = self.client.get(
+            reverse("add_score_for", args=[self.primary_course.pk])
+        )
+
+        expected = (
+            reverse("enter_scores", args=[self.primary_course.level])
+            + f"?subject={self.primary_course.pk}"
+        )
+        self.assertRedirects(response, expected)
 
     def test_student_can_view_released_results_page(self):
         self.client.force_login(self.student_user)

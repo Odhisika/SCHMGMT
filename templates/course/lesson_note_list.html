@@ -80,8 +80,12 @@
                                 </a>
                                 {% endif %}
                                 {% if note.status == 'DRAFT' %}
-                                <a href="{% url 'lesson_note_delete' note.pk %}" class="btn btn-sm btn-danger" 
-                                   onclick="return confirm('Are you sure you want to delete this lesson note?');" title="Delete">
+                                <a href="{% url 'lesson_note_delete' note.pk %}" class="btn btn-sm btn-danger"
+                                   data-confirm="Are you sure you want to delete this lesson note?"
+                                   data-confirm-title="Delete lesson note?"
+                                   data-confirm-ok="Delete note"
+                                   data-confirm-variant="danger"
+                                   data-confirm-icon="trash" title="Delete">
                                     <i class="fas fa-trash"></i>
                                 </a>
                                 {% endif %}
