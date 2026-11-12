@@ -3,8 +3,8 @@ from django.dispatch import receiver
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 
-from accounts.models import Student, User
-from course.models import Course, CourseAllocation
+from accounts.models import Student
+from course.models import Course
 from result.models import TakenCourse
 from core.models import Term, ActivityLog
 from attendance.utils import sync_attendance_records
@@ -157,46 +157,3 @@ def handle_student_level_program_change(sender, instance, created, **kwargs):
         ActivityLog.objects.create(
             message=_(f"Student '{instance.student.get_full_name}' changed program to {instance.program} - courses updated")
         )
-@receiver(post_save, sender=User)
-def auto_allocate_courses_to_teacher(sender, instance, created, **kwargs):
-    """
-    When a teacher is assigned a level (class), automatically allocate
-    all core courses for that level to them.
-    """
-    if kwargs.get('raw', False) or not instance.assigned_level:
-        return
-    
-    if not (instance.is_teacher or instance.is_lecturer or instance.is_class_teacher):
-        return
-        
-    school = instance.school
-    if not school:
-        return
-        
-    current_term = Term.objects.filter(is_current_term=True, school=school).first()
-    if not current_term:
-        return
-        
-    # Get all core courses for this level
-    courses = Course.objects.filter(
-        level=instance.assigned_level,
-        term=current_term.term,
-        is_core_subject=True,
-        school=school
-    )
-    
-    if not courses.exists():
-        return
-        
-    # Get or create allocation for this teacher
-    allocation, created_alloc = CourseAllocation.objects.get_or_create(
-        teacher=instance
-    )
-    
-    # Add courses to allocation
-    allocation.courses.add(*courses)
-    
-    # Log activity
-    ActivityLog.objects.create(
-        message=_(f"Teacher '{instance.get_full_name}' auto-allocated courses for {instance.assigned_level}")
-    )
