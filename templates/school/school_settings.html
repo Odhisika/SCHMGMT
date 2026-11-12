@@ -362,6 +362,16 @@
               {{ form.phone }}
             </div>
             <div class="col-md-4">
+              <label class="form-label fw-bold">{% trans 'Support Email' %}</label>
+              {{ form.support_email }}
+              <small class="form-text text-muted">{% trans 'Shown in account emails and school reports for help requests.' %}</small>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-bold">{% trans 'Support Phone' %}</label>
+              {{ form.support_phone }}
+              <small class="form-text text-muted">{% trans 'Shown with the support email where contact details appear.' %}</small>
+            </div>
+            <div class="col-md-4">
               <label class="form-label fw-bold">{% trans 'Founded In' %}</label>
               {{ form.founded_year }}
             </div>

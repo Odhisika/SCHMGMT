@@ -1,0 +1,143 @@
+{% load i18n %}
+{% load crispy_forms_tags %}
+
+<div class="row g-4">
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <p class="form-title">{% trans 'Personal Information' %}</p>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">{{ form.first_name|as_crispy_field }}</div>
+                    <div class="col-md-4">{{ form.other_names|as_crispy_field }}</div>
+                    <div class="col-md-4">{{ form.last_name|as_crispy_field }}</div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">{{ form.gender|as_crispy_field }}</div>
+                    <div class="col-md-6">{{ form.date_of_birth|as_crispy_field }}</div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">{{ form.place_of_birth|as_crispy_field }}</div>
+                    <div class="col-md-6">{{ form.nationality|as_crispy_field }}</div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">{{ form.hometown|as_crispy_field }}</div>
+                    <div class="col-md-6">{{ form.region|as_crispy_field }}</div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">{{ form.district|as_crispy_field }}</div>
+                    <div class="col-md-6">{{ form.religion|as_crispy_field }}</div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">{{ form.ghana_card_number|as_crispy_field }}</div>
+                    <div class="col-md-6">{{ form.nhis_number|as_crispy_field }}</div>
+                </div>
+                {{ form.birth_certificate_number|as_crispy_field }}
+                {{ form.picture|as_crispy_field }}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <p class="form-title">{% trans 'Contact & Address' %}</p>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">{{ form.phone|as_crispy_field }}</div>
+                    <div class="col-md-6">{{ form.alternate_phone|as_crispy_field }}</div>
+                </div>
+                {{ form.email|as_crispy_field }}
+                {{ form.address|as_crispy_field }}
+                {{ form.gps_address|as_crispy_field }}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <p class="form-title">{% trans 'Admission & Academic Record' %}</p>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">{{ form.admission_number|as_crispy_field }}</div>
+                    <div class="col-md-6">{{ form.admission_date|as_crispy_field }}</div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">{{ form.level|as_crispy_field }}</div>
+                    <div class="col-md-6">{{ form.program|as_crispy_field }}</div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">{{ form.house|as_crispy_field }}</div>
+                    <div class="col-md-6">{{ form.boarding_status|as_crispy_field }}</div>
+                </div>
+                {{ form.previous_school|as_crispy_field }}
+                <div class="row">
+                    <div class="col-md-6">{{ form.previous_class|as_crispy_field }}</div>
+                    <div class="col-md-6">{{ form.bece_year|as_crispy_field }}</div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">{{ form.bece_index_number|as_crispy_field }}</div>
+                    <div class="col-md-6">{{ form.bece_aggregate|as_crispy_field }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <p class="form-title">{% trans 'Parent / Guardian Details' %}</p>
+            <div class="card-body">
+                {{ form.guardian_name|as_crispy_field }}
+                <div class="row">
+                    <div class="col-md-6">{{ form.guardian_relationship|as_crispy_field }}</div>
+                    <div class="col-md-6">{{ form.guardian_phone|as_crispy_field }}</div>
+                </div>
+                {{ form.guardian_email|as_crispy_field }}
+                <div class="row">
+                    <div class="col-md-6">{{ form.guardian_occupation|as_crispy_field }}</div>
+                    <div class="col-md-6">{{ form.guardian_ghana_card|as_crispy_field }}</div>
+                </div>
+                {{ form.guardian_address|as_crispy_field }}
+                <hr>
+                <p class="small text-muted mb-2">{% trans 'Second parent / guardian (optional)' %}</p>
+                {{ form.second_guardian_name|as_crispy_field }}
+                <div class="row">
+                    <div class="col-md-6">{{ form.second_guardian_relationship|as_crispy_field }}</div>
+                    <div class="col-md-6">{{ form.second_guardian_phone|as_crispy_field }}</div>
+                </div>
+                {{ form.second_guardian_occupation|as_crispy_field }}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <p class="form-title">{% trans 'Health & Emergency Contact' %}</p>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">{{ form.blood_group|as_crispy_field }}</div>
+                    <div class="col-md-6">{{ form.emergency_contact_relationship|as_crispy_field }}</div>
+                </div>
+                {{ form.medical_conditions|as_crispy_field }}
+                {{ form.allergies|as_crispy_field }}
+                {{ form.special_needs|as_crispy_field }}
+                <hr>
+                {{ form.emergency_contact_name|as_crispy_field }}
+                {{ form.emergency_contact_phone|as_crispy_field }}
+                {{ form.emergency_contact_address|as_crispy_field }}
+            </div>
+        </div>
+    </div>
+
+    {% if form.username %}
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <p class="form-title">{% trans 'Account Access' %}</p>
+            <div class="card-body">
+                {{ form.username|as_crispy_field }}
+                <p class="small text-muted mb-0">
+                    {% trans 'Leave the username blank to generate a student login ID. The system will issue a temporary password after saving.' %}
+                </p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>

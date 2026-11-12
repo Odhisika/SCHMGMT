@@ -14,30 +14,20 @@
     </ol>
 </nav>
 
-<h4 class="fw-bold mb-3"><i class="fas fa-chalkboard-teacher me-2"></i>{% trans 'Teacher Add Form' %}</h4>
+<h4 class="fw-bold mb-3"><i class="fas fa-chalkboard-teacher me-2"></i>{% trans 'Teacher Registration / Employment Form' %}</h4>
+<p class="text-muted">{% trans 'Capture the teacher’s bio-data, GES employment record, statutory numbers, qualifications and payroll details.' %}</p>
 
 {% include 'snippets/messages.html' %}
 
-<form action="" method="POST">{% csrf_token %}
-    <div class="row mb-3">
-        
-        <div class="col-md-6">
-            <div class="card">
-                <p class="form-title">{% trans 'Personal Info' %}</p>
-                <div class="p-2">
-                    {{ form.first_name|as_crispy_field }}
-                    {{ form.last_name|as_crispy_field }}
-                    {{ form.email|as_crispy_field }}
-                    {{ form.address|as_crispy_field }}
-                    {{ form.phone|as_crispy_field }}
-                    {{ form.gender|as_crispy_field }}
-                    {{ form.department|as_crispy_field }}
-                    {{ form.division|as_crispy_field }}
-                </div>
-            </div>
-        </div>
+<form action="" method="POST" enctype="multipart/form-data">{% csrf_token %}
+    {% include 'accounts/snippets/staff_ges_form.html' %}
+
+    <div class="d-flex flex-wrap gap-2 mt-4">
+        <button class="btn btn-primary" type="submit">
+            <i class="fas fa-floppy-disk me-1"></i>{% trans 'Save Teacher' %}
+        </button>
+        <a class="btn btn-light" href="{% url 'lecturer_list' %}">{% trans 'Cancel' %}</a>
     </div>
-    <input class="btn btn-primary" type="submit" value="{% trans 'Save' %}">
 </form>
 
 {% endblock content %}

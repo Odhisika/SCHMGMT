@@ -10,7 +10,7 @@ class SchoolIdentityForm(forms.ModelForm):
     class Meta:
         model = School
         fields = [
-            'name', 'motto', 'email', 'phone', 'address', 'website',
+            'name', 'motto', 'email', 'phone', 'support_email', 'support_phone', 'address', 'website',
             'founded_year', 'logo', 'secondary_logo',
             'primary_color', 'secondary_color', 'accent_color',
         ]
@@ -19,6 +19,8 @@ class SchoolIdentityForm(forms.ModelForm):
             'motto': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. Knowledge is Light'}),
             'email': forms.EmailInput(attrs={'class': 'form-control'}),
             'phone': forms.TextInput(attrs={'class': 'form-control'}),
+            'support_email': forms.EmailInput(attrs={'class': 'form-control'}),
+            'support_phone': forms.TextInput(attrs={'class': 'form-control'}),
             'address': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'website': forms.URLInput(attrs={'class': 'form-control', 'placeholder': 'https://'}),
             'founded_year': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'e.g. 1995'}),
@@ -28,6 +30,70 @@ class SchoolIdentityForm(forms.ModelForm):
             'secondary_color': forms.TextInput(attrs={'class': 'form-control', 'type': 'color'}),
             'accent_color': forms.TextInput(attrs={'class': 'form-control', 'type': 'color'}),
         }
+
+
+class StudentIDFormatForm(forms.ModelForm):
+    """Configure distinct prefixes and layouts for each student division."""
+
+    class Meta:
+        model = School
+        fields = (
+            "student_id_nursery_prefix",
+            "student_id_nursery_pattern",
+            "student_id_primary_prefix",
+            "student_id_primary_pattern",
+            "student_id_jhs_prefix",
+            "student_id_jhs_pattern",
+        )
+        labels = {
+            "student_id_nursery_prefix": _("Nursery ID prefix"),
+            "student_id_nursery_pattern": _("Nursery ID format"),
+            "student_id_primary_prefix": _("Primary ID prefix"),
+            "student_id_primary_pattern": _("Primary ID format"),
+            "student_id_jhs_prefix": _("JHS ID prefix"),
+            "student_id_jhs_pattern": _("JHS ID format"),
+        }
+        help_texts = {
+            "student_id_nursery_prefix": _("Use a short, distinct code such as NUR."),
+            "student_id_primary_prefix": _("Use a short, distinct code such as PRI."),
+            "student_id_jhs_prefix": _("Use a short, distinct code such as JHS."),
+        }
+        widgets = {
+            "student_id_nursery_prefix": forms.TextInput(attrs={"class": "form-control", "maxlength": 12}),
+            "student_id_nursery_pattern": forms.Select(attrs={"class": "form-select"}),
+            "student_id_primary_prefix": forms.TextInput(attrs={"class": "form-control", "maxlength": 12}),
+            "student_id_primary_pattern": forms.Select(attrs={"class": "form-select"}),
+            "student_id_jhs_prefix": forms.TextInput(attrs={"class": "form-control", "maxlength": 12}),
+            "student_id_jhs_pattern": forms.Select(attrs={"class": "form-select"}),
+        }
+
+    def clean(self):
+        cleaned = super().clean()
+        prefix_fields = (
+            "student_id_nursery_prefix",
+            "student_id_primary_prefix",
+            "student_id_jhs_prefix",
+        )
+        for field_name in prefix_fields:
+            if cleaned.get(field_name):
+                cleaned[field_name] = cleaned[field_name].strip().upper()
+        seen = {}
+        for field_name in prefix_fields:
+            prefix = cleaned.get(field_name)
+            if not prefix:
+                continue
+            if prefix in seen:
+                self.add_error(
+                    field_name,
+                    _("Each division must have a different student ID prefix."),
+                )
+                self.add_error(
+                    seen[prefix],
+                    _("Each division must have a different student ID prefix."),
+                )
+            else:
+                seen[prefix] = field_name
+        return cleaned
 
 
 class GradeWeightForm(forms.ModelForm):

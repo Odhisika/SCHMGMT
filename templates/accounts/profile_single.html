@@ -52,6 +52,15 @@
                         </a>
                     {% endif %}
                 {% endif %}
+                {% if request.user.is_superuser or request.user.is_school_admin %}
+                    <form method="post" action="{% url 'reset_user_password' user.id %}"
+                          onsubmit="return confirm('{% trans 'Issue a new temporary password for this account?' %}');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-warning rounded-pill px-4 fw-bold">
+                            <i class="fas fa-key me-2"></i>{% trans 'Reset password' %}
+                        </button>
+                    </form>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -118,6 +127,18 @@
                     </div>
                 </div>
             </div>
+            {% if parent %}
+            <div class="card border-0 shadow-sm rounded-4 mb-4">
+                <div class="card-header bg-white border-0 py-3">
+                    <h5 class="card-title mb-0 fw-bold text-primary"><i class="fas fa-user-group me-2"></i>{% trans 'Linked Parent / Guardian' %}</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-1"><strong>{{ parent.user.get_full_name }}</strong> ({{ parent.get_relation_ship_display|default:parent.relation_ship }})</p>
+                    <p class="text-muted mb-2">{% trans 'Login ID' %}: {{ parent.user.username }}</p>
+                    <a href="{% url 'profile_single' parent.user_id %}" class="btn btn-sm btn-outline-primary">{% trans 'Open parent account' %}</a>
+                </div>
+            </div>
+            {% endif %}
             {% endif %}
 
             <!-- Personal Details Card -->

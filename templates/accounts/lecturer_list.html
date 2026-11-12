@@ -14,7 +14,10 @@
 {% if request.user.is_superuser or request.user.is_school_admin %}
 <div class="manage-wrap">
     <a class="btn btn-primary" href="{% url 'add_lecturer' %}"><i class="fas fa-plus"></i>{% trans 'Add Teacher' %}</a>
-    <a class="btn btn-primary" target="_blank" href="{% url 'lecturer_list_pdf' %}"><i class="fas fa-download"></i> {% trans 'Download pdf' %}</a><!--new-->
+    <a class="btn btn-primary" download="teachers_list.pdf" href="{% url 'lecturer_list_pdf' %}"><i class="fas fa-download"></i> {% trans 'Download pdf' %}</a>
+    <a class="btn btn-outline-primary" hx-boost="false" download="teachers_staff.xlsx" href="{% url 'staff_export' 'teachers' 'xlsx' %}"><i class="fas fa-file-excel"></i> {% trans 'Export Excel' %}</a>
+    <a class="btn btn-outline-primary" hx-boost="false" download="teachers_staff.docx" href="{% url 'staff_export' 'teachers' 'docx' %}"><i class="fas fa-file-word"></i> {% trans 'Export Word' %}</a>
+    <a class="btn btn-outline-secondary" hx-boost="false" href="{% url 'staff_import' %}"><i class="fas fa-file-import"></i> {% trans 'Import Excel' %}</a>
 </div>
 {% endif %}
 

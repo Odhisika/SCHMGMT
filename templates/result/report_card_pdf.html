@@ -107,8 +107,14 @@
         <div class="school-name">{{ request.school.name|upper }}</div>
         <div>
             {% if request.school.address %}{{ request.school.address }}{% endif %}
-            {% if request.school.address and request.school.phone %} | {% endif %}
-            {% if request.school.phone %}{{ request.school.phone }}{% endif %}
+            {% with contact_phone=request.school.support_phone|default:request.school.phone %}
+            {% if request.school.address and contact_phone %} | {% endif %}
+            {% if contact_phone %}{{ contact_phone }}{% endif %}
+            {% endwith %}
+            {% if request.school.support_email or request.school.email %}
+            {% if request.school.address or request.school.support_phone or request.school.phone %} | {% endif %}
+            {{ request.school.support_email|default:request.school.email }}
+            {% endif %}
         </div>
         <div class="report-title">{% trans 'TERMINAL REPORT CARD' %}</div>
     </div>

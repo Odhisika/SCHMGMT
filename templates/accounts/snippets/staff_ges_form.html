@@ -1,0 +1,166 @@
+{% load i18n %}
+{% load crispy_forms_tags %}
+
+<div class="row g-4">
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <p class="form-title">{% trans 'Personal Information' %}</p>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">{{ form.first_name|as_crispy_field }}</div>
+                    <div class="col-md-4">{{ form.other_names|as_crispy_field }}</div>
+                    <div class="col-md-4">{{ form.last_name|as_crispy_field }}</div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">{{ form.gender|as_crispy_field }}</div>
+                    <div class="col-md-6">{{ form.date_of_birth|as_crispy_field }}</div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">{{ form.place_of_birth|as_crispy_field }}</div>
+                    <div class="col-md-6">{{ form.nationality|as_crispy_field }}</div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">{{ form.hometown|as_crispy_field }}</div>
+                    <div class="col-md-6">{{ form.region|as_crispy_field }}</div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">{{ form.district|as_crispy_field }}</div>
+                    <div class="col-md-6">{{ form.religion|as_crispy_field }}</div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">{{ form.marital_status|as_crispy_field }}</div>
+                    <div class="col-md-6">{{ form.ghana_card_number|as_crispy_field }}</div>
+                </div>
+                {{ form.nhis_number|as_crispy_field }}
+                {{ form.picture|as_crispy_field }}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <p class="form-title">{% trans 'Contact & Address' %}</p>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">{{ form.phone|as_crispy_field }}</div>
+                    <div class="col-md-6">{{ form.alternate_phone|as_crispy_field }}</div>
+                </div>
+                {{ form.email|as_crispy_field }}
+                {{ form.address|as_crispy_field }}
+                {{ form.gps_address|as_crispy_field }}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <p class="form-title">{% trans 'Employment Details' %}</p>
+            <div class="card-body">
+                {% if form.non_teaching_position %}{{ form.non_teaching_position|as_crispy_field }}{% endif %}
+                {% if form.department %}{{ form.department|as_crispy_field }}{% endif %}
+                {% if form.division %}{{ form.division|as_crispy_field }}{% endif %}
+                {% if form.assigned_level %}{{ form.assigned_level|as_crispy_field }}{% endif %}
+                {% if form.is_class_teacher %}
+                    <div class="form-check mb-3">
+                        {{ form.is_class_teacher }}
+                        <label class="form-check-label" for="id_is_class_teacher">{{ form.is_class_teacher.label }}</label>
+                    </div>
+                {% endif %}
+                <div class="row">
+                    <div class="col-md-6">{{ form.staff_id|as_crispy_field }}</div>
+                    <div class="col-md-6">{{ form.designation|as_crispy_field }}</div>
+                </div>
+                {{ form.work_unit|as_crispy_field }}
+                {% if form.subject_specialization %}{{ form.subject_specialization|as_crispy_field }}{% endif %}
+                <div class="row">
+                    <div class="col-md-6">{{ form.date_of_first_appointment|as_crispy_field }}</div>
+                    <div class="col-md-6">{{ form.date_of_current_appointment|as_crispy_field }}</div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">{{ form.date_employed|as_crispy_field }}</div>
+                    <div class="col-md-6">{{ form.employment_type|as_crispy_field }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <p class="form-title">{% trans 'Statutory & Professional Details' %}</p>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">{{ form.ssnit_number|as_crispy_field }}</div>
+                    <div class="col-md-6">{{ form.tin_number|as_crispy_field }}</div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">{{ form.national_service_number|as_crispy_field }}</div>
+                    <div class="col-md-6">{{ form.payroll_number|as_crispy_field }}</div>
+                </div>
+                {% if form.ntc_license_number %}
+                    <div class="row">
+                        <div class="col-md-6">{{ form.ntc_license_number|as_crispy_field }}</div>
+                        <div class="col-md-6">{{ form.ntc_license_expiry|as_crispy_field }}</div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <p class="form-title">{% trans 'Qualifications' %}</p>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">{{ form.highest_qualification|as_crispy_field }}</div>
+                    <div class="col-md-6">{{ form.qualification_year|as_crispy_field }}</div>
+                </div>
+                {{ form.qualification_institution|as_crispy_field }}
+                {{ form.professional_qualification|as_crispy_field }}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <p class="form-title">{% trans 'Bank / Payroll Account' %}</p>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">{{ form.bank_name|as_crispy_field }}</div>
+                    <div class="col-md-6">{{ form.bank_branch|as_crispy_field }}</div>
+                </div>
+                {{ form.bank_account_name|as_crispy_field }}
+                {{ form.bank_account_number|as_crispy_field }}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <p class="form-title">{% trans 'Next of Kin / Emergency Contact' %}</p>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">{{ form.emergency_contact_name|as_crispy_field }}</div>
+                    <div class="col-md-6">{{ form.emergency_contact_relationship|as_crispy_field }}</div>
+                </div>
+                {{ form.emergency_contact_phone|as_crispy_field }}
+                {{ form.emergency_contact_address|as_crispy_field }}
+            </div>
+        </div>
+    </div>
+
+    {% if form.username or form.password1 %}
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <p class="form-title">{% trans 'Account Access' %}</p>
+            <div class="card-body">
+                {% if form.username %}{{ form.username|as_crispy_field }}{% endif %}
+                {% if form.username %}
+                    <p class="small text-muted mb-0">
+                        {% trans 'Leave the username blank to generate a staff login ID. The system will issue a temporary password after saving.' %}
+                    </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>

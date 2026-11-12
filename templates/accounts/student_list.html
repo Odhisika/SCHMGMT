@@ -14,7 +14,7 @@
 {% if request.user.is_superuser or request.user.is_school_admin %}
 <div class="manage-wrap">
     <a class="btn btn-primary" href="{% url 'add_student' %}"><i class="fas fa-plus"></i>{% trans 'Add Student' %}</a>
-    <a class="btn btn-primary" target="_blank" href="{% url 'student_list_pdf' %}"><i class="fas fa-download"></i> {% trans 'Download pdf' %}</a>
+    <a class="btn btn-primary" download="students_list.pdf" href="{% url 'student_list_pdf' %}"><i class="fas fa-download"></i> {% trans 'Download pdf' %}</a>
 </div>
 {% endif %}
 

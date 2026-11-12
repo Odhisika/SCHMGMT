@@ -1,13 +1,28 @@
-from django.core.validators import MinValueValidator, MaxValueValidator
+from django.core.validators import MinValueValidator, MaxValueValidator, RegexValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.utils.text import slugify
+
+
+STUDENT_ID_PATTERNS = (
+    ("DIVISION_SEQUENCE", _("Division prefix + sequence (e.g. NUR-0001)")),
+    ("DIVISION_YEAR_SEQUENCE", _("Division prefix + year + sequence (e.g. NUR-2026-0001)")),
+    ("SCHOOL_DIVISION_SEQUENCE", _("School code + division prefix + sequence (e.g. S1-NUR-0001)")),
+    ("SCHOOL_DIVISION_YEAR_SEQUENCE", _("School code + division prefix + year + sequence (e.g. S1-NUR-2026-0001)")),
+)
+
+STUDENT_ID_PREFIX_VALIDATOR = RegexValidator(
+    regex=r"^[A-Za-z0-9][A-Za-z0-9-]{0,11}$",
+    message=_("Use 1–12 letters, numbers, or hyphens; start with a letter or number."),
+)
 
 
 class School(models.Model):
     name = models.CharField(max_length=200, unique=True, help_text=_("Name of the school"))
     slug = models.SlugField(max_length=200, unique=True, help_text=_("Unique identifier for the school (subdomain/path)"))
     email = models.EmailField(blank=True, null=True)
+    support_email = models.EmailField(blank=True, null=True, verbose_name=_("Support email"))
+    support_phone = models.CharField(max_length=20, blank=True, null=True, verbose_name=_("Support phone"))
     logo = models.ImageField(upload_to="school_logos/", blank=True, null=True)
     secondary_logo = models.ImageField(
         upload_to="school_logos/",
@@ -22,6 +37,26 @@ class School(models.Model):
     founded_year = models.PositiveSmallIntegerField(
         blank=True, null=True,
         help_text=_("Year the school was founded")
+    )
+
+    # Student login ID format, configurable independently for each division.
+    student_id_nursery_prefix = models.CharField(
+        max_length=12, default="NUR", validators=[STUDENT_ID_PREFIX_VALIDATOR]
+    )
+    student_id_nursery_pattern = models.CharField(
+        max_length=40, choices=STUDENT_ID_PATTERNS, default="SCHOOL_DIVISION_YEAR_SEQUENCE"
+    )
+    student_id_primary_prefix = models.CharField(
+        max_length=12, default="PRI", validators=[STUDENT_ID_PREFIX_VALIDATOR]
+    )
+    student_id_primary_pattern = models.CharField(
+        max_length=40, choices=STUDENT_ID_PATTERNS, default="SCHOOL_DIVISION_YEAR_SEQUENCE"
+    )
+    student_id_jhs_prefix = models.CharField(
+        max_length=12, default="JHS", validators=[STUDENT_ID_PREFIX_VALIDATOR]
+    )
+    student_id_jhs_pattern = models.CharField(
+        max_length=40, choices=STUDENT_ID_PATTERNS, default="SCHOOL_DIVISION_YEAR_SEQUENCE"
     )
 
     # Domain management
@@ -80,6 +115,32 @@ class School(models.Model):
 
     def get_admin_count(self):
         return self.users.filter(is_school_admin=True, is_active=True).count()
+
+
+class StudentIDSequence(models.Model):
+    """Persistent independent student ID counter for each school division."""
+
+    DIVISION_CHOICES = (
+        ("Nursery", _("Nursery / Pre-School")),
+        ("Primary", _("Primary")),
+        ("JHS", _("JHS")),
+    )
+
+    school = models.ForeignKey(
+        School, on_delete=models.CASCADE, related_name="student_id_sequences"
+    )
+    division = models.CharField(max_length=20, choices=DIVISION_CHOICES)
+    last_number = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("school", "division"), name="unique_student_id_sequence_per_division"
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.school} — {self.division}: {self.last_number}"
 
 
 class GradeWeightConfig(models.Model):

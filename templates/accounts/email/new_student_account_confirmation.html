@@ -292,8 +292,11 @@
           <p>
             For any inquiries or assistance, please contact our support team.
           </p>
-          {% if school.email %}
-          <p>Email: <a href="mailto:{{ school.email }}">{{ school.email }}</a></p>
+          {% if school.support_email or school.email %}
+          <p>Email: <a href="mailto:{{ school.support_email|default:school.email }}">{{ school.support_email|default:school.email }}</a></p>
+          {% endif %}
+          {% if school.support_phone or school.phone %}
+          <p>Phone: {{ school.support_phone|default:school.phone }}</p>
           {% endif %}
           <p>
             &copy; {% now "Y" %} {{ school.name }} | All rights reserved.
