@@ -8,8 +8,18 @@
 <div class="container-fluid">
     <div class="row">
         <div class="col-12 mb-4">
-            <h2 class="h3 mb-2 text-gray-800">{{ title }}</h2>
-            <p class="mb-4">{% if is_admin %}{% trans 'Filter by division and class to review student scores.' %}{% else %}{% trans 'Select a class and subject to manage student scores.' %}{% endif %}</p>
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                <h2 class="h3 mb-0 text-gray-800">{{ title }}</h2>
+                {% if not is_admin %}
+                <a href="{% url 'ca_scoresheet' %}" class="btn btn-outline-primary btn-sm">
+                    <i class="fas fa-clipboard-list"></i> Open CA Scoresheet
+                </a>
+                {% endif %}
+            </div>
+            <p class="mb-2">{% if is_admin %}{% trans 'Filter by division and class to review student scores.' %}{% else %}{% trans 'Select a class and subject to manage student scores.' %}{% endif %}</p>
+            {% if not is_admin %}
+            <p class="text-muted small mb-0">Record class assignments, homework, class tests and class exercises in the CA Scoresheet. Those marks are then filled in automatically when you enter exam marks here.</p>
+            {% endif %}
         </div>
     </div>
 

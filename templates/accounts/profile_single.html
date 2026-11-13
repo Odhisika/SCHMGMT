@@ -54,7 +54,11 @@
                 {% endif %}
                 {% if request.user.is_superuser or request.user.is_school_admin %}
                     <form method="post" action="{% url 'reset_user_password' user.id %}"
-                          onsubmit="return confirm('{% trans 'Issue a new temporary password for this account?' %}');">
+                          data-confirm="{% trans 'Issue a new temporary password for this account?' %}"
+                          data-confirm-title="{% trans 'Reset password?' %}"
+                          data-confirm-ok="{% trans 'Reset password' %}"
+                          data-confirm-variant="warning"
+                          data-confirm-icon="key">
                         {% csrf_token %}
                         <button type="submit" class="btn btn-warning rounded-pill px-4 fw-bold">
                             <i class="fas fa-key me-2"></i>{% trans 'Reset password' %}

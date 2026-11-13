@@ -134,7 +134,7 @@
                     <td><small class="text-muted">{{ payment.receipt_number|default:payment.paystack_reference|default:'-' }}</small></td>
                     <td>
                         {% if payment.status == 'VERIFIED' %}
-                        <a href="{% url 'fees:download_receipt' payment.id %}" class="btn-secondary-clean btn-sm" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px;" target="_blank">
+                        <a href="{% url 'fees:download_receipt' payment.id %}" hx-boost="false" download="receipt_{{ payment.id }}.pdf" class="btn-secondary-clean btn-sm" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
                             <i class="fas fa-download"></i> {% trans 'Download' %}
                         </a>
                         {% else %}

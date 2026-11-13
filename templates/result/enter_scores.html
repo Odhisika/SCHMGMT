@@ -7,9 +7,14 @@
 <div class="container-fluid">
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
         <h1 class="h3 mb-0 text-gray-800">{{ title }}</h1>
-        <a href="{% url 'manage_scores' %}" class="d-none d-sm-inline-block btn btn-sm btn-secondary shadow-sm">
-            <i class="fas fa-arrow-left fa-sm text-white-50"></i> Back to Dashboard
-        </a>
+        <div class="d-flex gap-2">
+            <a href="{% url 'ca_scoresheet' %}?level={{ level }}&subject={{ course.id }}" class="d-none d-sm-inline-block btn btn-sm btn-outline-primary shadow-sm">
+                <i class="fas fa-clipboard-list fa-sm"></i> CA Scoresheet
+            </a>
+            <a href="{% url 'manage_scores' %}" class="d-none d-sm-inline-block btn btn-sm btn-secondary shadow-sm">
+                <i class="fas fa-arrow-left fa-sm text-white-50"></i> Back to Dashboard
+            </a>
+        </div>
     </div>
 
     <div class="row mb-4">
@@ -46,7 +51,13 @@
             </button>{% else %}<span class="badge bg-secondary">{% trans 'View only' %}</span>{% endif %}
         </div>
         <div class="card-body">
-            {% if can_edit_scores %}<p class="text-muted small">Enter each mark out of 100. The contribution column shows how much it adds toward that assessment's configured weight.</p>{% else %}<p class="text-muted small">{% trans 'Scores are displayed in view-only mode.' %}</p>{% endif %}
+            {% if can_edit_scores %}
+                {% if score_configuration.valid %}
+                <p class="text-muted small">CA marks (Classwork, Class Test and Assignment) come from the <a href="{% url 'ca_scoresheet' %}?level={{ level }}&subject={{ course.id }}">CA Scoresheet</a> and are read-only here. Enter the exam mark (and attendance/project if enabled); the total collates automatically.</p>
+                {% else %}
+                <p class="text-muted small">Enter each mark out of 100. The contribution column shows how much it adds toward that assessment's configured weight.</p>
+                {% endif %}
+            {% else %}<p class="text-muted small">{% trans 'Scores are displayed in view-only mode.' %}</p>{% endif %}
             <div class="table-responsive">
                 <table class="table table-bordered table-hover" id="scoresTable" width="100%" cellspacing="0" data-weights-url="{% url 'score_weights' %}">
                     <thead class="table-light">
@@ -69,9 +80,12 @@
                             </td>
                             {% for score_input in row.inputs %}
                             <td>
-                                <input type="number" class="form-control score-input" data-component="{{ score_input.key }}"
+                                <input type="number" class="form-control score-input {% if score_input.ca_managed and can_edit_scores %}bg-light{% endif %}" data-component="{{ score_input.key }}"
                                        value="{{ score_input.value }}" min="0" max="100" step="0.01" inputmode="decimal"
-                                       aria-label="{{ score_input.key }} mark for {{ row.taken_course.student }}" {% if not can_edit_scores %}readonly{% endif %}>
+                                       aria-label="{{ score_input.key }} mark for {{ row.taken_course.student }}" {% if not can_edit_scores or score_input.ca_managed %}readonly{% endif %}>
+                                {% if score_input.ca_managed and can_edit_scores %}
+                                <small class="text-muted d-block"><i class="fas fa-lock"></i> CA Scoresheet</small>
+                                {% endif %}
                                 <small class="text-muted contribution" data-contribution="{{ score_input.key }}"></small>
                                 <small class="text-danger score-error d-none" data-error="{{ score_input.key }}">Enter a mark from 0 to 100.</small>
                             </td>

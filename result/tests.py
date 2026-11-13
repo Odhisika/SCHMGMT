@@ -1,8 +1,10 @@
 """Tests for results, grading weights, positions and promotion workflows."""
 
+import json
 from decimal import Decimal
 from io import StringIO
 
+from django.conf import settings
 from django.core.management import call_command
 from django.urls import reverse
 
@@ -16,6 +18,7 @@ from result.models import (
     TakenCourse,
 )
 from result.promotion import apply_promotion, build_candidates, next_level
+from result.views import _score_configuration
 from school.models import School
 
 
@@ -382,7 +385,9 @@ class ResultViewTests(DemoDataTestCase):
     def test_school_admin_can_open_manage_scores(self):
         self.client.force_login(self.admin)
 
-        response = self.client.get(reverse("manage_scores"))
+        response = self.client.get(
+            reverse("manage_scores"), {"division": settings.DIVISION_PRIMARY}
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertIn(self.primary_course, response.context["subjects"])
@@ -429,3 +434,180 @@ class ResultViewTests(DemoDataTestCase):
         response = self.client.get(reverse("create_promotion"))
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, "/dashboard/")
+
+
+class CAScoresheetTests(DemoDataTestCase):
+    """Continuous-assessment scoresheet and automatic total collation."""
+
+    def setUp(self):
+        self.taken = TakenCourse.objects.get(
+            student=self.student,
+            course=self.primary_course,
+            school=self.school,
+        )
+        self.sheet_url = reverse("ca_scoresheet")
+        self.save_url = reverse("save_ca_scores")
+        self.manage_save_url = reverse("save_scores")
+        self.configuration = _score_configuration(self.school)
+
+        # Keep the test focused on CA marks: zero attendance/project and a
+        # known exam mark.
+        self.taken.attendance_score = Decimal("0.00")
+        self.taken.project_score = Decimal("0.00")
+        self.taken.exam_score = Decimal("50.00")
+        self.taken.save()
+
+    def _ca_payload(self, **overrides):
+        values = {
+            "class_assignment": "80",
+            "homework": "60",
+            "class_test": "70",
+            "class_exercise": "90",
+        }
+        values.update(overrides)
+        return {
+            "config_version": self.configuration["version"],
+            "rows": [{"id": self.taken.pk, "values": values}],
+        }
+
+    def test_teacher_can_open_ca_scoresheet(self):
+        self.client.force_login(self.teacher)
+
+        response = self.client.get(
+            self.sheet_url,
+            {"level": self.primary_course.level, "subject": self.primary_course.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["course"], self.primary_course)
+        self.assertTrue(response.context["can_edit_scores"])
+        self.assertContains(response, "Class Assignment")
+        self.assertContains(response, "Class Exercises")
+
+    def test_teacher_can_save_ca_marks_and_total_collates(self):
+        self.client.force_login(self.teacher)
+
+        response = self.client.post(
+            self.save_url,
+            data=json.dumps(self._ca_payload()),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["status"], "success")
+
+        self.taken.refresh_from_db()
+        self.assertEqual(self.taken.class_assignment_score, Decimal("80.00"))
+        self.assertEqual(self.taken.homework_score, Decimal("60.00"))
+        self.assertEqual(self.taken.assignment_score, Decimal("70.00"))
+        self.assertEqual(self.taken.midsem_score, Decimal("70.00"))
+        self.assertEqual(self.taken.quiz_score, Decimal("70.00"))
+        self.assertEqual(self.taken.classwork_score, Decimal("90.00"))
+        self.assertEqual(self.taken.class_score, Decimal("30.00"))
+        self.assertEqual(self.taken.total, Decimal("55.00"))
+        self.assertEqual(data["updated"][0]["ca_score"], 30.0)
+        self.assertEqual(data["updated"][0]["total"], 55.0)
+
+    def test_assignment_component_averages_recorded_marks(self):
+        self.taken.class_assignment_score = Decimal("80.00")
+        self.taken.homework_score = Decimal("60.00")
+        self.assertEqual(self.taken.get_assignment_component(), Decimal("70.00"))
+
+        self.taken.homework_score = None
+        self.assertEqual(self.taken.get_assignment_component(), Decimal("80.00"))
+
+        self.taken.class_assignment_score = None
+        self.taken.assignment_score = Decimal("65.00")
+        self.assertEqual(self.taken.get_assignment_component(), Decimal("65.00"))
+
+    def test_school_admin_can_view_ca_scoresheet_but_not_edit(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.get(
+            self.sheet_url,
+            {
+                "division": settings.DIVISION_PRIMARY,
+                "level": self.primary_course.level,
+                "subject": self.primary_course.pk,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context["can_edit_scores"])
+        self.assertNotContains(response, 'id="saveCaScoresBtn"')
+
+    def test_school_admin_cannot_save_ca_marks(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            self.save_url,
+            data=json.dumps(self._ca_payload()),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_unallocated_teacher_cannot_save_ca_marks(self):
+        jhs_taken = TakenCourse.objects.filter(
+            course=self.jhs_course, school=self.school
+        ).first()
+        self.assertIsNotNone(jhs_taken)
+        self.client.force_login(self.teacher)
+
+        payload = {
+            "config_version": self.configuration["version"],
+            "rows": [
+                {
+                    "id": jhs_taken.pk,
+                    "values": {
+                        "class_assignment": "80",
+                        "homework": "60",
+                        "class_test": "70",
+                        "class_exercise": "90",
+                    },
+                }
+            ],
+        }
+        response = self.client.post(
+            self.save_url,
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue(
+            any("not authorized" in error.lower() for error in response.json()["errors"])
+        )
+
+    def test_manage_scores_preserves_ca_marks(self):
+        self.taken.class_assignment_score = Decimal("80.00")
+        self.taken.homework_score = Decimal("60.00")
+        self.taken.midsem_score = Decimal("70.00")
+        self.taken.quiz_score = Decimal("70.00")
+        self.taken.classwork_score = Decimal("90.00")
+        self.taken.attendance_score = Decimal("0.00")
+        self.taken.exam_score = Decimal("50.00")
+        self.taken.save()
+
+        self.client.force_login(self.teacher)
+        values = {component["key"]: "0" for component in self.configuration["components"]}
+        values["exam"] = "50"
+        payload = {
+            "config_version": self.configuration["version"],
+            "scores": [{"id": self.taken.pk, "values": values}],
+        }
+
+        response = self.client.post(
+            self.manage_save_url,
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.taken.refresh_from_db()
+        self.assertEqual(self.taken.classwork_score, Decimal("90.00"))
+        self.assertEqual(self.taken.midsem_score, Decimal("70.00"))
+        self.assertEqual(self.taken.assignment_score, Decimal("70.00"))
+        self.assertEqual(self.taken.exam_score, Decimal("50.00"))
+        self.assertEqual(self.taken.total, Decimal("55.00"))

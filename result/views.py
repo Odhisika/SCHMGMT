@@ -1,3 +1,4 @@
+import os
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
 from django.http import HttpResponseRedirect, JsonResponse
@@ -11,6 +12,7 @@ from django.db import models
 from django.db import transaction
 from decimal import Decimal, InvalidOperation
 from xhtml2pdf import pisa
+from core.pdf_utils import link_callback, get_school_document_frame, clean_hex_color
 
 from reportlab.platypus import (
     SimpleDocTemplate,
@@ -1017,13 +1019,33 @@ def report_card_pdf_view(request, pk):
     for res in results:
         terms_results[res.term] = res
 
+    school = getattr(student.student, "school", None) or getattr(request, "school", None)
+    frame_path = get_school_document_frame(school)
+    primary_color = clean_hex_color(getattr(school, "primary_color", None), "#0c2340")
+    secondary_color = clean_hex_color(getattr(school, "secondary_color", None), "#7cb342")
+    accent_color = clean_hex_color(getattr(school, "accent_color", None), "#f59e0b")
+
+    logo_path = None
+    if school and getattr(school, "logo", None) and school.logo:
+        try:
+            if os.path.exists(school.logo.path):
+                logo_path = school.logo.path
+        except Exception:
+            pass
+
     context = {
         "courses": courses,
         "results": results,
         "terms_results": terms_results,
         "student": student,
+        "school": school,
         "title": f"Report Card - {student.student.get_full_name}",
         "request": request,
+        "background_image_path": frame_path,
+        "logo_path": logo_path,
+        "primary_color": primary_color,
+        "secondary_color": secondary_color,
+        "accent_color": accent_color,
     }
 
     # Verify if results are published for students/parents
@@ -1040,7 +1062,7 @@ def report_card_pdf_view(request, pk):
     template = get_template(template_path)
     html = template.render(context)
     
-    pisa_status = pisa.CreatePDF(html, dest=response)
+    pisa_status = pisa.CreatePDF(html, dest=response, link_callback=link_callback)
     if pisa_status.err:
         return HttpResponse(f"We encountered some errors <pre>{html}</pre>")
     
@@ -1113,6 +1135,17 @@ _GRADE_COMPONENTS = (
     ("exam", "Exam", "exam_score", "exam_weight", None),
 )
 
+# Components whose marks are entered from the dedicated CA scoresheet rather
+# than from the Manage Scores page.
+_CA_MANAGED_KEYS = {"classwork", "class_test", "assignment"}
+
+_CA_CATEGORIES = (
+    ("class_assignment", "Class Assignment", "class_assignment_score", "assignment"),
+    ("homework", "Homework", "homework_score", "assignment"),
+    ("class_test", "Class Test", "midsem_score", "class_test"),
+    ("class_exercise", "Class Exercises", "classwork_score", "classwork"),
+)
+
 
 def _score_configuration(school):
     """Return the school's active teacher-entry components and config version."""
@@ -1127,6 +1160,7 @@ def _score_configuration(school):
                 "field": field,
                 "weight": getattr(config, weight_field),
                 "weighted": True,
+                "ca_managed": key in _CA_MANAGED_KEYS,
             }
             for key, label, field, weight_field, toggle in _GRADE_COMPONENTS
             if toggle is None or getattr(config, toggle)
@@ -1135,10 +1169,10 @@ def _score_configuration(school):
 
     # Keep legacy score entry available until a valid grading setup is saved.
     components = [
-        {"key": "midsem", "label": "Mid-Sem", "field": "midsem_score", "weight": 100, "weighted": False},
-        {"key": "quiz", "label": "Quiz", "field": "quiz_score", "weight": 100, "weighted": False},
-        {"key": "assignment", "label": "Assignment", "field": "assignment_score", "weight": 100, "weighted": False},
-        {"key": "exam", "label": "Exam", "field": "exam_score", "weight": 100, "weighted": False},
+        {"key": "midsem", "label": "Mid-Sem", "field": "midsem_score", "weight": 100, "weighted": False, "ca_managed": False},
+        {"key": "quiz", "label": "Quiz", "field": "quiz_score", "weight": 100, "weighted": False, "ca_managed": False},
+        {"key": "assignment", "label": "Assignment", "field": "assignment_score", "weight": 100, "weighted": False, "ca_managed": False},
+        {"key": "exam", "label": "Exam", "field": "exam_score", "weight": 100, "weighted": False, "ca_managed": False},
     ]
     return {"components": components, "version": version, "valid": False}
 
@@ -1156,9 +1190,360 @@ def _score_rows(taken_courses, components):
                 "label": component["label"],
                 "weight": component["weight"],
                 "value": value,
+                "ca_managed": component.get("ca_managed", False),
             })
         rows.append({"taken_course": taken_course, "inputs": inputs})
     return rows
+
+
+def _build_ca_configuration(configuration):
+    """Expose only the weights needed by the CA scoresheet."""
+    components = {component["key"]: component for component in configuration["components"]}
+
+    def component_entry(key, label):
+        component = components.get(key)
+        return {
+            "key": key,
+            "label": label,
+            "weight": component["weight"] if component else 0,
+            "enabled": bool(component),
+            "ca_managed": bool(component and component.get("ca_managed")),
+        }
+
+    return {
+        "valid": configuration["valid"],
+        "version": configuration["version"],
+        "components": {
+            "assignment": component_entry("assignment", "Assignment"),
+            "class_test": component_entry("class_test", "Class Test"),
+            "classwork": component_entry("classwork", "Classwork"),
+            "attendance": component_entry("attendance", "Attendance"),
+            "project": component_entry("project", "Project"),
+            "exam": component_entry("exam", "Exam"),
+        },
+    }
+
+
+def _ca_columns(ca_configuration):
+    columns = []
+    for key, label, field, component_key in _CA_CATEGORIES:
+        component = ca_configuration["components"].get(component_key, {})
+        columns.append({
+            "key": key,
+            "label": label,
+            "component": component_key,
+            "weight": component.get("weight", 0),
+            "enabled": component.get("enabled", False),
+            # Class Assignment and Homework share the single Assignment weight.
+            "shared": key in {"class_assignment", "homework"},
+        })
+    return columns
+
+
+def _ca_rows(taken_courses):
+    rows = []
+    for taken_course in taken_courses:
+        class_test = taken_course.midsem_score or taken_course.quiz_score
+        class_assignment = taken_course.class_assignment_score
+        if (
+            class_assignment is None
+            and taken_course.homework_score is None
+            and taken_course.assignment_score
+        ):
+            # Pre-fill legacy rows so saving the CA sheet does not erase an
+            # assignment mark that was entered before this feature existed.
+            class_assignment = taken_course.assignment_score
+        rows.append({
+            "taken_course": taken_course,
+            "inputs": [
+                {
+                    "key": "class_assignment",
+                    "label": "Class Assignment",
+                    "value": class_assignment,
+                },
+                {
+                    "key": "homework",
+                    "label": "Homework",
+                    "value": taken_course.homework_score,
+                },
+                {
+                    "key": "class_test",
+                    "label": "Class Test",
+                    "value": class_test,
+                },
+                {
+                    "key": "class_exercise",
+                    "label": "Class Exercises",
+                    "value": taken_course.classwork_score,
+                },
+            ],
+            "assignment_component": taken_course.get_assignment_component(),
+            "attendance": taken_course.attendance_score,
+            "project": taken_course.project_score,
+            "exam": taken_course.exam_score,
+            "ca_score": taken_course.class_score,
+            "total": taken_course.total,
+        })
+    return rows
+
+
+@login_required
+@lecturer_required
+def ca_scoresheet(request):
+    """
+    Continuous-assessment scoresheet for teachers.
+
+    Class Assignment, Homework, Class Test and Class Exercises are entered
+    here. The values are written to TakenCourse so the existing weighted
+    Manage Scores / report-card calculations use them automatically.
+    """
+    current_term = Semester.objects.filter(
+        is_current_term=True, school=request.school
+    ).first()
+    is_admin = request.user.is_superuser or request.user.is_school_admin
+    divisions = [
+        (settings.DIVISION_NURSERY, _("Nursery/Pre-School")),
+        (settings.DIVISION_PRIMARY, _("Primary School")),
+        (settings.DIVISION_JHS, _("JHS")),
+    ]
+
+    if is_admin:
+        current_division = request.GET.get("division", settings.DIVISION_NURSERY)
+        if current_division not in dict(divisions):
+            current_division = settings.DIVISION_NURSERY
+        subjects = Course.objects.filter(school=request.school).distinct()
+        division_levels = settings.DIVISION_LEVEL_MAPPING.get(current_division, [])
+        subjects = subjects.filter(level__in=division_levels)
+    else:
+        subjects = Course.objects.filter(
+            school=request.school,
+            allocated_course__teacher=request.user,
+        ).distinct()
+        current_division = None
+
+    if current_term:
+        subjects = subjects.filter(term=current_term.term)
+
+    allocated_levels = list(subjects.values_list("level", flat=True).distinct())
+    levels = [level for level in settings.LEVEL_CHOICES if level[0] in allocated_levels]
+
+    selected_level = request.GET.get("level", "")
+    subject_id = request.GET.get("subject")
+    course = None
+    score_rows = []
+    ca_configuration = None
+    ca_columns = []
+
+    if subject_id:
+        course = get_object_or_404(Course, pk=subject_id, school=request.school)
+
+        if current_term and course.term != current_term.term:
+            messages.error(request, _("That subject is not part of the current term."))
+            return redirect("ca_scoresheet")
+
+        if not is_admin and not course.allocated_course.filter(
+            teacher=request.user, teacher__school=request.school
+        ).exists():
+            messages.error(
+                request,
+                _("You are not authorized to enter CA scores for this subject."),
+            )
+            return redirect("ca_scoresheet")
+
+        if is_admin:
+            division_levels = settings.DIVISION_LEVEL_MAPPING.get(current_division, [])
+            if course.level not in division_levels:
+                messages.error(
+                    request, _("That subject is outside the selected division.")
+                )
+                return redirect(f"{reverse_lazy('ca_scoresheet')}?division={current_division}")
+
+        if course.level != selected_level:
+            selected_level = course.level
+
+        taken_courses = TakenCourse.objects.filter(
+            course=course,
+            student__level=course.level,
+            school=request.school,
+        ).select_related("student", "student__student").order_by(
+            "student__student__last_name", "student__student__first_name"
+        )
+        configuration = _score_configuration(request.school)
+        ca_configuration = _build_ca_configuration(configuration)
+        ca_columns = _ca_columns(ca_configuration)
+        score_rows = _ca_rows(taken_courses)
+
+    context = {
+        "course": course,
+        "selected_level": selected_level,
+        "levels": levels,
+        "subjects": subjects,
+        "divisions": divisions if is_admin else [],
+        "current_division": current_division,
+        "is_admin": is_admin,
+        "can_edit_scores": not is_admin,
+        "score_rows": score_rows,
+        "ca_configuration": ca_configuration,
+        "ca_columns": ca_columns,
+        "current_term": current_term,
+        "title": _("CA Scoresheet"),
+    }
+    return render(request, "result/ca_scoresheet.html", context)
+
+
+@login_required
+@lecturer_required
+def save_ca_scores(request):
+    """Bulk-save CA marks and recalculate each student's weighted total."""
+    import json
+
+    if request.method != "POST":
+        return JsonResponse({"status": "error", "message": "Invalid method"}, status=405)
+
+    if request.user.is_superuser or request.user.is_school_admin:
+        return JsonResponse({
+            "status": "error",
+            "message": "Administrators can view CA scores but cannot edit them.",
+        }, status=403)
+
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({"status": "error", "message": "Invalid JSON request."}, status=400)
+    if not isinstance(data, dict):
+        return JsonResponse({"status": "error", "message": "Invalid CA payload."}, status=400)
+
+    configuration = _score_configuration(request.school)
+    if data.get("config_version", "") != configuration["version"]:
+        return JsonResponse({
+            "status": "error",
+            "message": "The grading weights changed. Reload the page and try again.",
+            "configuration": configuration,
+        }, status=409)
+
+    current_term = Semester.objects.filter(
+        is_current_term=True, school=request.school
+    ).first()
+    if current_term and current_term.result_released:
+        return JsonResponse({
+            "status": "error",
+            "message": "Results for this term have been published. Request an amendment before editing CA marks.",
+        }, status=403)
+
+    rows = data.get("rows")
+    if not isinstance(rows, list):
+        return JsonResponse({"status": "error", "message": "CA rows must be a list."}, status=400)
+
+    allowed_keys = {category[0] for category in _CA_CATEGORIES}
+    parsed_rows = []
+    errors = []
+
+    for item in rows:
+        if not isinstance(item, dict):
+            errors.append("A CA row is malformed.")
+            continue
+
+        taken_course = TakenCourse.objects.select_related("course").filter(
+            pk=item.get("id"), school=request.school
+        ).first()
+        if not taken_course:
+            errors.append(f"Student CA row {item.get('id')} was not found.")
+            continue
+
+        if not taken_course.course.allocated_course.filter(
+            teacher=request.user, teacher__school=request.school
+        ).exists():
+            errors.append(
+                f"You are not authorized to edit CA marks for {taken_course.course}."
+            )
+            continue
+
+        if current_term and taken_course.course.term != current_term.term:
+            errors.append(
+                f"{taken_course.course} is not part of the current term."
+            )
+            continue
+
+        values = item.get("values")
+        if not isinstance(values, dict) or set(values) != allowed_keys:
+            errors.append(
+                f"The CA fields for {taken_course.student} are out of date. Reload the page."
+            )
+            continue
+
+        parsed_values = {}
+        row_invalid = False
+        for key, raw_value in values.items():
+            try:
+                if raw_value is None or (
+                    isinstance(raw_value, str) and raw_value.strip() == ""
+                ):
+                    value = None
+                else:
+                    value = Decimal(str(raw_value).strip())
+                    if not value.is_finite() or value < 0 or value > 100:
+                        raise InvalidOperation
+            except (InvalidOperation, ValueError, TypeError):
+                errors.append(
+                    f"{taken_course.student}: {key} must be between 0 and 100."
+                )
+                row_invalid = True
+                continue
+            parsed_values[key] = value
+
+        if not row_invalid:
+            parsed_rows.append((taken_course, parsed_values))
+
+    if errors:
+        return JsonResponse({
+            "status": "error",
+            "message": "Please correct the invalid CA marks.",
+            "errors": errors,
+        }, status=400)
+
+    updated_rows = []
+    try:
+        with transaction.atomic():
+            for taken_course, values in parsed_rows:
+                class_assignment = values["class_assignment"]
+                homework = values["homework"]
+                class_test = values["class_test"] or Decimal("0.00")
+                class_exercise = values["class_exercise"] or Decimal("0.00")
+
+                taken_course.class_assignment_score = class_assignment
+                taken_course.homework_score = homework
+                taken_course.midsem_score = class_test
+                taken_course.quiz_score = class_test
+                taken_course.classwork_score = class_exercise
+
+                # Compute explicitly so clearing both raw marks does not fall
+                # back to a stale legacy assignment value.
+                raw_values = [
+                    value for value in (class_assignment, homework)
+                    if value is not None
+                ]
+                taken_course.assignment_score = (
+                    sum(raw_values, Decimal("0.00")) / Decimal(len(raw_values))
+                ).quantize(Decimal("0.01")) if raw_values else Decimal("0.00")
+                taken_course.save()
+                updated_rows.append({
+                    "id": taken_course.pk,
+                    "ca_score": float(taken_course.class_score),
+                    "total": float(taken_course.total),
+                    "grade": taken_course.grade,
+                })
+    except Exception as exc:
+        return JsonResponse({
+            "status": "error",
+            "message": f"CA marks could not be saved: {exc}",
+        }, status=400)
+
+    return JsonResponse({
+        "status": "success",
+        "message": f"Successfully saved CA marks for {len(parsed_rows)} students.",
+        "updated": updated_rows,
+    })
+
 
 @login_required
 @lecturer_required
@@ -1402,10 +1787,17 @@ def save_scores(request):
             for taken_course, row_values in parsed_rows:
                 for component in components:
                     key = component["key"]
-                    setattr(taken_course, component["field"], row_values[key])
+                    value = row_values[key]
+                    if configuration["valid"] and component.get("ca_managed"):
+                        # CA marks are owned by the CA scoresheet. Preserve the
+                        # stored value even if the browser submitted a change.
+                        value = getattr(taken_course, component["field"])
+                        if key == "class_test" and not value and taken_course.quiz_score:
+                            value = taken_course.quiz_score
+                    setattr(taken_course, component["field"], value)
                     if key == "class_test":
                         # Keep the legacy quiz field synchronized with its modern class-test field.
-                        taken_course.quiz_score = row_values[key]
+                        taken_course.quiz_score = value
                 taken_course.save()
     except Exception as exc:
         return JsonResponse({"status": "error", "message": f"Scores could not be saved: {exc}"}, status=400)

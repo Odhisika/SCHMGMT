@@ -26,7 +26,7 @@
 		{% url 'programs' as pro %} {% url 'semester_list' as sem %} {% url 'timetable:timetable_dashboard' as ttable %}
 		{% url 'manage_scores' as ascore %} {% url 'grade_results' as vr %}{% url 'ass_results' as ar %}
 		{% url 'course_registration' as cr %} {% url 'edit_profile' as ep %} {% url 'change_password' as cp %}
-		{% url 'quiz_progress' as qpr %} {% url 'quiz_marking' as qce %} {% url 'teacher_quiz_report' as qreport %} {% url 'user_course_list' as ucl %}
+		{% url 'quiz_progress' as qpr %} {% url 'ca_scoresheet' as ca_sheet %} {% url 'teacher_quiz_report' as qreport %} {% url 'user_course_list' as ucl %}
 		{% url 'admin_panel' as admin_p %}
 
 		<ul class="sidebar-top-items" hx-target="#main-content" hx-select="#main-content" hx-swap="innerHTML show:window:top" hx-push-url="true">
@@ -116,8 +116,8 @@
 			</div>
 			<ul class="menu-group-items" hx-target="#main-content" hx-select="#main-content" hx-swap="innerHTML show:window:top" hx-push-url="true">
 				{% if request.user.is_superuser or request.user.is_school_admin or request.user.is_lecturer or request.user.is_teacher %}
-				<li class="{% if request.path == qce %}active{% endif %}">
-					<a href="{% url 'quiz_marking' %}"><i class="fas fa-check-double"></i>{% trans 'Quiz Marking' %}</a>
+				<li class="{% if request.path == ca_sheet %}active{% endif %}">
+					<a href="{% url 'ca_scoresheet' %}"><i class="fas fa-clipboard-list"></i>{% trans 'CA Scoresheet' %}</a>
 				</li>
 				<li class="{% if request.path == qreport %}active{% endif %}">
 					<a href="{% url 'teacher_quiz_report' %}"><i class="fas fa-chart-bar"></i>{% trans 'Quiz Reports' %}</a>
