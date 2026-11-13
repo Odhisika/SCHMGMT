@@ -16,6 +16,7 @@
     <link rel="stylesheet" href="{% static 'vendor/fontawesome-6.5.1/css/all.min.css' %}">
     <!-- Super Admin layout -->
     <link rel="stylesheet" href="{% static 'css/superadmin.css' %}">
+    <link rel="stylesheet" href="{% static 'css/loading-states.css' %}">
 </head>
 <body class="sa-body">
 
@@ -107,6 +108,7 @@
 
     <!-- Bootstrap Bundle with Popper (local copy) -->
     <script src="{% static 'vendor/bootstrap-5.3.2/js/bootstrap.bundle.min.js' %}"></script>
+    <script src="{% static 'js/button-loading.js' %}"></script>
     <script>
         (function () {
             "use strict";
@@ -176,6 +178,17 @@
                 mobileQuery.addListener(handleBreakpointChange);
             }
         })();
+    </script>
+
+    <script>
+        // A page restored from the browser's Back/Forward cache (bfcache) is
+        // not re-fetched from the server. Force a real request so a signed-out
+        // user can't reopen a protected page.
+        window.addEventListener('pageshow', function (event) {
+            if (event.persisted) {
+                window.location.reload();
+            }
+        });
     </script>
 
     {% block js %}{% endblock %}

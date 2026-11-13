@@ -144,6 +144,21 @@ class GradeWeightConfigTests(TestCase):
             0.0,
         )
 
+    def test_normalize_score_converts_raw_marks_to_percentage(self):
+        cases = [
+            ("10", 10, Decimal("100.00")),
+            ("5", 10, Decimal("50.00")),
+            ("15", 20, Decimal("75.00")),
+            ("25", 50, Decimal("50.00")),
+            ("0", 10, Decimal("0.00")),
+            ("10", 0, Decimal("0.00")),
+        ]
+        for raw, maximum, expected in cases:
+            with self.subTest(raw=raw, maximum=maximum):
+                self.assertEqual(
+                    GradeWeightConfig.normalize_score(raw, maximum), expected
+                )
+
 
 class PromotionPolicyTests(TestCase):
     def setUp(self):

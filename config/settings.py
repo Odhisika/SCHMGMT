@@ -134,6 +134,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "accounts.middleware.NoCachePrivateMiddleware",
     "accounts.middleware.TemporaryPasswordMiddleware",
     "school.middleware.SchoolMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",

@@ -95,6 +95,11 @@ def render_credential_handoff(request, user, temporary_password, back_url):
 class RoleAwareLoginView(auth_views.LoginView):
     """Send super admins to the superadmin panel after the shared login."""
 
+    # If an already-authenticated user lands on the login page (for example by
+    # pressing the browser Back button after signing in), send them back into
+    # the app instead of showing the login form again.
+    redirect_authenticated_user = True
+
     def get_success_url(self):
         if self.request.user.must_change_password:
             return reverse("change_password")
@@ -115,6 +120,40 @@ class RoleAwareLoginView(auth_views.LoginView):
             # switches non-superusers to the public URLconf on the next
             # request, so send them to the shared root path.
             return "/"
+
+
+class AppLogoutView(auth_views.LogoutView):
+    """Sign out, destroy the session and never allow the page to be restored."""
+
+    # Keep GET working for the existing sign-out links (including HTMX pages);
+    # POST is also accepted and is what new forms should use.
+    http_method_names = ["get", "head", "post", "options"]
+
+    def get_default_redirect_url(self):
+        return reverse("login")
+
+    def get(self, request, *args, **kwargs):
+        # LogoutView only logs out on POST. Existing templates use GET links,
+        # so make GET perform the same logout-and-redirect flow.
+        return self.post(request, *args, **kwargs)
+
+    def dispatch(self, request, *args, **kwargs):
+        response = super().dispatch(request, *args, **kwargs)
+        if not response.has_header("Cache-Control") or "no-store" not in response["Cache-Control"]:
+            response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response["Pragma"] = "no-cache"
+        response["Expires"] = "0"
+        # Also ask supporting browsers to drop any cache left over from before
+        # this fix (HTTPS only; silently ignored on plain HTTP).
+        response["Clear-Site-Data"] = '"cache"'
+        # Drop the now-invalid session cookie from the browser as well.
+        response.delete_cookie(
+            settings.SESSION_COOKIE_NAME,
+            path=settings.SESSION_COOKIE_PATH,
+            domain=settings.SESSION_COOKIE_DOMAIN,
+            samesite=settings.SESSION_COOKIE_SAMESITE,
+        )
+        return response
 
 
 def validate_username(request):

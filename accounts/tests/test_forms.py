@@ -23,6 +23,14 @@ class AccountFormTestBase(TestCase):
             title="Primary Section", school=cls.school, division="Primary"
         )
 
+    def test_date_fields_use_the_native_date_picker(self):
+        for form_class in (StaffAddForm, StudentAddForm):
+            with self.subTest(form=form_class.__name__):
+                form = form_class(school=self.school)
+                rendered = str(form["date_of_birth"])
+                self.assertIn('type="date"', rendered)
+                self.assertIn('name="date_of_birth"', rendered)
+
 
 class StaffAddFormTests(AccountFormTestBase):
     def test_creates_teacher_in_the_current_school(self):

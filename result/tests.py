@@ -509,6 +509,139 @@ class CAScoresheetTests(DemoDataTestCase):
         self.assertEqual(data["updated"][0]["ca_score"], 30.0)
         self.assertEqual(data["updated"][0]["total"], 55.0)
 
+    def test_ca_marks_are_normalized_from_their_maximum_before_weighting(self):
+        self.client.force_login(self.teacher)
+        payload = self._ca_payload(
+            class_assignment="10",
+            homework="10",
+            class_test="10",
+            class_exercise="10",
+        )
+        payload["max_marks"] = {
+            "class_assignment": "10",
+            "homework": "10",
+            "class_test": "10",
+            "class_exercise": "10",
+        }
+
+        response = self.client.post(
+            self.save_url,
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.taken.refresh_from_db()
+        self.primary_course.refresh_from_db()
+        self.assertEqual(self.primary_course.ca_class_test_max, 10)
+        self.assertEqual(self.taken.class_assignment_score, Decimal("10.00"))
+        self.assertEqual(self.taken.homework_score, Decimal("10.00"))
+        self.assertEqual(self.taken.assignment_score, Decimal("100.00"))
+        self.assertEqual(self.taken.midsem_score, Decimal("10.00"))
+        self.assertEqual(self.taken.classwork_score, Decimal("10.00"))
+        # 100% of assignment (15), class test (15) and classwork (10).
+        self.assertEqual(self.taken.class_score, Decimal("40.00"))
+        self.assertEqual(self.taken.total, Decimal("65.00"))
+
+    def test_all_rows_use_the_updated_maximum_marks(self):
+        taken_courses = list(
+            TakenCourse.objects.filter(
+                course=self.primary_course, school=self.school
+            )
+        )
+        self.assertGreaterEqual(len(taken_courses), 2)
+        for taken_course in taken_courses:
+            taken_course.exam_score = Decimal("50.00")
+            taken_course.attendance_score = Decimal("0.00")
+            taken_course.project_score = Decimal("0.00")
+            taken_course.save()
+
+        self.client.force_login(self.teacher)
+        payload = {
+            "config_version": self.configuration["version"],
+            "max_marks": {
+                "class_assignment": "10",
+                "homework": "10",
+                "class_test": "10",
+                "class_exercise": "10",
+            },
+            "rows": [
+                {
+                    "id": taken_course.pk,
+                    "values": {
+                        "class_assignment": "10",
+                        "homework": "10",
+                        "class_test": "10",
+                        "class_exercise": "10",
+                    },
+                }
+                for taken_course in taken_courses
+            ],
+        }
+
+        response = self.client.post(
+            self.save_url,
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        for taken_course in taken_courses:
+            taken_course.refresh_from_db()
+            self.assertEqual(taken_course.assignment_score, Decimal("100.00"))
+            self.assertEqual(taken_course.class_score, Decimal("40.00"))
+            self.assertEqual(taken_course.total, Decimal("65.00"))
+
+    def test_ca_marks_with_different_maximums_are_normalized_individually(self):
+        self.client.force_login(self.teacher)
+        payload = self._ca_payload(
+            class_assignment="10",
+            homework="5",
+            class_test="10",
+            class_exercise="10",
+        )
+        payload["max_marks"] = {
+            "class_assignment": "10",
+            "homework": "10",
+            "class_test": "20",
+            "class_exercise": "10",
+        }
+
+        response = self.client.post(
+            self.save_url,
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.taken.refresh_from_db()
+        # Assignment: average(100%, 50%) = 75% -> 11.25
+        # Class test: 10/20 = 50% -> 7.5
+        # Classwork: 10/10 = 100% -> 10
+        # Exam: 50% -> 25
+        self.assertEqual(self.taken.assignment_score, Decimal("75.00"))
+        self.assertEqual(self.taken.class_score, Decimal("28.75"))
+        self.assertEqual(self.taken.total, Decimal("53.75"))
+
+    def test_ca_marks_above_the_configured_maximum_are_rejected(self):
+        self.client.force_login(self.teacher)
+        original_midsem = self.taken.midsem_score
+        payload = self._ca_payload(class_test="20")
+        payload["max_marks"] = {"class_test": "10"}
+
+        response = self.client.post(
+            self.save_url,
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue(
+            any("class_test" in error and "0 and 10" in error for error in response.json()["errors"])
+        )
+        self.taken.refresh_from_db()
+        self.assertEqual(self.taken.midsem_score, original_midsem)
+
     def test_assignment_component_averages_recorded_marks(self):
         self.taken.class_assignment_score = Decimal("80.00")
         self.taken.homework_score = Decimal("60.00")

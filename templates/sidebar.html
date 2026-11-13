@@ -29,7 +29,7 @@
 		{% url 'quiz_progress' as qpr %} {% url 'ca_scoresheet' as ca_sheet %} {% url 'teacher_quiz_report' as qreport %} {% url 'user_course_list' as ucl %}
 		{% url 'admin_panel' as admin_p %}
 
-		<ul class="sidebar-top-items" hx-target="#main-content" hx-select="#main-content" hx-swap="innerHTML show:window:top" hx-push-url="true">
+		<ul class="sidebar-top-items">
 			{% if request.user.is_superuser or request.user.is_school_admin %}
 			<li class="{% if request.path == dash %}active{% endif %}">
 				<a href="{% url 'dashboard' %}"><i class="fas fa-tachometer-alt"></i>{% trans 'Dashboard' %}</a>
@@ -46,7 +46,7 @@
 				<span><i class="fas fa-user-circle group-icon"></i>{% trans 'Home & Profile' %}</span>
 				<i class="fas fa-chevron-right chevron-icon"></i>
 			</div>
-			<ul class="menu-group-items" hx-target="#main-content" hx-select="#main-content" hx-swap="innerHTML show:window:top" hx-push-url="true">
+			<ul class="menu-group-items">
 				<li class="{% if request.path == prof %}active{% endif %}">
 					<a href="{% url 'profile' %}"><i class="fas fa-user"></i>{% trans 'Profile' %}</a>
 				</li>
@@ -65,7 +65,7 @@
 				<span><i class="fas fa-graduation-cap group-icon"></i>{% trans 'Academics' %}</span>
 				<i class="fas fa-chevron-right chevron-icon"></i>
 			</div>
-			<ul class="menu-group-items" hx-target="#main-content" hx-select="#main-content" hx-swap="innerHTML show:window:top" hx-push-url="true">
+			<ul class="menu-group-items">
 				{% if request.user.is_lecturer or request.user.is_teacher or request.user.is_student %}
 				<li class="{% if request.path == ucl %}active{% endif %}">
 					<a href="{% url 'user_course_list' %}"><i class="fas fa-book"></i>{% trans 'My Subjects' %}</a>
@@ -114,7 +114,7 @@
 				<span><i class="fas fa-file-invoice-dollar group-icon"></i>{% trans 'Exams & Results' %}</span>
 				<i class="fas fa-chevron-right chevron-icon"></i>
 			</div>
-			<ul class="menu-group-items" hx-target="#main-content" hx-select="#main-content" hx-swap="innerHTML show:window:top" hx-push-url="true">
+			<ul class="menu-group-items">
 				{% if request.user.is_superuser or request.user.is_school_admin or request.user.is_lecturer or request.user.is_teacher %}
 				<li class="{% if request.path == ca_sheet %}active{% endif %}">
 					<a href="{% url 'ca_scoresheet' %}"><i class="fas fa-clipboard-list"></i>{% trans 'CA Scoresheet' %}</a>
@@ -165,7 +165,7 @@
 				<span><i class="fas fa-sliders-h group-icon"></i>{% trans 'Administration' %}</span>
 				<i class="fas fa-chevron-right chevron-icon"></i>
 			</div>
-			<ul class="menu-group-items" hx-target="#main-content" hx-select="#main-content" hx-swap="innerHTML show:window:top" hx-push-url="true">
+			<ul class="menu-group-items">
 				{% if request.user.is_superuser and superadmin_urls_available %}
 				<li class="{% if '/superadmin/' == request.path %}active{% endif %}">
 					<a href="{% url 'superadmin:dashboard' %}"><i class="fas fa-user-shield"></i>{% trans 'Super Admin Dashboard' %}</a>

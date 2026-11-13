@@ -1,0 +1,48 @@
+/* -------------------------------------------------------------------------
+   Shared button loading states
+   Used by static/js/button-loading.js in every portal.
+   ------------------------------------------------------------------------- */
+
+.app-btn-loading {
+  cursor: progress !important;
+  opacity: 0.85;
+}
+
+/* Links cannot use the disabled attribute, so make them inert while the
+   request/navigation is in progress. */
+a.app-btn-loading {
+  pointer-events: none !important;
+}
+
+.app-btn-spinner {
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  margin-right: 0.45em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  vertical-align: -0.12em;
+  animation: app-btn-spin 0.65s linear infinite;
+}
+
+/* Buttons that only contained an icon still get a properly centred spinner. */
+.app-btn-loading > .app-btn-spinner:only-child {
+  margin-right: 0;
+}
+
+input.app-btn-loading {
+  cursor: progress !important;
+}
+
+@keyframes app-btn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-btn-spinner {
+    animation-duration: 1.6s;
+  }
+}

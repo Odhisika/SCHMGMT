@@ -8,6 +8,7 @@ from django.utils.translation import gettext_lazy as _
 from accounts.models import Student
 from core.models import Term
 from course.models import Course
+from school.models import GradeWeightConfig
 
 # Ghana Education Service Grading Scale (1-9)
 GRADE_1 = "1"
@@ -158,27 +159,55 @@ class TakenCourse(models.Model):
             pass
         return None
 
+    def _max_marks(self, field_name):
+        """Return the course's maximum raw mark for a CA category."""
+        if self.course_id:
+            return getattr(self.course, field_name, 100) or 100
+        return 100
+
     def get_assignment_component(self):
         """
-        Return the mark used for the Assignment component.
+        Return the Assignment component mark as a percentage out of 100.
 
         Class Assignment and Homework are entered separately on the CA
-        scoresheet but share the school's single Assignment weight. Their
-        average is therefore used as the component mark. When only one of the
-        two has been recorded, that mark is used. Rows created before the CA
-        scoresheet existed have neither raw mark and fall back to the legacy
-        ``assignment_score`` value.
+        scoresheet but share the school's single Assignment weight. Each raw
+        mark is first converted from its own maximum to a percentage, then the
+        percentages are averaged. When only one of the two has been recorded,
+        that mark is used. Rows created before the CA scoresheet existed have
+        neither raw mark and fall back to the legacy ``assignment_score``
+        value, which is already a percentage.
         """
-        raw_values = [
-            value
-            for value in (self.class_assignment_score, self.homework_score)
-            if value is not None
-        ]
+        raw_values = []
+        if self.class_assignment_score is not None:
+            raw_values.append(GradeWeightConfig.normalize_score(
+                self.class_assignment_score,
+                self._max_marks("ca_class_assignment_max"),
+            ))
+        if self.homework_score is not None:
+            raw_values.append(GradeWeightConfig.normalize_score(
+                self.homework_score,
+                self._max_marks("ca_homework_max"),
+            ))
         if raw_values:
             return (
                 sum(raw_values, Decimal("0.00")) / Decimal(len(raw_values))
             ).quantize(Decimal("0.01"))
-        return self.assignment_score or Decimal("0.00")
+        return GradeWeightConfig.normalize_score(
+            self.assignment_score or Decimal("0.00"), 100
+        )
+
+    def get_class_test_component(self):
+        """Return the class test mark normalized to a percentage out of 100."""
+        raw = self.midsem_score or self.quiz_score
+        return GradeWeightConfig.normalize_score(
+            raw, self._max_marks("ca_class_test_max")
+        )
+
+    def get_classwork_component(self):
+        """Return the class exercise mark normalized to a percentage out of 100."""
+        return GradeWeightConfig.normalize_score(
+            self.classwork_score, self._max_marks("ca_class_exercise_max")
+        )
 
     def compute_total(self):
         """
@@ -188,8 +217,8 @@ class TakenCourse(models.Model):
         config = self._get_grade_config()
         if config and config.is_valid_config():
             ca = config.calculate_total(
-                classwork=float(self.classwork_score),
-                class_test=float(self.midsem_score or self.quiz_score),
+                classwork=float(self.get_classwork_component()),
+                class_test=float(self.get_class_test_component()),
                 assignment=float(self.get_assignment_component()),
                 attendance=float(self.attendance_score),
                 project=float(self.project_score),
@@ -199,8 +228,12 @@ class TakenCourse(models.Model):
         else:
             # Legacy Ghana 40/60 fallback
             class_total = (
-                self.midsem_score
-                + self.quiz_score
+                GradeWeightConfig.normalize_score(
+                    self.midsem_score, self._max_marks("ca_class_test_max")
+                )
+                + GradeWeightConfig.normalize_score(
+                    self.quiz_score, self._max_marks("ca_class_test_max")
+                )
                 + self.get_assignment_component()
             )
             return class_total + self.exam_score
@@ -243,8 +276,8 @@ class TakenCourse(models.Model):
         if config and config.is_valid_config():
             # Modern weighted system
             self.total = Decimal(str(config.calculate_total(
-                classwork=float(self.classwork_score),
-                class_test=float(self.midsem_score or self.quiz_score),
+                classwork=float(self.get_classwork_component()),
+                class_test=float(self.get_class_test_component()),
                 assignment=float(self.assignment_score),
                 attendance=float(self.attendance_score),
                 project=float(self.project_score),
@@ -255,7 +288,15 @@ class TakenCourse(models.Model):
             self.class_score = max(Decimal("0.00"), self.total - exam_contribution)
         else:
             # Legacy Ghana 40/60 fallback
-            self.class_score = self.midsem_score + self.quiz_score + self.assignment_score
+            self.class_score = (
+                GradeWeightConfig.normalize_score(
+                    self.midsem_score, self._max_marks("ca_class_test_max")
+                )
+                + GradeWeightConfig.normalize_score(
+                    self.quiz_score, self._max_marks("ca_class_test_max")
+                )
+                + self.assignment_score
+            )
             self.total = self.class_score + self.exam_score
 
         self.grade = self.get_grade()

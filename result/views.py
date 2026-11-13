@@ -1146,6 +1146,14 @@ _CA_CATEGORIES = (
     ("class_exercise", "Class Exercises", "classwork_score", "classwork"),
 )
 
+# Maps each CA category to the Course field holding its maximum raw mark.
+_CA_MAX_FIELDS = {
+    "class_assignment": "ca_class_assignment_max",
+    "homework": "ca_homework_max",
+    "class_test": "ca_class_test_max",
+    "class_exercise": "ca_class_exercise_max",
+}
+
 
 def _score_configuration(school):
     """Return the school's active teacher-entry components and config version."""
@@ -1183,7 +1191,16 @@ def _score_rows(taken_courses, components):
         inputs = []
         for component in components:
             value = getattr(taken_course, component["field"])
-            if component["key"] == "class_test" and not value and taken_course.quiz_score:
+            if component.get("ca_managed"):
+                # CA marks are stored as raw marks (possibly out of 10/20/50)
+                # but this page displays every component as a percentage.
+                if component["key"] == "class_test":
+                    value = taken_course.get_class_test_component()
+                elif component["key"] == "classwork":
+                    value = taken_course.get_classwork_component()
+                elif component["key"] == "assignment":
+                    value = taken_course.get_assignment_component()
+            elif component["key"] == "class_test" and not value and taken_course.quiz_score:
                 value = taken_course.quiz_score
             inputs.append({
                 "key": component["key"],
@@ -1224,7 +1241,7 @@ def _build_ca_configuration(configuration):
     }
 
 
-def _ca_columns(ca_configuration):
+def _ca_columns(ca_configuration, course=None):
     columns = []
     for key, label, field, component_key in _CA_CATEGORIES:
         component = ca_configuration["components"].get(component_key, {})
@@ -1236,6 +1253,9 @@ def _ca_columns(ca_configuration):
             "enabled": component.get("enabled", False),
             # Class Assignment and Homework share the single Assignment weight.
             "shared": key in {"class_assignment", "homework"},
+            "max_marks": (
+                getattr(course, _CA_MAX_FIELDS[key], 100) if course else 100
+            ),
         })
     return columns
 
@@ -1243,6 +1263,10 @@ def _ca_columns(ca_configuration):
 def _ca_rows(taken_courses):
     rows = []
     for taken_course in taken_courses:
+        category_max = {
+            key: getattr(taken_course.course, field_name, 100) or 100
+            for key, field_name in _CA_MAX_FIELDS.items()
+        }
         class_test = taken_course.midsem_score or taken_course.quiz_score
         class_assignment = taken_course.class_assignment_score
         if (
@@ -1252,7 +1276,13 @@ def _ca_rows(taken_courses):
         ):
             # Pre-fill legacy rows so saving the CA sheet does not erase an
             # assignment mark that was entered before this feature existed.
-            class_assignment = taken_course.assignment_score
+            # Legacy marks were percentages, so convert them back to the
+            # course's current raw maximum for this category.
+            class_assignment = (
+                Decimal(str(taken_course.assignment_score))
+                / Decimal("100")
+                * Decimal(str(category_max["class_assignment"]))
+            ).quantize(Decimal("0.01"))
         rows.append({
             "taken_course": taken_course,
             "inputs": [
@@ -1260,21 +1290,25 @@ def _ca_rows(taken_courses):
                     "key": "class_assignment",
                     "label": "Class Assignment",
                     "value": class_assignment,
+                    "max_marks": category_max["class_assignment"],
                 },
                 {
                     "key": "homework",
                     "label": "Homework",
                     "value": taken_course.homework_score,
+                    "max_marks": category_max["homework"],
                 },
                 {
                     "key": "class_test",
                     "label": "Class Test",
                     "value": class_test,
+                    "max_marks": category_max["class_test"],
                 },
                 {
                     "key": "class_exercise",
                     "label": "Class Exercises",
                     "value": taken_course.classwork_score,
+                    "max_marks": category_max["class_exercise"],
                 },
             ],
             "assignment_component": taken_course.get_assignment_component(),
@@ -1370,7 +1404,7 @@ def ca_scoresheet(request):
         )
         configuration = _score_configuration(request.school)
         ca_configuration = _build_ca_configuration(configuration)
-        ca_columns = _ca_columns(ca_configuration)
+        ca_columns = _ca_columns(ca_configuration, course)
         score_rows = _ca_rows(taken_courses)
 
     context = {
@@ -1438,6 +1472,38 @@ def save_ca_scores(request):
     parsed_rows = []
     errors = []
 
+    # The scoresheet can send the maximum raw marks for each category. They are
+    # stored on the course so future calculations know how to normalize marks.
+    submitted_max_marks = {}
+    max_marks_data = data.get("max_marks", {})
+    if max_marks_data is None:
+        max_marks_data = {}
+    if not isinstance(max_marks_data, dict):
+        return JsonResponse({
+            "status": "error",
+            "message": "CA maximum marks must be an object.",
+        }, status=400)
+
+    for key, field_name in _CA_MAX_FIELDS.items():
+        raw_maximum = max_marks_data.get(key)
+        if raw_maximum is None or str(raw_maximum).strip() == "":
+            continue
+        try:
+            maximum = Decimal(str(raw_maximum).strip())
+            if (
+                not maximum.is_finite()
+                or maximum < 1
+                or maximum > 1000
+                or maximum != maximum.to_integral_value()
+            ):
+                raise InvalidOperation
+        except (InvalidOperation, ValueError, TypeError):
+            return JsonResponse({
+                "status": "error",
+                "message": f"{key} maximum marks must be a whole number between 1 and 1000.",
+            }, status=400)
+        submitted_max_marks[field_name] = int(maximum)
+
     for item in rows:
         if not isinstance(item, dict):
             errors.append("A CA row is malformed.")
@@ -1473,6 +1539,13 @@ def save_ca_scores(request):
 
         parsed_values = {}
         row_invalid = False
+        row_max_marks = {
+            key: submitted_max_marks.get(
+                field_name,
+                getattr(taken_course.course, field_name, 100) or 100,
+            )
+            for key, field_name in _CA_MAX_FIELDS.items()
+        }
         for key, raw_value in values.items():
             try:
                 if raw_value is None or (
@@ -1481,11 +1554,13 @@ def save_ca_scores(request):
                     value = None
                 else:
                     value = Decimal(str(raw_value).strip())
-                    if not value.is_finite() or value < 0 or value > 100:
+                    maximum = row_max_marks[key]
+                    if not value.is_finite() or value < 0 or value > maximum:
                         raise InvalidOperation
             except (InvalidOperation, ValueError, TypeError):
                 errors.append(
-                    f"{taken_course.student}: {key} must be between 0 and 100."
+                    f"{taken_course.student}: {key} must be between 0 and "
+                    f"{row_max_marks[key]}."
                 )
                 row_invalid = True
                 continue
@@ -1504,6 +1579,20 @@ def save_ca_scores(request):
     updated_rows = []
     try:
         with transaction.atomic():
+            if submitted_max_marks:
+                courses_to_update = {}
+                for taken_course, _values in parsed_rows:
+                    course_obj = courses_to_update.setdefault(
+                        taken_course.course_id, taken_course.course
+                    )
+                    for field_name, maximum in submitted_max_marks.items():
+                        setattr(course_obj, field_name, maximum)
+                    # Every row may have loaded its own Course instance, so
+                    # point them all at the updated object before recalculating.
+                    taken_course.course = course_obj
+                for course_obj in courses_to_update.values():
+                    course_obj.save(update_fields=list(submitted_max_marks))
+
             for taken_course, values in parsed_rows:
                 class_assignment = values["class_assignment"]
                 homework = values["homework"]

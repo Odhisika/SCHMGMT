@@ -55,7 +55,7 @@
                 {% if score_configuration.valid %}
                 <p class="text-muted small">CA marks (Classwork, Class Test and Assignment) come from the <a href="{% url 'ca_scoresheet' %}?level={{ level }}&subject={{ course.id }}">CA Scoresheet</a> and are read-only here. Enter the exam mark (and attendance/project if enabled); the total collates automatically.</p>
                 {% else %}
-                <p class="text-muted small">Enter each mark out of 100. The contribution column shows how much it adds toward that assessment's configured weight.</p>
+                <p class="text-muted small">Enter each mark out of 100. CA marks are shown as percentages after being converted from their scoresheet maximums. The contribution column shows how much it adds toward that assessment's configured weight.</p>
                 {% endif %}
             {% else %}<p class="text-muted small">{% trans 'Scores are displayed in view-only mode.' %}</p>{% endif %}
             <div class="table-responsive">

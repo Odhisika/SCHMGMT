@@ -101,8 +101,9 @@
                                     </a>
                                 </li>
                                 <li>
-                                    <button class="dropdown-item toggle-draft-btn"
+                                    <button type="button" class="dropdown-item toggle-draft-btn"
                                             data-quiz-id="{{ item.quiz.id }}"
+                                            data-loading
                                             data-draft="{{ item.quiz.draft|yesno:'true,false' }}">
                                         <i class="fas fa-{% if item.quiz.draft %}eye{% else %}eye-slash{% endif %} me-2 text-info"></i>
                                         {% if item.quiz.draft %}{% trans 'Publish' %}{% else %}{% trans 'Set to Draft' %}{% endif %}
@@ -282,6 +283,7 @@
 // Toggle draft via AJAX
 document.querySelectorAll('.toggle-draft-btn').forEach(btn => {
     btn.addEventListener('click', function() {
+        if (window.AppButtons) window.AppButtons.load(this);
         const quizId = this.dataset.quizId;
         fetch(`/quiz/${quizId}/toggle-draft/`, {
             method: 'POST',
@@ -292,9 +294,16 @@ document.querySelectorAll('.toggle-draft-btn').forEach(btn => {
         })
         .then(r => r.json())
         .then(data => {
-            if (data.error) { console.error(data.error); return; }
+            if (data.error) {
+                console.error(data.error);
+                if (window.AppButtons) window.AppButtons.reset(btn);
+                return;
+            }
             // Simple reload to refresh UI state
             window.location.reload();
+        })
+        .catch(() => {
+            if (window.AppButtons) window.AppButtons.reset(btn);
         });
     });
 });
