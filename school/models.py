@@ -1,3 +1,5 @@
+from decimal import Decimal, InvalidOperation
+
 from django.core.validators import MinValueValidator, MaxValueValidator, RegexValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -213,10 +215,32 @@ class GradeWeightConfig(models.Model):
     def is_valid_config(self):
         return self.get_active_weights_total() == 100
 
+    @staticmethod
+    def normalize_score(raw_score, max_marks=100):
+        """
+        Convert a raw mark scored out of ``max_marks`` into a percentage.
+
+        Schools and teachers record class tests, assignments and exercises out
+        of different maximum marks (for example 10, 20 or 50). All weighted
+        calculations expect a mark out of 100, so every raw mark passes through
+        this helper before its weight is applied.
+        """
+        try:
+            raw = Decimal(str(raw_score or 0))
+            maximum = Decimal(str(100 if max_marks in (None, "") else max_marks))
+        except (InvalidOperation, TypeError, ValueError):
+            return Decimal("0.00")
+        if not raw.is_finite() or not maximum.is_finite() or maximum <= 0:
+            return Decimal("0.00")
+        return ((raw / maximum) * Decimal("100")).quantize(Decimal("0.01"))
+
     def calculate_total(self, classwork=0, class_test=0, assignment=0, attendance=0, project=0, exam=0):
         """
         Calculate a student's weighted total score.
-        Each raw score is assumed to be out of 100, then scaled by its weight.
+
+        Every component passed here must already be a percentage out of 100.
+        Use :meth:`normalize_score` first when the raw mark was scored out of
+        a different maximum.
         """
         total = (float(exam) / 100) * self.exam_weight
         if self.use_classwork:

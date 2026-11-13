@@ -67,7 +67,7 @@
                         </div>
                     {% endif %}
 
-                    <button type="submit" class="login-btn-pill" id="login-btn">
+                    <button type="submit" class="login-btn-pill" id="login-btn" data-loading-text="{% trans 'Signing you in...' %}">
                         {% trans 'LOGIN AS A USER' %}
                     </button>
                 </form>
@@ -133,7 +133,6 @@
 
 {% block js %}
 <script>
-    const loginForm = document.getElementById('login-form');
     const togglePassword = document.querySelector('#togglePassword');
     const password = document.querySelector('#password_id');
 
@@ -142,12 +141,6 @@
         password.setAttribute('type', type);
         this.classList.toggle('fa-eye');
         this.classList.toggle('fa-eye-slash');
-    });
-
-    loginForm.addEventListener('submit', function(e) {
-        const btn = document.getElementById('login-btn');
-        btn.classList.add('disabled');
-        btn.innerHTML = `{% trans 'Signing you in...' %}`;
     });
 
     function openModal(id) {

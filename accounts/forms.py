@@ -141,6 +141,14 @@ def _apply_bootstrap_widgets(form):
         if isinstance(widget, forms.CheckboxInput):
             widget.attrs.setdefault("class", "form-check-input")
             continue
+        if isinstance(widget, forms.DateInput) and not isinstance(
+            widget, forms.DateTimeInput
+        ):
+            # Use the browser's native date picker so users cannot type an
+            # ambiguous date format. This also keeps the value in ISO format
+            # for Django's DateField parsing.
+            widget.input_type = "date"
+            widget.format = "%Y-%m-%d"
         css_classes = widget.attrs.get("class", "")
         if "form-control" not in css_classes and "form-select" not in css_classes:
             bootstrap_class = (

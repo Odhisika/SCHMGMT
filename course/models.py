@@ -1,5 +1,5 @@
 from django.conf import settings
-from django.core.validators import FileExtensionValidator
+from django.core.validators import FileExtensionValidator, MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models import Q
 from django.db.models.signals import pre_save, post_delete, post_save
@@ -91,7 +91,35 @@ class Course(models.Model):
     is_core_subject = models.BooleanField(default=True, help_text=_("Core subjects are mandatory"))
     is_elective = models.BooleanField(default=False)
     school = models.ForeignKey("school.School", on_delete=models.CASCADE, null=True, blank=True)
-    
+
+    # Maximum raw marks for the continuous-assessment categories entered on
+    # the CA scoresheet. Teachers enter marks out of these values; the result
+    # is converted to a percentage before the school's weights are applied.
+    ca_class_assignment_max = models.PositiveSmallIntegerField(
+        default=100,
+        validators=[MinValueValidator(1), MaxValueValidator(1000)],
+        verbose_name=_("Class assignment maximum marks"),
+        help_text=_("The highest raw mark a student can score for class assignments."),
+    )
+    ca_homework_max = models.PositiveSmallIntegerField(
+        default=100,
+        validators=[MinValueValidator(1), MaxValueValidator(1000)],
+        verbose_name=_("Homework maximum marks"),
+        help_text=_("The highest raw mark a student can score for homework."),
+    )
+    ca_class_test_max = models.PositiveSmallIntegerField(
+        default=100,
+        validators=[MinValueValidator(1), MaxValueValidator(1000)],
+        verbose_name=_("Class test maximum marks"),
+        help_text=_("The highest raw mark a student can score for class tests."),
+    )
+    ca_class_exercise_max = models.PositiveSmallIntegerField(
+        default=100,
+        validators=[MinValueValidator(1), MaxValueValidator(1000)],
+        verbose_name=_("Class exercise maximum marks"),
+        help_text=_("The highest raw mark a student can score for class exercises."),
+    )
+
     class Meta:
         unique_together = ["code", "school"]
 

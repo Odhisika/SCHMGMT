@@ -192,16 +192,16 @@
             </div>
             
             <div class="status-group">
-                <button class="status-btn present {% if record.status == 'Present' %}active{% endif %}" onclick="markStudent({{ student.id }}, 'Present')">
+                <button class="status-btn present {% if record.status == 'Present' %}active{% endif %}" onclick="markStudent({{ student.id }}, 'Present', this)">
                     <i class="fas fa-check"></i> {% trans 'Present' %}
                 </button>
-                <button class="status-btn absent {% if record.status == 'Absent' %}active{% endif %}" onclick="markStudent({{ student.id }}, 'Absent')">
+                <button class="status-btn absent {% if record.status == 'Absent' %}active{% endif %}" onclick="markStudent({{ student.id }}, 'Absent', this)">
                     <i class="fas fa-times"></i> {% trans 'Absent' %}
                 </button>
-                <button class="status-btn late {% if record.status == 'Late' %}active{% endif %}" onclick="markStudent({{ student.id }}, 'Late')">
+                <button class="status-btn late {% if record.status == 'Late' %}active{% endif %}" onclick="markStudent({{ student.id }}, 'Late', this)">
                     <i class="fas fa-clock"></i> {% trans 'Late' %}
                 </button>
-                <button class="status-btn excused {% if record.status == 'Excused' %}active{% endif %}" onclick="markStudent({{ student.id }}, 'Excused')">
+                <button class="status-btn excused {% if record.status == 'Excused' %}active{% endif %}" onclick="markStudent({{ student.id }}, 'Excused', this)">
                     <i class="fas fa-calendar-check"></i> {% trans 'Excused' %}
                 </button>
                 <button class="btn btn-sm btn-light border-0 ms-2" onclick="toggleRemarks({{ student.id }})" title="{% trans 'Add Remarks' %}">
@@ -236,7 +236,8 @@
             if (input.style.display === 'block') input.focus();
         }
 
-        function markStudent(studentId, status) {
+        function markStudent(studentId, status, button) {
+            if (button && window.AppButtons) window.AppButtons.load(button);
             const remarks = document.getElementById(`remarks-${studentId}`).value;
             const card = document.getElementById(`student-row-${studentId}`);
             
@@ -273,6 +274,7 @@
                         checkEmpty();
                     }, 400);
                     {% else %}
+                    if (button && window.AppButtons) window.AppButtons.reset(button);
                     // Just update buttons
                     buttons.forEach(btn => {
                         btn.disabled = false;
@@ -284,12 +286,14 @@
                     {% endif %}
                 } else {
                     showToast(data.message, 'error');
+                    if (button && window.AppButtons) window.AppButtons.reset(button);
                     buttons.forEach(btn => btn.disabled = false);
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
                 showToast('{% trans "An error occurred while saving." %}', 'error');
+                if (button && window.AppButtons) window.AppButtons.reset(button);
                 buttons.forEach(btn => btn.disabled = false);
             });
         }

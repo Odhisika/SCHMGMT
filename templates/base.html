@@ -21,9 +21,12 @@
     <link rel="stylesheet" type="text/css" href="{% static 'css/style.min.css' %}">
     <link rel="stylesheet" type="text/css" href="{% static 'css/confirm-modal.css' %}">
     <link rel="stylesheet" type="text/css" href="{% static 'css/notifications.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'css/loading-states.css' %}">
 
     <!-- <script src="https://js.stripe.com/v3/"></script> -->
-    <!-- HTMX for silent refresh -->
+    <!-- HTMX is used only for explicit partial updates (for example the
+         notification widget). Full-page links and forms use normal browser
+         navigation so every page's own scripts always load. -->
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     {% block header %}{% endblock %}
 </head>
@@ -44,7 +47,10 @@
             {% include 'navbar.html' %}
         {% endblock %}
 
-        <div class="container-fluid" id="main-content" hx-boost="true" hx-target="#main-content" hx-select="#main-content">
+        <!-- Deliberately a normal page container, not an hx-boost target.
+             Boosted navigation swaps only this element and skips the
+             page-specific scripts at the bottom of the document. -->
+        <div class="container-fluid" id="main-content">
             {% block content %}{% endblock content %}
         </div>
 
@@ -76,6 +82,19 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <script type="text/javascript" src="{% static 'js/main.js' %}"></script>
+    <script type="text/javascript" src="{% static 'js/button-loading.js' %}"></script>
+
+    <script>
+        // A page restored from the browser's Back/Forward cache (bfcache) is
+        // not re-fetched from the server. Force a real request so a signed-out
+        // user can't reopen a protected page, and a signed-in user can't land
+        // back on the login screen.
+        window.addEventListener('pageshow', function (event) {
+            if (event.persisted) {
+                window.location.reload();
+            }
+        });
+    </script>
 
     {% block js %}
     {% endblock js %}

@@ -133,7 +133,7 @@
             </div>
             <div class="card-body">
                 <p class="text-muted small">
-                    {% trans 'Class Assignment and Homework are averaged into the Assignment component. Class Test uses the Class Test weight, and Class Exercises use the Classwork weight. Attendance and project marks (if enabled) are entered in Manage Scores.' %}
+                    {% trans 'Enter each mark out of the maximum shown in its column heading. Class Assignment and Homework are converted to percentages and averaged into the Assignment component. Class Test uses the Class Test weight, and Class Exercises use the Classwork weight. Attendance and project marks (if enabled) are entered in Manage Scores.' %}
                 </p>
                 <div class="table-responsive">
                     <table class="table table-bordered table-hover align-middle" id="caScoresTable" data-config-version="{{ ca_configuration.version }}">
@@ -151,6 +151,14 @@
                                         <br><small class="text-danger">{% trans 'Not weighted' %}</small>
                                         {% endif %}
                                     {% endif %}
+                                    <div class="input-group input-group-sm ca-max-group mx-auto mt-2">
+                                        <span class="input-group-text">{% trans 'out of' %}</span>
+                                        <input type="number" class="form-control form-control-sm ca-max-input"
+                                               data-category="{{ column.key }}" value="{{ column.max_marks }}"
+                                               min="1" max="1000" step="1" inputmode="numeric"
+                                               aria-label="{% trans 'Maximum marks for' %} {{ column.label }}"
+                                               {% if not can_edit_scores %}readonly{% endif %}>
+                                    </div>
                                 </th>
                                 {% endfor %}
                                 <th class="text-center" style="min-width: 110px">{% trans 'CA Score' %}</th>
@@ -172,9 +180,9 @@
                                 {% for cell in row.inputs %}
                                 <td>
                                     <input type="number" class="form-control form-control-sm ca-input" data-category="{{ cell.key }}"
-                                           value="{{ cell.value|default_if_none:'' }}" min="0" max="100" step="0.01" inputmode="decimal"
+                                           value="{{ cell.value|default_if_none:'' }}" min="0" max="{{ cell.max_marks }}" step="0.01" inputmode="decimal"
                                            aria-label="{{ cell.label }} for {{ row.taken_course.student }}" {% if not can_edit_scores %}readonly{% endif %}>
-                                    <small class="text-danger ca-error d-none" data-error="{{ cell.key }}">{% trans 'Enter a mark from 0 to 100.' %}</small>
+                                    <small class="text-danger ca-error d-none" data-error="{{ cell.key }}">{% trans 'Enter a mark within the allowed maximum.' %}</small>
                                 </td>
                                 {% endfor %}
                                 <td class="text-center">
@@ -260,6 +268,33 @@ document.addEventListener('DOMContentLoaded', function () {
         return Number.isFinite(number) ? number : 0;
     }
 
+    function maxFor(key) {
+        const input = table.querySelector(`.ca-max-input[data-category="${key}"]`);
+        const maximum = input ? Number(input.value) : 100;
+        return Number.isFinite(maximum) && maximum > 0 ? maximum : 100;
+    }
+
+    function normalizeMark(value, maxMarks) {
+        return (numberOrZero(value) / (maxMarks || 100)) * 100;
+    }
+
+    function maxInputIsValid(input) {
+        const value = input.value.trim();
+        const number = Number(value);
+        const valid = value !== ''
+            && Number.isInteger(number)
+            && number >= 1
+            && number <= 1000;
+        input.classList.toggle('is-invalid', !valid);
+        return valid;
+    }
+
+    function syncInputMaximums() {
+        table.querySelectorAll('.ca-input').forEach(function (input) {
+            input.max = maxFor(input.dataset.category);
+        });
+    }
+
     function inputFor(row, key) {
         return row.querySelector(`.ca-input[data-category="${key}"]`);
     }
@@ -269,10 +304,10 @@ document.addEventListener('DOMContentLoaded', function () {
         const classAssignment = inputFor(row, 'class_assignment');
         const homework = inputFor(row, 'homework');
         if (classAssignment && classAssignment.value.trim() !== '') {
-            values.push(numberOrZero(classAssignment.value));
+            values.push(normalizeMark(classAssignment.value, maxFor('class_assignment')));
         }
         if (homework && homework.value.trim() !== '') {
-            values.push(numberOrZero(homework.value));
+            values.push(normalizeMark(homework.value, maxFor('homework')));
         }
         if (!values.length) return 0;
         return values.reduce(function (total, value) { return total + value; }, 0) / values.length;
@@ -280,10 +315,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function inputIsValid(input) {
         const value = input.value.trim();
-        const valid = value === '' || (Number.isFinite(Number(value)) && Number(value) >= 0 && Number(value) <= 100);
+        const maximum = maxFor(input.dataset.category);
+        const valid = value === '' || (Number.isFinite(Number(value)) && Number(value) >= 0 && Number(value) <= maximum);
         input.classList.toggle('is-invalid', !valid);
         const error = input.parentElement.querySelector(`.ca-error[data-error="${input.dataset.category}"]`);
-        if (error) error.classList.toggle('d-none', valid);
+        if (error) {
+            error.textContent = `Enter a mark from 0 to ${maximum}.`;
+            error.classList.toggle('d-none', valid);
+        }
         return valid;
     }
 
@@ -291,15 +330,18 @@ document.addEventListener('DOMContentLoaded', function () {
         const hasInvalidMark = Array.from(table.querySelectorAll('.ca-input')).some(function (input) {
             return !inputIsValid(input);
         });
-        saveBtn.disabled = isSaving || hasInvalidMark;
+        const hasInvalidMaximum = Array.from(table.querySelectorAll('.ca-max-input')).some(function (input) {
+            return !maxInputIsValid(input);
+        });
+        saveBtn.disabled = isSaving || hasInvalidMark || hasInvalidMaximum;
     }
 
     function updateRow(row) {
         if (!configuration.valid) return;
 
         const assignment = assignmentComponent(row);
-        const classTest = numberOrZero((inputFor(row, 'class_test') || {}).value);
-        const classExercise = numberOrZero((inputFor(row, 'class_exercise') || {}).value);
+        const classTest = normalizeMark((inputFor(row, 'class_test') || {}).value, maxFor('class_test'));
+        const classExercise = normalizeMark((inputFor(row, 'class_exercise') || {}).value, maxFor('class_exercise'));
         const attendance = numberOrZero(row.dataset.attendance);
         const project = numberOrZero(row.dataset.project);
         const exam = numberOrZero(row.dataset.exam);
@@ -325,6 +367,15 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     table.addEventListener('input', function (event) {
+        if (event.target.matches('.ca-max-input')) {
+            syncInputMaximums();
+            table.querySelectorAll('tbody tr[data-id]').forEach(function (row) {
+                row.classList.add('table-warning');
+            });
+            updateAllRows();
+            updateSaveState();
+            return;
+        }
         if (!event.target.matches('.ca-input')) return;
         inputIsValid(event.target);
         const row = event.target.closest('tr');
@@ -355,6 +406,11 @@ document.addEventListener('DOMContentLoaded', function () {
             return {id: row.dataset.id, values: values};
         });
 
+        const maxMarks = {};
+        table.querySelectorAll('.ca-max-input').forEach(function (input) {
+            maxMarks[input.dataset.category] = input.value;
+        });
+
         isSaving = true;
         const originalText = saveBtn.innerHTML;
         saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
@@ -366,6 +422,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
                 body: JSON.stringify({
                     rows: rows,
+                    max_marks: maxMarks,
                     config_version: table.dataset.configVersion || configuration.version
                 })
             });
@@ -405,6 +462,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
+    syncInputMaximums();
     updateAllRows();
     updateSaveState();
 });

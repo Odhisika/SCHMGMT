@@ -21,7 +21,7 @@
           <p class="text-danger my-2"><i class="fas fa-exclamation-circle"></i>{% trans 'Please correct the highlighted fields.' %}</p><br>
     {% endif %}
 
-    <button type="submit" class="btn btn-primary" id="login-btn"><i class="fas fa-sign-in-alt"></i><small>{% trans 'SIGN UP' %}</small></button>
+    <button type="submit" class="btn btn-primary" id="login-btn" data-loading-text="{% trans 'Signing you in . . .' %}"><i class="fas fa-sign-in-alt"></i><small>{% trans 'SIGN UP' %}</small></button>
   </form>
   <br>
   <span> {% trans 'Already Registered ?' %} </span><a href="{% url 'login' %}" class="link">{% trans 'Login' %}</a>
@@ -31,13 +31,7 @@
 {% block js %}
 
 <script>
-  const loginFormEl = document.getElementById('login-form');
-  const loginBtnEl = document.getElementById('login-btn');
-
-  loginFormEl.addEventListener('submit', () => {
-    loginBtnEl.innerHTML = '<i class="fas fa-sign-in-alt"></i> Signing you in . . .';
-    loginBtnEl.classList.add("disabled");
-  })
+  // The shared button-loading script handles the submit button state.
 
   $("#username_id").on("input", function () {
     username = $(this).val();
