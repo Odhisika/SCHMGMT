@@ -1,296 +1,103 @@
 """
 PDF Receipt Generator for Student Payments
+Redesigned with the elegant school frame design dynamically themed to the school's native colors.
 """
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter, A4
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
-from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
+import os
+from decimal import Decimal
 from io import BytesIO
 from django.conf import settings
-from datetime import datetime
+from django.template.loader import get_template
+from xhtml2pdf import pisa
+from core.pdf_utils import link_callback, get_school_document_frame, clean_hex_color
 
 
 class PaymentReceiptGenerator:
     """Generate PDF receipts for student payments"""
-    
+
     def __init__(self, payment):
         self.payment = payment
         self.buffer = BytesIO()
-        self.styles = getSampleStyleSheet()
-        self._setup_custom_styles()
-    
-    def _setup_custom_styles(self):
-        """Setup custom paragraph styles"""
-        self.styles.add(ParagraphStyle(
-            name='SchoolHeader',
-            parent=self.styles['Heading1'],
-            fontSize=18,
-            textColor=colors.HexColor('#1a73e8'),
-            alignment=TA_CENTER,
-            spaceAfter=6,
-            fontName='Helvetica-Bold'
-        ))
-        
-        self.styles.add(ParagraphStyle(
-            name='ReceiptTitle',
-            parent=self.styles['Heading2'],
-            fontSize=14,
-            textColor=colors.HexColor('#202124'),
-            alignment=TA_CENTER,
-            spaceAfter=20,
-            fontName='Helvetica-Bold'
-        ))
-        
-        self.styles.add(ParagraphStyle(
-            name='SectionHeader',
-            fontSize=11,
-            textColor=colors.HexColor('#5f6368'),
-            spaceAfter=8,
-            fontName='Helvetica-Bold'
-        ))
-    
+
     def generate(self):
-        """Generate the PDF receipt"""
-        doc = SimpleDocTemplate(
-            self.buffer,
-            pagesize=A4,
-            rightMargin=inch,
-            leftMargin=inch,
-            topMargin=0.75*inch,
-            bottomMargin=0.75*inch
-        )
-        
-        # Build PDF content
-        story = []
-        
-        # Header
-        story.extend(self._build_header())
-        story.append(Spacer(1, 0.3*inch))
-        
-        # Receipt Info
-        story.extend(self._build_receipt_info())
-        story.append(Spacer(1, 0.2*inch))
-        
-        # Student Details
-        story.extend(self._build_student_details())
-        story.append(Spacer(1, 0.2*inch))
-        
-        # Payment Details
-        story.extend(self._build_payment_details())
-        story.append(Spacer(1, 0.3*inch))
-        
-        # Footer
-        story.extend(self._build_footer())
-        
-        # Build PDF
-        doc.build(story)
-        self.buffer.seek(0)
-        return self.buffer
-    
-    def _build_header(self):
-        """Build school header"""
-        elements = []
-        import os
-        
+        """Generate the redesigned PDF receipt"""
         school = self.payment.school
-        
-        # Add school logo if available
-        if getattr(school, 'logo', None) and school.logo:
+        frame_path = get_school_document_frame(school)
+        primary_color = clean_hex_color(getattr(school, "primary_color", None), "#0c2340")
+        secondary_color = clean_hex_color(getattr(school, "secondary_color", None), "#7cb342")
+        accent_color = clean_hex_color(getattr(school, "accent_color", None), "#f59e0b")
+
+        logo_path = None
+        if getattr(school, "logo", None) and school.logo:
             try:
-                logo_path = school.logo.path
-                if os.path.exists(logo_path):
-                    img = Image(logo_path, width=1.5*inch, height=1.5*inch)
-                    img.hAlign = 'CENTER'
-                    elements.append(img)
-                    elements.append(Spacer(1, 0.1*inch))
+                if os.path.exists(school.logo.path):
+                    logo_path = school.logo.path
             except Exception:
                 pass
-        
-        # School name
-        school_name = school.name
-        elements.append(Paragraph(school_name, self.styles['SchoolHeader']))
-        
-        # School address and contact info if available
-        contact_info = []
-        if getattr(school, 'address', None) and school.address:
-            contact_info.append(school.address)
-        if getattr(school, 'phone', None) and school.phone:
-            contact_info.append(school.phone)
-            
-        if contact_info:
-            address_style = ParagraphStyle(
-                'Address',
-                parent=self.styles['Normal'],
-                fontSize=9,
-                textColor=colors.HexColor('#5f6368'),
-                alignment=TA_CENTER
-            )
-            elements.append(Paragraph(" | ".join(contact_info), address_style))
-        
-        return elements
-    
-    def _build_receipt_info(self):
-        """Build receipt information section"""
-        elements = []
-        
-        elements.append(Paragraph("PAYMENT RECEIPT", self.styles['ReceiptTitle']))
-        
-        # Receipt details table
-        receipt_data = [
-            ['Receipt No:', self.payment.receipt_number or f"RCP-{self.payment.id}"],
-            ['Date Issued:', datetime.now().strftime('%B %d, %Y')],
-            ['Payment Date:', self.payment.payment_date.strftime('%B %d, %Y')],
-        ]
-        
-        receipt_table = Table(receipt_data, colWidths=[2*inch, 3*inch])
-        receipt_table.setStyle(TableStyle([
-            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#5f6368')),
-            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
-            ('ALIGN', (1, 0), (1, -1), 'LEFT'),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ]))
-        
-        elements.append(receipt_table)
-        return elements
-    
-    def _build_student_details(self):
-        """Build student details section"""
-        elements = []
-        
-        elements.append(Paragraph("Student Information", self.styles['SectionHeader']))
-        
-        student = self.payment.student
-        student_data = [
-            ['Name:', student.student.get_full_name],
-            ['Student ID:', student.student.username],
-            ['Class/Level:', student.level or 'N/A'],
-        ]
-        
-        # Add payment reference if available
+
+        # Embedded fonts that include the cedi sign (U+20B5). The default
+        # Helvetica font used by xhtml2pdf does not, so "GH₵" renders as a box.
+        font_regular = os.path.join(
+            settings.BASE_DIR, "static", "fonts", "dejavu", "DejaVuSans.ttf"
+        )
+        font_bold = os.path.join(
+            settings.BASE_DIR, "static", "fonts", "dejavu", "DejaVuSans-Bold.ttf"
+        )
+
+        # Payment reference code
+        payment_reference = None
         try:
-            payment_ref = student.payment_reference.reference_code
-            student_data.append(['Payment Reference:', payment_ref])
-        except:
+            payment_reference = self.payment.student.payment_reference.reference_code
+        except Exception:
             pass
-        
-        student_table = Table(student_data, colWidths=[2*inch, 3*inch])
-        student_table.setStyle(TableStyle([
-            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#5f6368')),
-            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
-            ('ALIGN', (1, 0), (1, -1), 'LEFT'),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f8f9fa')),
-            ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#dee2e6')),
-        ]))
-        
-        elements.append(student_table)
-        return elements
-    
-    def _build_payment_details(self):
-        """Build payment details section"""
-        elements = []
-        
-        elements.append(Paragraph("Payment Details", self.styles['SectionHeader']))
-        
-        # Payment info table
-        payment_data = [
-            ['Payment Method:', self.payment.get_payment_method_display()],
-            ['Status:', self.payment.get_status_display()],
-        ]
-        
+        if not payment_reference and getattr(self.payment, "paystack_reference", None):
+            payment_reference = self.payment.paystack_reference
+
+        # Fee structure & billing calculations
+        fee_title = "School Tuition & Facility Fees"
+        billed_amount = self.payment.amount
+        remaining_balance = None
+
         if self.payment.assignment:
-            payment_data.append(['Fee Type:', self.payment.assignment.fee_structure.name])
-        
-        payment_table = Table(payment_data, colWidths=[2*inch, 3*inch])
-        payment_table.setStyle(TableStyle([
-            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#5f6368')),
-            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
-            ('ALIGN', (1, 0), (1, -1), 'LEFT'),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ]))
-        
-        elements.append(payment_table)
-        elements.append(Spacer(1, 0.2*inch))
-        
-        # Amount paid (highlighted)
-        amount_data = [
-            ['Amount Paid:', f'GH₵{self.payment.amount}']
-        ]
-        
-        amount_table = Table(amount_data, colWidths=[2*inch, 3*inch])
-        amount_table.setStyle(TableStyle([
-            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 14),
-            ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#1a73e8')),
-            ('TEXTCOLOR', (1, 0), (1, -1), colors.HexColor('#1a73e8')),
-            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
-            ('ALIGN', (1, 0), (1, -1), 'LEFT'),
-            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#e8f0fe')),
-            ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#1a73e8')),
-            ('TOPPADDING', (0, 0), (-1, -1), 12),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
-            ('LEFTPADDING', (0, 0), (-1, -1), 12),
-        ]))
-        
-        elements.append(amount_table)
-        return elements
-    
-    def _build_footer(self):
-        """Build receipt footer"""
-        elements = []
-        
-        # Thank you message
-        thank_you_style = ParagraphStyle(
-            'ThankYou',
-            parent=self.styles['Normal'],
-            fontSize=10,
-            textColor=colors.HexColor('#5f6368'),
-            alignment=TA_CENTER,
-            spaceAfter=20
-        )
-        elements.append(Paragraph("Thank you for your payment!", thank_you_style))
-        
-        # Signature line
-        elements.append(Spacer(1, 0.5*inch))
-        
-        sig_data = [
-            ['_' * 30, '', '_' * 30],
-            ['Bursar/Accountant', '', 'School Stamp']
-        ]
-        
-        sig_table = Table(sig_data, colWidths=[2.2*inch, 0.6*inch, 2.2*inch])
-        sig_table.setStyle(TableStyle([
-            ('FONTSIZE', (0, 0), (-1, -1), 9),
-            ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#5f6368')),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('TOPPADDING', (0, 1), (-1, 1), 0),
-        ]))
-        
-        elements.append(sig_table)
-        
-        # Note
-        note_style = ParagraphStyle(
-            'Note',
-            parent=self.styles['Normal'],
-            fontSize=8,
-            textColor=colors.HexColor('#5f6368'),
-            alignment=TA_CENTER,
-            leftIndent=0.5*inch,
-            rightIndent=0.5*inch
-        )
-        elements.append(Spacer(1, 0.3*inch))
-        elements.append(Paragraph(
-            "<i>This is a computer-generated receipt and is valid without signature. "
-            "For inquiries, please contact the school administration.</i>",
-            note_style
-        ))
-        
-        return elements
+            if getattr(self.payment.assignment, "fee_structure", None):
+                fee_title = self.payment.assignment.fee_structure.name
+            billed_amount = getattr(self.payment.assignment, "amount", self.payment.amount)
+
+            # Compute remaining balance for this assignment
+            try:
+                from .models import Payment
+                total_verified = sum(
+                    p.amount
+                    for p in Payment.objects.filter(
+                        assignment=self.payment.assignment, status="VERIFIED"
+                    )
+                )
+                remaining_balance = max(Decimal("0.00"), billed_amount - total_verified)
+            except Exception:
+                pass
+
+        context = {
+            "payment": self.payment,
+            "school": school,
+            "receipt_number": self.payment.receipt_number or f"RCP-{self.payment.id:06d}",
+            "payment_reference": payment_reference,
+            "fee_title": fee_title,
+            "billed_amount": billed_amount,
+            "remaining_balance": remaining_balance,
+            "background_image_path": frame_path,
+            "logo_path": logo_path,
+            "font_regular": font_regular if os.path.exists(font_regular) else "",
+            "font_bold": font_bold if os.path.exists(font_bold) else "",
+            "primary_color": primary_color,
+            "secondary_color": secondary_color,
+            "accent_color": accent_color,
+            "title": f"Fee Receipt - {self.payment.receipt_number or self.payment.id}",
+        }
+
+        template = get_template("fees/payment_receipt_pdf.html")
+        html = template.render(context)
+        pisa_status = pisa.CreatePDF(html, dest=self.buffer, link_callback=link_callback)
+        if pisa_status.err:
+            pass
+
+        self.buffer.seek(0)
+        return self.buffer

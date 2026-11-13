@@ -21,6 +21,7 @@ from datetime import date, datetime
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill
 from docx import Document
+from core.pdf_utils import get_school_document_frame, clean_hex_color
 
 from accounts.decorators import admin_required, lecturer_required
 from accounts.filters import LecturerFilter, StudentFilter
@@ -56,6 +57,16 @@ def render_to_pdf(template_name, context):
 
 def render_credential_handoff(request, user, temporary_password, back_url):
     """Display newly issued credentials once without caching the response."""
+    try:
+        login_url = request.build_absolute_uri(reverse("login"))
+    except Exception:
+        login_url = "/accounts/login/"
+    school = getattr(request, "school", None) or getattr(user, "school", None)
+    frame_path = get_school_document_frame(school)
+    primary_color = clean_hex_color(getattr(school, "primary_color", None), "#0c2340")
+    secondary_color = clean_hex_color(getattr(school, "secondary_color", None), "#7cb342")
+    accent_color = clean_hex_color(getattr(school, "accent_color", None), "#f59e0b")
+
     response = render(
         request,
         "accounts/credential_handoff.html",
@@ -63,6 +74,12 @@ def render_credential_handoff(request, user, temporary_password, back_url):
             "user_account": user,
             "temporary_password": temporary_password,
             "back_url": back_url,
+            "login_url": login_url,
+            "school": school,
+            "background_image_path": frame_path,
+            "primary_color": primary_color,
+            "secondary_color": secondary_color,
+            "accent_color": accent_color,
         },
     )
     response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"

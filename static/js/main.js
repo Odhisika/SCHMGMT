@@ -297,6 +297,11 @@ document.body.addEventListener('htmx:afterOnLoad', function (evt) {
       var trigger = event.target.closest("[data-confirm]");
       if (!trigger) return;
 
+      // Forms are handled by the submit listener below. Without this guard a
+      // click on a submit button would be treated as a click on the form,
+      // preventing the submission and re-clicking the form (which never submits).
+      if (trigger.tagName === "FORM") return;
+
       if (trigger.getAttribute("data-confirm-bypass") === "true") {
         trigger.removeAttribute("data-confirm-bypass");
         return;

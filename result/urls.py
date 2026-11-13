@@ -15,6 +15,8 @@ from .views import (
     enter_scores,
     score_weights,
     save_scores,
+    ca_scoresheet,
+    save_ca_scores,
 )
 
 
@@ -28,6 +30,10 @@ urlpatterns = [
     path("enter-scores/<str:level>/", enter_scores, name="enter_scores"),
     path("score-weights/", score_weights, name="score_weights"),
     path("save-scores/", save_scores, name="save_scores"),
+
+    # Teacher continuous-assessment scoresheet
+    path("ca-scoresheet/", ca_scoresheet, name="ca_scoresheet"),
+    path("ca-scoresheet/save/", save_ca_scores, name="save_ca_scores"),
 
     path("grade/", grade_result, name="grade_results"),
     path("assessment/", assessment_result, name="ass_results"),

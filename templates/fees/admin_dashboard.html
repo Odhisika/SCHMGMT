@@ -266,7 +266,7 @@
                                 </td>
                                 <td class="text-center">
                                     <div class="btn-group">
-                                        <a href="{% url 'fees:download_receipt' payment.id %}" class="btn btn-sm btn-outline-clean me-1" title="{% trans 'Download Receipt' %}">
+                                        <a href="{% url 'fees:download_receipt' payment.id %}" hx-boost="false" download="receipt_{{ payment.id }}.pdf" class="btn btn-sm btn-outline-clean me-1" title="{% trans 'Download Receipt' %}">
                                             <i class="fas fa-file-download text-primary"></i>
                                         </a>
                                         <a href="{% url 'fees:payment_edit' payment.pk %}" class="btn btn-sm btn-outline-clean me-1" title="{% trans 'Edit Payment' %}">

@@ -64,7 +64,7 @@
                         {% if request.user.is_superuser or request.user.is_school_admin %}
                         <td class="text-center">
                             <div class="btn-group">
-                                <a href="{% url 'fees:download_receipt' p.id %}" class="btn btn-sm btn-outline-clean me-1" title="{% trans 'Download Receipt' %}">
+                                <a href="{% url 'fees:download_receipt' p.id %}" hx-boost="false" download="receipt_{{ p.id }}.pdf" class="btn btn-sm btn-outline-clean me-1" title="{% trans 'Download Receipt' %}">
                                     <i class="fas fa-file-download text-primary"></i>
                                 </a>
                                 <a href="{% url 'fees:payment_edit' p.pk %}" class="btn btn-sm btn-outline-clean me-1" title="{% trans 'Edit Payment' %}">

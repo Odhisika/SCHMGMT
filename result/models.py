@@ -99,7 +99,18 @@ class TakenCourse(models.Model):
     )
     assignment_score = models.DecimalField(
         max_digits=5, decimal_places=2, default=Decimal("0.00"),
-        help_text=_("Assignment / homework score (raw, out of 100)")
+        help_text=_("Assignment component score (average of class assignment and homework, out of 100)")
+    )
+    # Raw continuous-assessment marks entered from the teacher CA scoresheet.
+    # `assignment_score` above remains the weighted component value used by
+    # report cards, so these two fields are kept as the source of truth.
+    class_assignment_score = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True,
+        help_text=_("Class assignment score (raw, out of 100)")
+    )
+    homework_score = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True,
+        help_text=_("Homework score (raw, out of 100)")
     )
     attendance_score = models.DecimalField(
         max_digits=5, decimal_places=2, default=Decimal("0.00"),
@@ -147,6 +158,28 @@ class TakenCourse(models.Model):
             pass
         return None
 
+    def get_assignment_component(self):
+        """
+        Return the mark used for the Assignment component.
+
+        Class Assignment and Homework are entered separately on the CA
+        scoresheet but share the school's single Assignment weight. Their
+        average is therefore used as the component mark. When only one of the
+        two has been recorded, that mark is used. Rows created before the CA
+        scoresheet existed have neither raw mark and fall back to the legacy
+        ``assignment_score`` value.
+        """
+        raw_values = [
+            value
+            for value in (self.class_assignment_score, self.homework_score)
+            if value is not None
+        ]
+        if raw_values:
+            return (
+                sum(raw_values, Decimal("0.00")) / Decimal(len(raw_values))
+            ).quantize(Decimal("0.01"))
+        return self.assignment_score or Decimal("0.00")
+
     def compute_total(self):
         """
         Compute the total score using the school's GradeWeightConfig.
@@ -157,7 +190,7 @@ class TakenCourse(models.Model):
             ca = config.calculate_total(
                 classwork=float(self.classwork_score),
                 class_test=float(self.midsem_score or self.quiz_score),
-                assignment=float(self.assignment_score),
+                assignment=float(self.get_assignment_component()),
                 attendance=float(self.attendance_score),
                 project=float(self.project_score),
                 exam=float(self.exam_score),
@@ -165,7 +198,11 @@ class TakenCourse(models.Model):
             return Decimal(str(ca))
         else:
             # Legacy Ghana 40/60 fallback
-            class_total = self.midsem_score + self.quiz_score + self.assignment_score
+            class_total = (
+                self.midsem_score
+                + self.quiz_score
+                + self.get_assignment_component()
+            )
             return class_total + self.exam_score
 
     def get_total(self):
@@ -198,6 +235,9 @@ class TakenCourse(models.Model):
     def save(self, *args, update_position=True, **kwargs):
         if not self.school and self.student:
             self.school = self.student.student.school
+
+        # Keep the Assignment component in sync with the raw CA marks.
+        self.assignment_score = self.get_assignment_component()
 
         config = self._get_grade_config()
         if config and config.is_valid_config():

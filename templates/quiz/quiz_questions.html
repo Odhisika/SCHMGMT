@@ -126,7 +126,11 @@
                     {% endif %}
                     <form method="post"
                           action="{% url 'question_delete' slug=course.slug quiz_id=quiz.pk pk=question.pk %}"
-                          onsubmit="return confirm('{% trans "Delete this question? This cannot be undone." %}');">
+                          data-confirm="{% trans 'Delete this question? This cannot be undone.' %}"
+                          data-confirm-title="{% trans 'Delete question?' %}"
+                          data-confirm-ok="{% trans 'Delete' %}"
+                          data-confirm-variant="danger"
+                          data-confirm-icon="trash">
                         {% csrf_token %}
                         <button type="submit" class="btn btn-sm btn-outline-danger w-100" title="{% trans 'Delete question' %}">
                             <i class="fas fa-trash"></i>

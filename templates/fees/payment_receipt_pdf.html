@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+{% load i18n static %}
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title }}</title>
+    <style>
+        @page {
+            size: A4 portrait;
+            margin-top: 1.1cm;
+            margin-bottom: 1.0cm;
+            margin-left: 1.2cm;
+            margin-right: 1.5cm;
+            background-image: url('{{ background_image_path }}');
+        }
+
+        {% if font_regular %}
+        @font-face {
+            font-family: 'DejaVuSans';
+            src: url('{{ font_regular }}');
+        }
+        {% endif %}
+        {% if font_bold %}
+        @font-face {
+            font-family: 'DejaVuSans';
+            font-weight: bold;
+            src: url('{{ font_bold }}');
+        }
+        {% endif %}
+
+        body {
+            font-family: {% if font_regular %}'DejaVuSans', {% endif %}Helvetica, Arial, sans-serif;
+            font-size: 8.5pt;
+            line-height: 1.35;
+            color: #1e293b;
+        }
+
+        .receipt-container {
+            width: 100%;
+        }
+
+        /* Header Section */
+        .header-table {
+            width: 100%;
+            margin-bottom: 15px;
+            border-collapse: collapse;
+        }
+
+        .header-logo-cell {
+            width: 75px;
+            vertical-align: middle;
+            text-align: left;
+        }
+
+        .school-logo-img {
+            max-height: 65px;
+            max-width: 65px;
+            border-radius: 35px;
+        }
+
+        .school-logo-fallback {
+            width: 60px;
+            height: 60px;
+            border-radius: 30px;
+            background-color: {{ primary_color }};
+            color: #ffffff;
+            font-size: 14pt;
+            font-weight: bold;
+            text-align: center;
+            line-height: 60px;
+            border: 2px solid {{ secondary_color }};
+        }
+
+        .header-text-cell {
+            vertical-align: middle;
+            padding-left: 12px;
+            text-align: left;
+        }
+
+        .receipt-main-title {
+            font-size: 22pt;
+            font-weight: bold;
+            color: {{ primary_color }};
+            letter-spacing: 1px;
+            margin: 0;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .school-name-title {
+            font-size: 12.5pt;
+            font-weight: bold;
+            color: #1e293b;
+            margin-top: 3px;
+            margin-bottom: 2px;
+        }
+
+        .school-contact-sub {
+            font-size: 7.5pt;
+            color: #64748b;
+            line-height: 1.2;
+        }
+
+        /* Receipt Info Strip */
+        .receipt-meta-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 12px;
+            background-color: #f8fafc;
+            border: 1px solid #cbd5e1;
+        }
+
+        .receipt-meta-table td {
+            padding: 6px 10px;
+            font-size: 8.5pt;
+            vertical-align: middle;
+        }
+
+        .meta-label {
+            color: #64748b;
+            font-size: 7.5pt;
+            text-transform: uppercase;
+            font-weight: bold;
+            display: block;
+        }
+
+        .meta-value {
+            color: {{ primary_color }};
+            font-weight: bold;
+            font-size: 9pt;
+        }
+
+        /* Student Information Grid */
+        .student-info-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+        }
+
+        .student-info-table td {
+            padding: 4px 6px;
+            font-size: 8.5pt;
+            vertical-align: bottom;
+        }
+
+        .info-label {
+            font-weight: bold;
+            color: {{ primary_color }};
+            white-space: nowrap;
+        }
+
+        .info-value-line {
+            border-bottom: 1px solid #94a3b8;
+            color: #0f172a;
+            padding-left: 4px;
+            padding-bottom: 1px;
+        }
+
+        /* Payment Items Table */
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 12px;
+        }
+
+        .items-table th {
+            background-color: {{ primary_color }};
+            color: #ffffff;
+            font-size: 8pt;
+            font-weight: bold;
+            padding: 6px 6px;
+            text-align: center;
+            border: 1px solid {{ primary_color }};
+            text-transform: uppercase;
+        }
+
+        .items-table td {
+            border: 1px solid #cbd5e1;
+            padding: 6px 6px;
+            text-align: center;
+            font-size: 8.5pt;
+            color: #0f172a;
+        }
+
+        .items-table td.desc-col {
+            text-align: left !important;
+            font-weight: bold;
+            padding-left: 8px;
+        }
+
+        /* Amount & Verification Card */
+        .highlight-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            margin-bottom: 15px;
+        }
+
+        .amount-box {
+            background-color: #f8fafc;
+            border: 1.5px solid {{ secondary_color }};
+            padding: 10px 14px;
+            text-align: left;
+        }
+
+        .amount-label {
+            font-size: 8pt;
+            color: #475569;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .amount-val {
+            font-size: 18pt;
+            font-weight: bold;
+            color: {{ primary_color }};
+            margin-top: 2px;
+        }
+
+        .status-badge {
+            background-color: {{ secondary_color }};
+            color: #ffffff;
+            font-size: 8pt;
+            font-weight: bold;
+            padding: 3px 8px;
+            border-radius: 4px;
+            display: inline-block;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Security & Notes */
+        .notes-box {
+            background-color: #f8fafc;
+            border: 1px dashed #cbd5e1;
+            padding: 8px 10px;
+            font-size: 7.5pt;
+            color: #475569;
+            margin-bottom: 15px;
+            line-height: 1.35;
+        }
+
+        /* Signatures */
+        .signature-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .signature-table td {
+            width: 48%;
+            text-align: center;
+            vertical-align: bottom;
+        }
+
+        .sig-line {
+            border-top: 1px solid #475569;
+            padding-top: 4px;
+            font-size: 8pt;
+            font-weight: bold;
+            color: {{ primary_color }};
+        }
+
+        .stamp-box {
+            display: inline-block;
+            width: 90px;
+            height: 45px;
+            border: 1px dashed #94a3b8;
+            margin-bottom: 4px;
+            text-align: center;
+            line-height: 45px;
+            color: #94a3b8;
+            font-size: 7pt;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+
+<div class="receipt-container">
+    
+    <!-- Header Block: Circular Logo on Left, Title on Right -->
+    <table class="header-table">
+        <tr>
+            <td class="header-logo-cell">
+                {% if school.logo and school.logo.path %}
+                    <img src="{{ school.logo.path }}" alt="Logo" class="school-logo-img">
+                {% elif logo_path %}
+                    <img src="{{ logo_path }}" alt="Logo" class="school-logo-img">
+                {% else %}
+                    <div class="school-logo-fallback">
+                        {{ school.name|slice:":2"|upper|default:"SC" }}
+                    </div>
+                {% endif %}
+            </td>
+            <td class="header-text-cell">
+                <div class="receipt-main-title">{% trans 'FEE PAYMENT RECEIPT' %}</div>
+                <div class="school-name-title">{{ school.name|default:"School Name"|upper }}</div>
+                <div class="school-contact-sub">
+                    {% if school.address %}{{ school.address }}{% endif %}
+                    {% with contact_phone=school.support_phone|default:school.phone %}
+                    {% if contact_phone %} &bull; {{ contact_phone }}{% endif %}
+                    {% endwith %}
+                    {% with contact_email=school.support_email|default:school.email %}
+                    {% if contact_email %} &bull; {{ contact_email }}{% endif %}
+                    {% endwith %}
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <!-- Receipt Meta Strip -->
+    <table class="receipt-meta-table">
+        <tr>
+            <td style="width: 25%;">
+                <span class="meta-label">{% trans 'Receipt Number' %}</span>
+                <span class="meta-value">{{ payment.receipt_number|default:receipt_number }}</span>
+            </td>
+            <td style="width: 25%;">
+                <span class="meta-label">{% trans 'Date Issued' %}</span>
+                <span class="meta-value">{% now "F j, Y" %}</span>
+            </td>
+            <td style="width: 25%;">
+                <span class="meta-label">{% trans 'Payment Date' %}</span>
+                <span class="meta-value">{{ payment.payment_date|date:"F j, Y" }}</span>
+            </td>
+            <td style="width: 25%;">
+                <span class="meta-label">{% trans 'Payment Method' %}</span>
+                <span class="meta-value">{{ payment.get_payment_method_display }}</span>
+            </td>
+        </tr>
+    </table>
+
+    <!-- Student & Payer Information Block -->
+    <table class="student-info-table">
+        <tr>
+            <td class="info-label" style="width: 15%;">{% trans 'Student Name:' %}</td>
+            <td class="info-value-line" style="width: 35%;"><b>{{ payment.student.student.get_full_name|upper }}</b></td>
+            <td class="info-label" style="width: 15%;">{% trans 'Class / Level:' %}</td>
+            <td class="info-value-line" style="width: 35%;">{{ payment.student.level|default:"-" }}</td>
+        </tr>
+        <tr>
+            <td class="info-label">{% trans 'Student ID:' %}</td>
+            <td class="info-value-line">{{ payment.student.student.username }}</td>
+            <td class="info-label">{% trans 'Academic Term:' %}</td>
+            <td class="info-value-line">{{ payment.assignment.term|default:"-" }}</td>
+        </tr>
+        <tr>
+            <td class="info-label">{% trans 'Reference Code:' %}</td>
+            <td class="info-value-line">{{ payment_reference|default:payment.paystack_reference|default:"-" }}</td>
+            <td class="info-label">{% trans 'Recorded By:' %}</td>
+            <td class="info-value-line">
+                {% if payment.recorded_by %}
+                    {{ payment.recorded_by.get_full_name|default:payment.recorded_by.username }}
+                {% else %}
+                    {% trans 'Accounts Department' %}
+                {% endif %}
+            </td>
+        </tr>
+    </table>
+
+    <!-- Payment Item Breakdown Table -->
+    <table class="items-table">
+        <thead>
+            <tr>
+                <th style="width: 6%;">#</th>
+                <th class="desc-col" style="width: 44%;">{% trans 'Fee Description' %}</th>
+                <th style="width: 16%;">{% trans 'Term / Session' %}</th>
+                <th style="width: 17%;">{% trans 'Billed (GH₵)' %}</th>
+                <th style="width: 17%;">{% trans 'Paid (GH₵)' %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>1</td>
+                <td class="desc-col">{{ fee_title|default:"School Tuition & Facility Fees" }}</td>
+                <td>{{ payment.assignment.term|default:"Current Term" }}</td>
+                <td>{{ billed_amount|floatformat:2 }}</td>
+                <td><b>{{ payment.amount|floatformat:2 }}</b></td>
+            </tr>
+        </tbody>
+        <tfoot>
+            <tr style="background-color: #f8fafc; font-weight: bold;">
+                <td colspan="4" style="text-align: right; padding-right: 10px;">{% trans 'Total Amount Paid:' %}</td>
+                <td style="color: {{ primary_color }}; font-size: 9.5pt; border-top: 1.5px solid {{ primary_color }};"><b>GH₵{{ payment.amount|floatformat:2 }}</b></td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <!-- Highlighted Amount & Verification Box -->
+    <table class="highlight-table">
+        <tr>
+            <td class="amount-box" style="width: 65%;">
+                <div class="amount-label">{% trans 'Amount Received' %}</div>
+                <div class="amount-val">GH₵{{ payment.amount|floatformat:2 }}</div>
+                {% if remaining_balance %}
+                <div style="font-size: 7.5pt; color: #475569; margin-top: 4px;">
+                    {% trans 'Remaining Balance on Fee Structure:' %} <b>GH₵{{ remaining_balance|floatformat:2 }}</b>
+                </div>
+                {% endif %}
+            </td>
+            <td style="width: 35%; text-align: center; vertical-align: middle; background-color: #f8fafc; border: 1px solid #cbd5e1; padding: 10px;">
+                <div style="font-size: 7.5pt; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">{% trans 'Payment Status' %}</div>
+                <div class="status-badge">&check; {{ payment.get_status_display|upper }}</div>
+                <div style="font-size: 7pt; color: #64748b; margin-top: 4px;">
+                    {% trans 'Verified on' %} {{ payment.verified_at|date:"M j, Y"|default:payment.payment_date|date:"M j, Y" }}
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <!-- Important Notice -->
+    <div class="notes-box">
+        <b>{% trans 'Official Notice:' %}</b> {% trans 'This is a computer-generated official receipt valid without manual signature. Retain this receipt as official proof of payment. For inquiries or discrepancies, contact the school accounts office quoting the receipt number above.' %}
+    </div>
+
+    <!-- Signatures & Stamp -->
+    <table class="signature-table">
+        <tr>
+            <td style="padding-right: 20px;">
+                <div class="stamp-box">{% trans 'OFFICIAL STAMP' %}</div>
+                <div class="sig-line">{% trans 'Accounts Office / Bursar' %}</div>
+            </td>
+            <td style="padding-left: 20px;">
+                <div style="height: 45px;"></div>
+                <div class="sig-line">{% trans 'Authorized Signature' %}</div>
+            </td>
+        </tr>
+    </table>
+
+    <div style="text-align: center; margin-top: 25px; font-size: 7pt; color: #64748b;">
+        {% trans 'Official Fee Payment Receipt' %} &bull; {% trans 'Generated on' %} {% now "jS F Y H:i" %} &bull; {{ school.name }}
+    </div>
+
+</div>
+
+</body>
+</html>

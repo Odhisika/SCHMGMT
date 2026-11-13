@@ -1,0 +1,412 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% load static %}
+
+{% block title %}{{ title }} | {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <div>
+            <h1 class="h3 mb-1 text-gray-800">{{ title }}</h1>
+            <p class="text-muted mb-0">Record class assignments, homework, class tests and class exercises. The system applies the school's grading weights automatically.</p>
+        </div>
+        <a href="{% url 'manage_scores' %}" class="d-none d-sm-inline-block btn btn-sm btn-secondary shadow-sm">
+            <i class="fas fa-arrow-left fa-sm text-white-50"></i> Manage Scores
+        </a>
+    </div>
+
+    {% if is_admin %}
+    <ul class="nav nav-pills mb-3" role="tablist" aria-label="{% trans 'Filter CA scores by division' %}">
+        {% for division_code, division_name in divisions %}
+        <li class="nav-item" role="presentation">
+            <a class="nav-link {% if current_division == division_code %}active{% endif %}"
+               href="?division={{ division_code }}" role="tab" aria-selected="{% if current_division == division_code %}true{% else %}false{% endif %}">
+                {{ division_name }}
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-end" id="caSelectionForm">
+                {% if is_admin %}
+                <input type="hidden" name="division" value="{{ current_division }}">
+                {% endif %}
+                <div class="col-md-4">
+                    <label for="caLevelSelect" class="form-label fw-semibold">{% trans 'Class / Level' %}</label>
+                    <select class="form-select" id="caLevelSelect" name="level" required>
+                        <option value="">{% trans 'Choose a class' %}</option>
+                        {% for code, name in levels %}
+                        <option value="{{ code }}" {% if selected_level == code %}selected{% endif %}>{{ name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-5">
+                    <label for="caSubjectSelect" class="form-label fw-semibold">{% trans 'Subject' %}</label>
+                    <select class="form-select" id="caSubjectSelect" name="subject" required>
+                        <option value="">{% trans 'Choose a class first...' %}</option>
+                        {% for subject in subjects %}
+                        <option value="{{ subject.id }}" data-level="{{ subject.level }}" {% if course and course.id == subject.id %}selected{% endif %}>{{ subject.title }} ({{ subject.code }}) - {{ subject.level }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-arrow-right"></i> {% trans 'Open Scoresheet' %}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if course %}
+        {% if ca_configuration.valid %}
+        <div class="row mb-4">
+            <div class="col-xl-3 col-md-6 mb-3">
+                <div class="card border-left-primary shadow h-100 py-2">
+                    <div class="card-body">
+                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">{% trans 'Assignment' %}</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">
+                            {{ ca_configuration.components.assignment.weight }}%
+                            {% if not ca_configuration.components.assignment.enabled %}<span class="badge bg-secondary ms-1">{% trans 'Not weighted' %}</span>{% endif %}
+                        </div>
+                        <small class="text-muted">{% trans 'Class Assignment + Homework average' %}</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xl-3 col-md-6 mb-3">
+                <div class="card border-left-success shadow h-100 py-2">
+                    <div class="card-body">
+                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">{% trans 'Class Test' %}</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">
+                            {{ ca_configuration.components.class_test.weight }}%
+                            {% if not ca_configuration.components.class_test.enabled %}<span class="badge bg-secondary ms-1">{% trans 'Not weighted' %}</span>{% endif %}
+                        </div>
+                        <small class="text-muted">{% trans 'Class Test / Mid-Sem component' %}</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xl-3 col-md-6 mb-3">
+                <div class="card border-left-info shadow h-100 py-2">
+                    <div class="card-body">
+                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">{% trans 'Class Exercises' %}</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">
+                            {{ ca_configuration.components.classwork.weight }}%
+                            {% if not ca_configuration.components.classwork.enabled %}<span class="badge bg-secondary ms-1">{% trans 'Not weighted' %}</span>{% endif %}
+                        </div>
+                        <small class="text-muted">{% trans 'Classwork component' %}</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xl-3 col-md-6 mb-3">
+                <div class="card border-left-warning shadow h-100 py-2">
+                    <div class="card-body">
+                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">{% trans 'Exam' %}</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ ca_configuration.components.exam.weight }}%</div>
+                        <small class="text-muted">{% trans 'Entered in Manage Scores' %}</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="alert alert-warning" role="alert">
+            {% trans 'Grade weights are missing or do not add up to 100%. CA marks can still be saved, but totals use the legacy calculation until an administrator saves a valid grading setup.' %}
+        </div>
+        {% endif %}
+
+        <div class="card shadow mb-4">
+            <div class="card-header py-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <div>
+                    <h6 class="m-0 font-weight-bold text-primary">{{ course.title }} — {% trans 'CA Scoresheet' %}</h6>
+                    <small class="text-muted">{{ course.code }} · {{ course.level }}{% if current_term %} · {{ current_term }}{% endif %}</small>
+                </div>
+                {% if can_edit_scores %}
+                <button id="saveCaScoresBtn" class="btn btn-primary btn-sm" type="button">
+                    <i class="fas fa-save fa-sm text-white-50"></i> {% trans 'Save CA Marks' %}
+                </button>
+                {% else %}
+                <span class="badge bg-secondary">{% trans 'View only' %}</span>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                <p class="text-muted small">
+                    {% trans 'Class Assignment and Homework are averaged into the Assignment component. Class Test uses the Class Test weight, and Class Exercises use the Classwork weight. Attendance and project marks (if enabled) are entered in Manage Scores.' %}
+                </p>
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover align-middle" id="caScoresTable" data-config-version="{{ ca_configuration.version }}">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 4%">#</th>
+                                <th style="min-width: 180px">{% trans 'Student' %}</th>
+                                {% for column in ca_columns %}
+                                <th class="text-center" style="min-width: 130px">
+                                    {{ column.label }}
+                                    {% if ca_configuration.valid %}
+                                        {% if column.enabled %}
+                                        <br><small class="text-muted">{{ column.weight }}%{% if column.shared %} {% trans 'shared' %}{% endif %}</small>
+                                        {% else %}
+                                        <br><small class="text-danger">{% trans 'Not weighted' %}</small>
+                                        {% endif %}
+                                    {% endif %}
+                                </th>
+                                {% endfor %}
+                                <th class="text-center" style="min-width: 110px">{% trans 'CA Score' %}</th>
+                                <th class="text-center" style="min-width: 90px">{% trans 'Exam' %}</th>
+                                <th class="text-center" style="min-width: 100px">{% trans 'Total' %}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in score_rows %}
+                            <tr data-id="{{ row.taken_course.id }}"
+                                data-attendance="{{ row.attendance|default:0 }}"
+                                data-project="{{ row.project|default:0 }}"
+                                data-exam="{{ row.exam|default:0 }}">
+                                <td>{{ forloop.counter }}</td>
+                                <td>
+                                    <span class="fw-bold">{{ row.taken_course.student.student.get_full_name }}</span><br>
+                                    <small class="text-muted">{{ row.taken_course.student.student.username }}</small>
+                                </td>
+                                {% for cell in row.inputs %}
+                                <td>
+                                    <input type="number" class="form-control form-control-sm ca-input" data-category="{{ cell.key }}"
+                                           value="{{ cell.value|default_if_none:'' }}" min="0" max="100" step="0.01" inputmode="decimal"
+                                           aria-label="{{ cell.label }} for {{ row.taken_course.student }}" {% if not can_edit_scores %}readonly{% endif %}>
+                                    <small class="text-danger ca-error d-none" data-error="{{ cell.key }}">{% trans 'Enter a mark from 0 to 100.' %}</small>
+                                </td>
+                                {% endfor %}
+                                <td class="text-center">
+                                    <span class="badge bg-secondary ca-score" data-ca-score>{{ row.ca_score }}</span>
+                                </td>
+                                <td class="text-center">{{ row.exam|default:0 }}</td>
+                                <td class="text-center">
+                                    <span class="badge bg-secondary total-score" data-total>{{ row.total }}</span>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="{{ ca_columns|length|add:5 }}" class="text-center text-muted py-4">{% trans 'No students found for this class and subject.' %}</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    {% else %}
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body text-center text-muted py-5">
+            <i class="fas fa-clipboard-list fa-2x mb-3"></i>
+            <p class="mb-1">{% trans 'Choose a class and subject to open its CA scoresheet.' %}</p>
+            <p class="small mb-0">{% trans 'Only classes and subjects allocated to you for the current term are shown.' %}</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{{ ca_configuration|json_script:"caConfiguration" }}
+{% endblock content %}
+
+{% block js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const levelSelect = document.getElementById('caLevelSelect');
+    const subjectSelect = document.getElementById('caSubjectSelect');
+
+    if (levelSelect && subjectSelect) {
+        const allSubjectOptions = Array.from(subjectSelect.querySelectorAll('option[data-level]'));
+
+        function filterSubjects() {
+            const level = levelSelect.value;
+            const previousValue = subjectSelect.value;
+            subjectSelect.innerHTML = '';
+
+            if (!level) {
+                subjectSelect.appendChild(new Option('Choose a class first...', ''));
+                subjectSelect.disabled = true;
+                return;
+            }
+
+            subjectSelect.appendChild(new Option('Choose...', ''));
+            allSubjectOptions.forEach(function (option) {
+                if (option.dataset.level === level) {
+                    subjectSelect.appendChild(option.cloneNode(true));
+                }
+            });
+            subjectSelect.disabled = false;
+            if (Array.from(subjectSelect.options).some(function (option) { return option.value === previousValue; })) {
+                subjectSelect.value = previousValue;
+            }
+        }
+
+        levelSelect.addEventListener('change', filterSubjects);
+        filterSubjects();
+    }
+
+    const table = document.getElementById('caScoresTable');
+    const saveBtn = document.getElementById('saveCaScoresBtn');
+    if (!table || !saveBtn) return;
+
+    const configuration = JSON.parse(document.getElementById('caConfiguration').textContent);
+    const csrfToken = '{{ csrf_token }}';
+    let isSaving = false;
+
+    function weightFor(key) {
+        const component = configuration.components[key];
+        return component && component.enabled ? Number(component.weight) : 0;
+    }
+
+    function numberOrZero(value) {
+        const number = Number(value);
+        return Number.isFinite(number) ? number : 0;
+    }
+
+    function inputFor(row, key) {
+        return row.querySelector(`.ca-input[data-category="${key}"]`);
+    }
+
+    function assignmentComponent(row) {
+        const values = [];
+        const classAssignment = inputFor(row, 'class_assignment');
+        const homework = inputFor(row, 'homework');
+        if (classAssignment && classAssignment.value.trim() !== '') {
+            values.push(numberOrZero(classAssignment.value));
+        }
+        if (homework && homework.value.trim() !== '') {
+            values.push(numberOrZero(homework.value));
+        }
+        if (!values.length) return 0;
+        return values.reduce(function (total, value) { return total + value; }, 0) / values.length;
+    }
+
+    function inputIsValid(input) {
+        const value = input.value.trim();
+        const valid = value === '' || (Number.isFinite(Number(value)) && Number(value) >= 0 && Number(value) <= 100);
+        input.classList.toggle('is-invalid', !valid);
+        const error = input.parentElement.querySelector(`.ca-error[data-error="${input.dataset.category}"]`);
+        if (error) error.classList.toggle('d-none', valid);
+        return valid;
+    }
+
+    function updateSaveState() {
+        const hasInvalidMark = Array.from(table.querySelectorAll('.ca-input')).some(function (input) {
+            return !inputIsValid(input);
+        });
+        saveBtn.disabled = isSaving || hasInvalidMark;
+    }
+
+    function updateRow(row) {
+        if (!configuration.valid) return;
+
+        const assignment = assignmentComponent(row);
+        const classTest = numberOrZero((inputFor(row, 'class_test') || {}).value);
+        const classExercise = numberOrZero((inputFor(row, 'class_exercise') || {}).value);
+        const attendance = numberOrZero(row.dataset.attendance);
+        const project = numberOrZero(row.dataset.project);
+        const exam = numberOrZero(row.dataset.exam);
+
+        const caScore = (assignment / 100) * weightFor('assignment')
+            + (classTest / 100) * weightFor('class_test')
+            + (classExercise / 100) * weightFor('classwork')
+            + (attendance / 100) * weightFor('attendance')
+            + (project / 100) * weightFor('project');
+        const total = caScore + (exam / 100) * weightFor('exam');
+
+        const caBadge = row.querySelector('[data-ca-score]');
+        caBadge.textContent = caScore.toFixed(2);
+        caBadge.className = 'badge ca-score ' + (caScore >= 50 ? 'bg-success' : 'bg-secondary');
+
+        const totalBadge = row.querySelector('[data-total]');
+        totalBadge.textContent = total.toFixed(2);
+        totalBadge.className = 'badge total-score ' + (total >= 50 ? 'bg-success' : 'bg-danger');
+    }
+
+    function updateAllRows() {
+        table.querySelectorAll('tbody tr[data-id]').forEach(updateRow);
+    }
+
+    table.addEventListener('input', function (event) {
+        if (!event.target.matches('.ca-input')) return;
+        inputIsValid(event.target);
+        const row = event.target.closest('tr');
+        updateRow(row);
+        row.classList.add('table-warning');
+        updateSaveState();
+    });
+
+    saveBtn.addEventListener('click', async function () {
+        updateSaveState();
+        if (saveBtn.disabled) return;
+
+        const confirmed = await window.appConfirm({
+            title: 'Save CA marks?',
+            message: 'This will update the continuous-assessment marks for every student shown in this subject.',
+            okText: 'Save marks',
+            cancelText: 'Keep editing',
+            variant: 'primary',
+            icon: 'floppy-disk'
+        });
+        if (!confirmed) return;
+
+        const rows = Array.from(table.querySelectorAll('tbody tr[data-id]')).map(function (row) {
+            const values = {};
+            row.querySelectorAll('.ca-input').forEach(function (input) {
+                values[input.dataset.category] = input.value;
+            });
+            return {id: row.dataset.id, values: values};
+        });
+
+        isSaving = true;
+        const originalText = saveBtn.innerHTML;
+        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+        updateSaveState();
+
+        try {
+            const response = await fetch("{% url 'save_ca_scores' %}", {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                body: JSON.stringify({
+                    rows: rows,
+                    config_version: table.dataset.configVersion || configuration.version
+                })
+            });
+            const data = await response.json();
+            if (!response.ok || data.status !== 'success') {
+                const details = data.errors ? '\n' + data.errors.join('\n') : '';
+                window.appNotify((data.message || 'CA marks could not be saved.') + details, 'danger', 'Save failed');
+                if (response.status === 409) {
+                    window.setTimeout(function () { window.location.reload(); }, 1500);
+                }
+                return;
+            }
+
+            (data.updated || []).forEach(function (item) {
+                const row = table.querySelector(`tr[data-id="${item.id}"]`);
+                if (!row) return;
+                const caBadge = row.querySelector('[data-ca-score]');
+                caBadge.textContent = Number(item.ca_score).toFixed(2);
+                caBadge.className = 'badge ca-score ' + (Number(item.ca_score) >= 50 ? 'bg-success' : 'bg-secondary');
+                const totalBadge = row.querySelector('[data-total]');
+                totalBadge.textContent = Number(item.total).toFixed(2);
+                totalBadge.className = 'badge total-score ' + (Number(item.total) >= 50 ? 'bg-success' : 'bg-danger');
+            });
+
+            rows.forEach(function (row) {
+                const tr = table.querySelector(`tr[data-id="${row.id}"]`);
+                if (tr) tr.classList.remove('table-warning');
+            });
+            window.appNotify(data.message, 'success', 'CA marks saved');
+        } catch (error) {
+            console.error(error);
+            window.appNotify('An error occurred while saving CA marks.', 'danger', 'Save failed');
+        } finally {
+            isSaving = false;
+            saveBtn.innerHTML = originalText;
+            updateSaveState();
+        }
+    });
+
+    updateAllRows();
+    updateSaveState();
+});
+</script>
+{% endblock js %}
