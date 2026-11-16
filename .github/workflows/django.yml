@@ -11,6 +11,7 @@ jobs:
 
     runs-on: ubuntu-latest
     env:
+      SECRET_KEY: ci-only-secret-key-not-used-in-production
       EMAIL_BACKEND: django.core.mail.backends.console.EmailBackend
       EMAIL_HOST: smtp.gmail.com
       EMAIL_PORT: 587
