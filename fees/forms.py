@@ -1,7 +1,7 @@
 from django import forms
 from django.forms import inlineformset_factory
 from .models import FeeStructure, StudentFeeAssignment, Payment, FeeItem, SchoolBankAccount
-from accounts.models import Student
+from accounts.models import STUDENT_STATUS_ACTIVE, Student
 
 
 class ManualPaymentForm(forms.ModelForm):

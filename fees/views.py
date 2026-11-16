@@ -9,7 +9,7 @@ from datetime import date
 from decimal import Decimal
 
 from accounts.decorators import admin_required, student_required
-from accounts.models import Student
+from accounts.models import STUDENT_STATUS_ACTIVE, Student
 from core.models import Term
 from core.models import Notification
 from core.notifications import notify

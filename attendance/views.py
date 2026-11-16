@@ -12,7 +12,7 @@ from django.db.models import Sum
 from django.utils import timezone
 
 from accounts.decorators import lecturer_required, student_required, admin_required
-from accounts.models import Student, Parent
+from accounts.models import STUDENT_STATUS_ACTIVE, Student, Parent
 from core.models import Term
 from course.models import CourseAllocation
 from .models import Attendance, AttendanceSession, AttendanceSummary, PRESENT, ABSENT
