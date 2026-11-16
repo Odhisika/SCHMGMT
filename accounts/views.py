@@ -22,6 +22,7 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill
 from docx import Document
 from core.pdf_utils import get_school_document_frame, clean_hex_color
+from core.search import build_search_query
 
 from accounts.decorators import admin_required, lecturer_required
 from accounts.filters import LecturerFilter, StudentFilter
@@ -34,7 +35,14 @@ from accounts.forms import (
     StaffPromotionForm,
     StudentAddForm,
 )
-from accounts.models import Parent, PasswordResetAudit, Student, User, NON_TEACHING_POSITIONS
+from accounts.models import (
+    NON_TEACHING_POSITIONS,
+    Parent,
+    PasswordResetAudit,
+    STUDENT_STATUS_ACTIVE,
+    Student,
+    User,
+)
 from core.models import Semester
 from course.models import Course, CourseAllocation, Program
 from result.models import TakenCourse, Result
@@ -214,13 +222,18 @@ def profile(request):
         courses = TakenCourse.objects.filter(
             student__student__id=request.user.id, course__level=student.level
         )
+        level = request.GET.get("level") or None
+        session = request.GET.get("session") or None
+        term = request.GET.get("term") or None
         context.update(
             {
                 "parent": parent,
                 "courses": courses,
                 "level": student.level,
+                "student": student,
             }
         )
+        context.update(_build_student_history_context(student, request.school, level=level, session=session, term=term))
         return render(request, "accounts/profile.html", context)
 
     # For superuser or other staff
@@ -229,10 +242,126 @@ def profile(request):
     return render(request, "accounts/profile.html", context)
 
 
+def _build_student_history_context(student, school, level=None, session=None, term=None):
+    from django.db.models import Sum
+    from attendance.models import Attendance, AttendanceSummary
+    from fees.models import StudentFeeAssignment, Payment
+    from result.models import PromotionDecision
+
+    results_qs = Result.objects.filter(student=student, school=school)
+    taken_qs = TakenCourse.objects.select_related("course").filter(student=student, school=school)
+    attendance_qs = Attendance.objects.filter(student=student, school=school)
+    attendance_summary_qs = AttendanceSummary.objects.select_related("term").filter(student=student, school=school)
+    fees_qs = StudentFeeAssignment.objects.select_related("fee_structure", "term").filter(student=student)
+    payments_qs = Payment.objects.select_related("assignment", "assignment__fee_structure", "assignment__term").filter(student=student, school=school)
+    decisions_qs = PromotionDecision.objects.filter(student=student, school=school)
+
+    # Determine admission/graduation window
+    admission_date = getattr(student, "admission_date", None) or student.student.date_joined.date()
+    all_sessions = sorted({s for s in results_qs.values_list("session", flat=True) if s} |
+                          {s for s in decisions_qs.values_list("session", flat=True) if s})
+    # include fee/payment/attendance years if present
+    for d in fees_qs.values_list("term__year", flat=True):
+        if d: all_sessions.append(str(d))
+    for d in attendance_qs.values_list("date__year", flat=True):
+        if d: all_sessions.append(str(d))
+    all_sessions = sorted(set(all_sessions))
+    all_levels = sorted({l for l in results_qs.values_list("level", flat=True) if l} |
+                        {l for l in taken_qs.values_list("course__level", flat=True) if l} |
+                        ({student.level} if student.level else set()))
+
+    if level:
+        results_qs = results_qs.filter(level=level)
+        taken_qs = taken_qs.filter(course__level=level)
+        # keep attendance/fees broad unless user expects level filter; level not stored on all, so filter loosely where possible
+        decisions_qs = decisions_qs.filter(level=level)
+    if session:
+        results_qs = results_qs.filter(session=session)
+        decisions_qs = decisions_qs.filter(session=session)
+        fees_qs = fees_qs.filter(term__year=session)
+        payments_qs = payments_qs.filter(payment_date__year=session)
+        attendance_qs = attendance_qs.filter(date__year=session)
+        attendance_summary_qs = attendance_summary_qs.filter(term__year=session)
+    if term:
+        results_qs = results_qs.filter(term=term)
+        taken_qs = taken_qs.filter(course__term=term)
+        # attendance has date; fees/payments have term relation
+        fees_qs = fees_qs.filter(term__term=term)
+        payments_qs = payments_qs.filter(assignment__term__term=term)
+
+    # Group taken courses by (session, term, level)
+    # Try to infer session/level from matching Result for same student/term
+    result_map = {}
+    for r in Result.objects.filter(student=student, school=school):
+        result_map[(r.session, r.term, r.level)] = r
+    # fallback: by term+level latest
+    result_by_term_level = {}
+    for r in Result.objects.filter(student=student, school=school).order_by("session"):
+        result_by_term_level[(r.term, r.level)] = r
+
+    grouped = {}
+    for tc in taken_qs.order_by("course__level", "course__term", "course__title"):
+        # find best matching result
+        match = None
+        for (s,t,l), r in result_map.items():
+            if t == tc.course.term and l == tc.course.level:
+                if (not level or l == level) and (not session or s == session) and (not term or t == term):
+                    match = r; break
+        if not match:
+            match = result_by_term_level.get((tc.course.term, tc.course.level))
+        sess = match.session if match else (session or "")
+        lvl = tc.course.level or (match.level if match else "")
+        trm = tc.course.term
+        if level and lvl and lvl != level: continue
+        if session and sess and sess != session: continue
+        if term and trm and trm != term: continue
+        key = (sess, trm, lvl)
+        grouped.setdefault(key, {"session": sess, "term": trm, "level": lvl, "courses": [], "result": match})
+        grouped[key]["courses"].append(tc)
+    # also include results with no taken courses shown
+    for r in results_qs.order_by("session", "term", "level"):
+        key = (r.session, r.term, r.level)
+        grouped.setdefault(key, {"session": r.session, "term": r.term, "level": r.level, "courses": [], "result": r})
+        grouped[key]["result"] = r
+    # sort groups
+    term_order = {getattr(settings, 'FIRST_TERM', 'First'):1, getattr(settings,'SECOND_TERM','Second'):2, getattr(settings,'THIRD_TERM','Third'):3}
+    academic_groups = sorted(grouped.values(), key=lambda g: (g.get('session') or '', term_order.get(g.get('term'), 9), g.get('level') or ''))
+
+    attendance_totals = {
+        "present": attendance_qs.filter(status__iexact="Present").count(),
+        "absent": attendance_qs.filter(status__iexact="Absent").count(),
+        "late": attendance_qs.filter(status__iexact="Late").count(),
+        "excused": attendance_qs.filter(status__iexact="Excused").count(),
+        "total": attendance_qs.count(),
+    }
+    fees_total = fees_qs.aggregate(total=Sum('amount'))['total'] or 0
+    paid_total = payments_qs.filter(status='VERIFIED').aggregate(total=Sum('amount'))['total'] or 0
+
+    return {
+        "history_filters": {"level": level or "", "session": session or "", "term": term or ""},
+        "history_levels": all_levels,
+        "history_sessions": all_sessions,
+        "history_terms": [t for t,_ in settings.TERM_CHOICES],
+        "history_academic_groups": academic_groups,
+        "history_results": results_qs.order_by("session", "term", "level"),
+        "history_decisions": decisions_qs.order_by("session", "level"),
+        "history_attendance": attendance_qs.order_by("-date")[:500],
+        "history_attendance_summaries": attendance_summary_qs.order_by("-term__year", "term__term"),
+        "history_attendance_totals": attendance_totals,
+        "history_fees": fees_qs.order_by("-term__year", "term__term", "fee_structure__name"),
+        "history_payments": payments_qs.order_by("-payment_date", "-created_at"),
+        "history_fees_total": fees_total,
+        "history_paid_total": paid_total,
+        "history_balance_total": (fees_total - paid_total),
+        "history_admission_date": admission_date,
+        "history_exit_session": getattr(student, "exit_session", None),
+        "history_exit_date": getattr(student, "exit_date", None),
+    }
+
+
 @login_required
-@admin_required
 def profile_single(request, user_id):
-    """Show profile of any selected user."""
+    """Show profile of any selected user. Accessible to admin/teachers in school and to the user/parent for student profiles."""
     if request.user.id == user_id:
         return redirect("profile")
 
@@ -240,6 +369,28 @@ def profile_single(request, user_id):
         is_current_term=True, school=request.school
     ).first()
     user = get_object_or_404(User, pk=user_id, school=request.school)
+
+    # Permission: admins/school admins/lecturers can view users in their school; students/parents only their own/child student profile
+    is_admin_like = request.user.is_superuser or request.user.is_school_admin
+    is_teacher = getattr(request.user, "is_lecturer", False) or getattr(request.user, "is_teacher", False)
+    allowed = is_admin_like or is_teacher
+    if not allowed and request.user.is_student and user.is_student and request.user.id == user.id:
+        allowed = True
+    if not allowed and request.user.is_parent and user.is_student:
+        try:
+            viewer_student = Student.objects.get(student__pk=request.user.id)
+        except Student.DoesNotExist:
+            viewer_student = None
+        # parent accounts are separate User records in this project; allow if parent linked to this student
+        if Parent.objects.filter(student__student=user, user=request.user).exists():
+            allowed = True
+    # also allow any authenticated user who is parent of that student via Parent model
+    if not allowed and user.is_student and Parent.objects.filter(student__student=user, user=request.user).exists():
+        allowed = True
+    # students can view their own profile_single? redirected above. parents - Parent.user is parent user
+    if not allowed:
+        messages.error(request, "You do not have permission to view this profile.")
+        return redirect("home")
 
     context = {
         "title": user.get_full_name,
@@ -266,6 +417,9 @@ def profile_single(request, user_id):
         courses = TakenCourse.objects.filter(
             student__student__id=user_id, course__level=student.level
         )
+        level = request.GET.get("level") or None
+        session = request.GET.get("session") or None
+        term = request.GET.get("term") or None
         context.update(
             {
                 "user_type": "Student",
@@ -274,6 +428,7 @@ def profile_single(request, user_id):
                 "parent": parent,
             }
         )
+        context.update(_build_student_history_context(student, request.school, level=level, session=session, term=term))
     else:
         context["user_type"] = "Superuser"
 
@@ -484,10 +639,18 @@ def non_teaching_staff_list(request):
     query = request.GET.get("q", "").strip()
     if query:
         staff = staff.filter(
-            Q(first_name__icontains=query)
-            | Q(last_name__icontains=query)
-            | Q(username__icontains=query)
-            | Q(non_teaching_position__icontains=query)
+            build_search_query(
+                query,
+                [
+                    "first_name",
+                    "last_name",
+                    "other_names",
+                    "username",
+                    "email",
+                    "phone",
+                    "non_teaching_position",
+                ],
+            )
         )
     return render(request, "accounts/non_teaching_staff_list.html", {
         "title": "Non-teaching Staff",
@@ -983,19 +1146,38 @@ class StudentListView(FilterView):
     paginate_by = 10
 
     def get_queryset(self):
-        return Student.objects.filter(student__school=self.request.school).select_related("student", "program")
+        qs = Student.objects.filter(
+            student__school=self.request.school
+        ).select_related("student", "program")
+        status = self.request.GET.get("status")
+        if not status:
+            qs = qs.filter(status=STUDENT_STATUS_ACTIVE)
+        return qs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["title"] = "Students"
 
-        qs = self.get_queryset()
+        qs = Student.objects.filter(student__school=self.request.school).select_related(
+            "student", "program"
+        )
+        status = self.request.GET.get("status")
+        if not status:
+            qs = qs.filter(status=STUDENT_STATUS_ACTIVE)
         filtered_qs = self.filterset_class(self.request.GET, queryset=qs).qs
 
-        context["nursery_students"] = filtered_qs.filter(student__division=settings.DIVISION_NURSERY)
-        context["primary_students"] = filtered_qs.filter(student__division=settings.DIVISION_PRIMARY)
-        context["jhs_students"] = filtered_qs.filter(student__division=settings.DIVISION_JHS)
-        context["other_students"] = filtered_qs.filter(student__division__isnull=True)
+        context["nursery_students"] = filtered_qs.filter(
+            student__division=settings.DIVISION_NURSERY
+        )
+        context["primary_students"] = filtered_qs.filter(
+            student__division=settings.DIVISION_PRIMARY
+        )
+        context["jhs_students"] = filtered_qs.filter(
+            student__division=settings.DIVISION_JHS
+        )
+        context["other_students"] = filtered_qs.filter(
+            student__division__isnull=True
+        )
 
         return context
 
@@ -1003,7 +1185,10 @@ class StudentListView(FilterView):
 @login_required
 @admin_required
 def render_student_pdf_list(request):
-    students = Student.objects.filter(student__school=request.school)
+    students = Student.objects.filter(
+        student__school=request.school,
+        status=STUDENT_STATUS_ACTIVE,
+    )
     template_path = "pdf/student_list.html"
     context = {"students": students}
     response = HttpResponse(content_type="application/pdf")
@@ -1099,7 +1284,11 @@ def class_list_view(request):
     # Calculate student counts per class efficiently
     students_counts = {}
     for level_code, _ in levels:
-        count = Student.objects.filter(level=level_code, student__school=request.school).count()
+        count = Student.objects.filter(
+            level=level_code,
+            student__school=request.school,
+            status=STUDENT_STATUS_ACTIVE,
+        ).count()
         students_counts[level_code] = count
 
     context = {
@@ -1139,7 +1328,9 @@ def class_detail_view(request, level_code):
         return redirect('class_list')
 
     students = Student.objects.filter(
-        level=level_code, student__school=request.school
+        level=level_code,
+        student__school=request.school,
+        status=STUDENT_STATUS_ACTIVE,
     ).select_related('student', 'program')
 
     current_term = Semester.objects.filter(is_current_term=True, school=request.school).first()

@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 from django.conf import settings
 from django.utils.dateparse import parse_date
@@ -13,63 +14,184 @@ from django.utils import timezone
 from accounts.decorators import lecturer_required, student_required, admin_required
 from accounts.models import Student, Parent
 from core.models import Term
+from course.models import CourseAllocation
 from .models import Attendance, AttendanceSession, AttendanceSummary, PRESENT, ABSENT
 
 
 def _attendance_levels_for_user(user):
-    """Return attendance levels visible to this user; class teachers get one class."""
+    """Return attendance levels this user can view.
+
+    This controls read access only. Marking is restricted separately to
+    teachers with an allocated course in the class.
+    """
     all_levels = settings.LEVEL_CHOICES
     valid_level_codes = {code for code, _ in all_levels}
 
     if user.is_superuser or user.is_school_admin:
         return list(all_levels)
 
-    if user.is_class_teacher:
-        assigned_level = user.assigned_level
-        if assigned_level in valid_level_codes:
-            return [(assigned_level, dict(all_levels)[assigned_level])]
-        return []
-
+    accessible = []
     if user.is_teacher or user.is_lecturer:
         division_levels = set(user.get_division_levels())
-        return [(code, name) for code, name in all_levels if code in division_levels]
+        accessible = [(code, name) for code, name in all_levels if code in division_levels]
 
-    return []
+    if user.is_class_teacher:
+        assigned_level = user.assigned_level
+        already_included = {code for code, _ in accessible}
+        if assigned_level in valid_level_codes and assigned_level not in already_included:
+            accessible.append((assigned_level, dict(all_levels)[assigned_level]))
+
+    return accessible
+
+
+def _teacher_markable_level_codes(user, school):
+    """Level codes where this user has an allocated course in their division."""
+    if user.is_superuser or user.is_school_admin:
+        return set()
+    if not (user.is_teacher or user.is_lecturer):
+        return set()
+    if not user.division:
+        return set()
+
+    division_levels = set(user.get_division_levels())
+    if not division_levels:
+        return set()
+
+    return set(
+        CourseAllocation.objects.filter(
+            teacher=user,
+            courses__school=school,
+            courses__level__in=division_levels,
+        ).values_list('courses__level', flat=True)
+    )
+
+
+def _attendance_marking_levels_for_user(user, school):
+    """Levels this user is allowed to mark, based on course allocations."""
+    markable_levels = _teacher_markable_level_codes(user, school)
+    return [
+        (code, name)
+        for code, name in settings.LEVEL_CHOICES
+        if code in markable_levels
+    ]
+
+
+def _session_lock_error(user, session):
+    """Return a reason the user cannot mark an existing session, if any."""
+    if session is None or session.marked_by_id == user.id:
+        return None
+
+    owner = session.marked_by.get_full_name if session.marked_by_id else ""
+    if owner:
+        return _(
+            "Attendance for this class has already been marked by %(teacher)s. "
+            "Only that teacher can update it."
+        ) % {"teacher": owner}
+    return _(
+        "Attendance for this class has already been marked. "
+        "Only the teacher who marked it can update it."
+    )
+
+
+def _term_for_date(school, target_date):
+    """Find the school term that contains ``target_date``.
+
+    Terms with missing start/end dates cannot be matched by range, so the
+    current term is used as a fallback for those legacy records.
+    """
+    term = (
+        Term.objects.filter(
+            school=school,
+            start_date__isnull=False,
+            end_date__isnull=False,
+            start_date__lte=target_date,
+            end_date__gte=target_date,
+        )
+        .order_by("-is_current_term", "-year", "-term")
+        .first()
+    )
+    if term:
+        return term
+
+    current_term = Term.objects.filter(school=school, is_current_term=True).first()
+    if current_term and (current_term.start_date is None or current_term.end_date is None):
+        return current_term
+
+    return None
+
+
+def _validate_attendance_date(user, school, target_date):
+    """Return ``(term, error_message)`` for a requested attendance date."""
+    if target_date > timezone.localdate():
+        return None, _("Attendance cannot be marked for a future date.")
+
+    term = _term_for_date(school, target_date)
+    if term is None:
+        return None, _(
+            "No term covers %(date)s. Ask an administrator to check the term dates."
+        ) % {"date": target_date}
+
+    if not (user.is_superuser or user.is_school_admin):
+        current_term = Term.objects.filter(school=school, is_current_term=True).first()
+        if current_term is None:
+            return None, _("No active term found. Ask an administrator to set up the term dates.")
+        if current_term.pk != term.pk:
+            return None, _(
+                "Only attendance for the current term can be edited. "
+                "Ask a school administrator to correct older records."
+            )
+
+    return term, None
+
 
 @login_required
 @lecturer_required
 def attendance_dashboard(request):
     """Attendance overview for teachers/admins - filtered by division"""
+    target_level = request.GET.get('level')
+    target_date_str = request.GET.get('date')
+    if target_level and target_date_str:
+        allowed_levels = {code for code, _ in _attendance_levels_for_user(request.user)}
+        target_date = parse_date(target_date_str)
+        if target_level in allowed_levels and target_date:
+            url = reverse('attendance:mark_attendance', args=[target_level])
+            return redirect(f"{url}?date={target_date.isoformat()}")
+        messages.error(request, _("Choose a valid class and date."))
+        return redirect('attendance:dashboard')
+
     current_term = Term.objects.filter(is_current_term=True, school=request.school).first()
-    today = date.today()
+    today = timezone.localdate()
     
-    accessible_levels = _attendance_levels_for_user(request.user)
+    view_levels = _attendance_levels_for_user(request.user)
+    view_level_codes = [code for code, name in view_levels]
+    marking_levels = _attendance_marking_levels_for_user(request.user, request.school)
     
-    accessible_level_codes = [code for code, name in accessible_levels]
-    
-    # Recent sessions (filtered by accessible levels)
+    # Recent sessions (filtered by levels this user can view)
     recent_sessions = AttendanceSession.objects.filter(
         school=request.school,
-        level__in=accessible_level_codes
+        level__in=view_level_codes
     ).select_related('term', 'marked_by').order_by('-date')[:10]
     
-    # Today's sessions (filtered by accessible levels)
+    # Today's sessions (filtered by levels this user can view)
     today_sessions = AttendanceSession.objects.filter(
         school=request.school,
         date=today,
-        level__in=accessible_level_codes
+        level__in=view_level_codes
     ).select_related('term')
     
-    # Get classes that need marking today
-    marked_today = list(today_sessions.values_list('level', flat=True))
-    pending_levels = [code for code, name in accessible_levels if code not in marked_today]
+    # Only teachers with an allocated course can start a new register.
+    marked_today = set(today_sessions.values_list('level', flat=True))
+    pending_levels = [
+        (code, name) for code, name in marking_levels if code not in marked_today
+    ]
     
     context = {
         'title': _('Attendance Dashboard'),
         'current_term': current_term,
         'recent_sessions': recent_sessions,
         'today_sessions': today_sessions,
-        'pending_levels': [(code, dict(accessible_levels).get(code, code)) for code in pending_levels],
+        'pending_levels': pending_levels,
+        'marking_levels': marking_levels,
         'today': today,
         'user_division': request.user.division if hasattr(request.user, 'division') else None,
     }
@@ -87,21 +209,48 @@ def save_attendance_ajax(request):
         attendance_date_str = request.POST.get('date')
         level_code = request.POST.get('level')
         
-        attendance_date = parse_date(attendance_date_str) if attendance_date_str else date.today()
-        current_term = Term.objects.filter(is_current_term=True, school=request.school).first()
-        
-        if not current_term:
-            return JsonResponse({'status': 'error', 'message': _("No active term found.")}, status=400)
+        attendance_date = parse_date(attendance_date_str) if attendance_date_str else timezone.localdate()
+        if not attendance_date:
+            return JsonResponse(
+                {'status': 'error', 'message': _("Invalid attendance date.")}, status=400
+            )
+
+        attendance_term, date_error = _validate_attendance_date(
+            request.user, request.school, attendance_date
+        )
+        if date_error:
+            return JsonResponse({'status': 'error', 'message': date_error}, status=400)
             
+        if request.user.is_superuser or request.user.is_school_admin:
+            return JsonResponse(
+                {
+                    'status': 'error',
+                    'message': _(
+                        "School administrators can view attendance records but cannot mark them."
+                    ),
+                },
+                status=403,
+            )
+
         student = get_object_or_404(
             Student.objects.select_related('student'),
             id=student_id,
             student__school=request.school,
         )
-        allowed_levels = {code for code, _ in _attendance_levels_for_user(request.user)}
+        allowed_levels = {
+            code
+            for code, _ in _attendance_marking_levels_for_user(
+                request.user, request.school
+            )
+        }
         if student.level not in allowed_levels or level_code != student.level:
             return JsonResponse(
-                {'status': 'error', 'message': _("You can only mark attendance for your assigned class.")},
+                {
+                    'status': 'error',
+                    'message': _(
+                        "You can only mark attendance for classes where you have an allocated course."
+                    ),
+                },
                 status=403,
             )
 
@@ -109,14 +258,17 @@ def save_attendance_ajax(request):
         if status not in valid_statuses:
             return JsonResponse({'status': 'error', 'message': _("Invalid attendance status.")}, status=400)
         
-        # Create or update session for this date/level if it doesn't exist
+        # The first teacher to mark a class/date claims the register. Other
+        # teachers can still view it, but only the owner may add or change marks.
         session, created = AttendanceSession.objects.get_or_create(
             school=request.school,
-            term=current_term,
             level=student.level,
             date=attendance_date,
-            defaults={'marked_by': request.user}
+            defaults={'term': attendance_term, 'marked_by': request.user}
         )
+        lock_error = _session_lock_error(request.user, session)
+        if lock_error:
+            return JsonResponse({'status': 'error', 'message': lock_error}, status=403)
         
         # Save individual record
         Attendance.objects.update_or_create(
@@ -142,22 +294,63 @@ def save_attendance_ajax(request):
 @login_required
 @lecturer_required  
 def mark_attendance(request, level=None):
-    """Mark attendance for a class - updated to facilitate AJAX workflow"""
-    allowed_levels = {code for code, _ in _attendance_levels_for_user(request.user)}
-    if level not in allowed_levels:
-        return HttpResponseForbidden(_("You can only access attendance for your assigned class."))
+    """View a class register and let allocated teachers mark it."""
+    view_levels = {code for code, _ in _attendance_levels_for_user(request.user)}
+    if level not in view_levels:
+        return HttpResponseForbidden(_("You can only access attendance for your assigned class or division."))
 
-    current_term = Term.objects.filter(is_current_term=True, school=request.school).first()
-    if not current_term:
-        messages.error(request, _("No active term found."))
-        return redirect('attendance:dashboard')
-    
-    attendance_date_str = request.GET.get('date')
-    attendance_date = parse_date(attendance_date_str) if attendance_date_str else date.today()
-    
+    attendance_date_str = request.GET.get('date') or request.POST.get('date')
+    attendance_date = parse_date(attendance_date_str) if attendance_date_str else timezone.localdate()
     if not attendance_date:
-        attendance_date = date.today()
-    
+        attendance_date = timezone.localdate()
+
+    attendance_term, date_error = _validate_attendance_date(
+        request.user, request.school, attendance_date
+    )
+    if date_error:
+        messages.error(request, date_error)
+        return redirect('attendance:dashboard')
+
+    today = timezone.localdate()
+
+    existing_session = AttendanceSession.objects.filter(
+        school=request.school,
+        level=level,
+        date=attendance_date,
+    ).select_related('marked_by').first()
+
+    marking_levels = {
+        code
+        for code, _ in _attendance_marking_levels_for_user(
+            request.user, request.school
+        )
+    }
+    can_mark = level in marking_levels
+    read_only_reason = None
+    if request.user.is_superuser or request.user.is_school_admin:
+        can_mark = False
+        read_only_reason = _(
+            "School administrators can view attendance records but cannot mark them."
+        )
+    elif not can_mark:
+        read_only_reason = _(
+            "You can only mark attendance for classes where you have an allocated course."
+        )
+    else:
+        lock_error = _session_lock_error(request.user, existing_session)
+        if lock_error:
+            can_mark = False
+            read_only_reason = lock_error
+
+    if request.method == 'POST' and not can_mark:
+        return HttpResponseForbidden(
+            read_only_reason or _("You cannot mark attendance for this class.")
+        )
+
+    # Read-only views show the whole class so administrators can see every
+    # recorded status, while teachers only see their remaining students.
+    show_all = request.GET.get('show_all') == 'true' or not can_mark
+
     # Get students for this level who haven't been marked yet for this date
     # (unless they are editing an existing record, but user wants them "gone")
     marked_student_ids = Attendance.objects.filter(
@@ -166,11 +359,10 @@ def mark_attendance(request, level=None):
         school=request.school
     ).values_list('student_id', flat=True)
     
-    show_all = request.GET.get('show_all') == 'true'
-    
     students_qs = Student.objects.filter(
         level=level,
-        student__school=request.school
+        student__school=request.school,
+        status=STUDENT_STATUS_ACTIVE,
     ).select_related('student')
     
     if not show_all:
@@ -182,11 +374,15 @@ def mark_attendance(request, level=None):
         # Legacy support for bulk save if JS is disabled
         session, created = AttendanceSession.objects.get_or_create(
             school=request.school,
-            term=current_term,
             level=level,
             date=attendance_date,
-            defaults={'marked_by': request.user}
+            defaults={'term': attendance_term, 'marked_by': request.user}
         )
+        lock_error = _session_lock_error(request.user, session)
+        if lock_error:
+            messages.error(request, lock_error)
+            return redirect('attendance:dashboard')
+        existing_session = session
         
         for student in students_qs:
             status = request.POST.get(f'status_{student.id}')
@@ -216,7 +412,7 @@ def mark_attendance(request, level=None):
     )
     for record in existing_records:
         existing_attendance[record.student_id] = record
-    
+
     context = {
         'title': _('Mark Attendance'),
         'level': level,
@@ -226,7 +422,13 @@ def mark_attendance(request, level=None):
         'total_count': students_qs.count(),
         'attendance_date': attendance_date,
         'existing_attendance': existing_attendance,
-        'current_term': current_term,
+        'attendance_term': attendance_term,
+        'existing_session': existing_session,
+        'can_mark': can_mark,
+        'read_only_reason': read_only_reason,
+        'today': today,
+        'is_late': attendance_date < today,
+        'late_days': (today - attendance_date).days,
         'show_all': show_all,
     }
     return render(request, 'attendance/mark_attendance.html', context)

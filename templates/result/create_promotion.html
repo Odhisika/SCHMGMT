@@ -29,12 +29,25 @@
             {% endfor %}
         </ul>
 
-        {% if not is_third_term %}
+        {% if not can_process %}
         <div class="alert alert-warning">
-            <i class="fas fa-exclamation-triangle"></i> 
-            {% trans 'Promotions can only be processed in the <strong>Third Term</strong>.' %}
+            <i class="fas fa-exclamation-triangle"></i>
+            {% if selected_is_final %}
+                {% trans 'The final class can only be completed from' %} <strong>{{ final_class_completion_term }} Term</strong>.
+            {% else %}
+                {% trans 'Non-final classes can only be processed in the <strong>Third Term</strong>.' %}
+            {% endif %}
             <br>
             {% trans 'Current Term:' %} <strong>{{ current_term.term }}</strong>
+        </div>
+        {% endif %}
+
+        {% if selected_is_final %}
+        <div class="alert alert-info">
+            <i class="fas fa-graduation-cap"></i>
+            <strong>{% trans 'Final class completion (JHS 3)' %}</strong> &mdash;
+            {% trans 'There is no academic repeat in JHS 3. Learners with a valid record are completed/graduated; Term 3 is not required and BECE results are handled by WAEC.' %}
+            {% trans 'Use "Hold" only if a learner cannot complete/register for BECE due to illness, fees, or a school decision (they remain active in JHS 3, not repeating).' %}
         </div>
         {% endif %}
 
@@ -57,16 +70,20 @@
         <hr>
         <h4 class="mt-4">{% trans 'Candidates from' %} {{ selected_level }}</h4>
         <p class="text-muted">
-            {% trans 'Pass Mark for Promotion:' %} <strong>{{ pass_mark }}%</strong>
-            &middot;
-            {% trans 'Review band:' %} <strong>{{ failure_mark }}% &ndash; {{ pass_mark }}%</strong>
+            {% if selected_is_final %}
+                {% trans 'Completion is based on the terms recorded. The average is stored for the transcript.' %}
+            {% else %}
+                {% trans 'Pass Mark for Promotion:' %} <strong>{{ pass_mark }}%</strong>
+                &middot;
+                {% trans 'Review band:' %} <strong>{{ failure_mark }}% &ndash; {{ pass_mark }}%</strong>
+            {% endif %}
         </p>
         
         <form method="post"
-              data-confirm="Are you sure you want to promote these students? This action will update their class levels."
-              data-confirm-title="Process student promotion?"
-              data-confirm-ok="Yes, promote students"
-              data-confirm-cancel="Cancel"
+              data-confirm="{% if selected_is_final %}{% trans 'Graduate these final-class learners? Their records will be closed but kept.' %}{% else %}{% trans 'Are you sure you want to promote these students? This action will update their class levels.' %}{% endif %}"
+              data-confirm-title="{% if selected_is_final %}{% trans 'Complete final class?' %}{% else %}{% trans 'Process student promotion?' %}{% endif %}"
+              data-confirm-ok="{% if selected_is_final %}{% trans 'Yes, graduate learners' %}{% else %}{% trans 'Yes, promote students' %}{% endif %}"
+              data-confirm-cancel="{% trans 'Cancel' %}"
               data-confirm-variant="primary"
               data-confirm-icon="graduation-cap">
             {% csrf_token %}
@@ -81,23 +98,37 @@
                             <th>{% trans 'Term 1' %}</th>
                             <th>{% trans 'Term 2' %}</th>
                             <th>{% trans 'Term 3' %}</th>
-                            <th>{% trans 'Annual Avg' %}</th>
+                            <th>{% trans 'Terms Used' %}</th>
+                            <th>{% trans 'Average' %}</th>
                             <th>{% trans 'Status' %}</th>
                             <th>{% trans 'Action' %}</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for item in promotion_list %}
-                        <tr {% if item.promoted %}class="table-success"{% else %}class="table-danger"{% endif %}>
+                        <tr class="{% if item.promoted %}table-success{% elif item.status == 'INCOMPLETE' %}table-warning{% else %}table-danger{% endif %}">
                             <td>{{ item.student.student.get_full_name }}</td>
                             <td>{{ item.student.student.username }}</td>
-                            <td>{{ item.term1|default:"-" }}</td>
-                            <td>{{ item.term2|default:"-" }}</td>
-                            <td>{{ item.term3|default:"-" }}</td>
-                            <td><strong>{{ item.average }}%</strong></td>
+                            <td>{{ item.term1|default_if_none:"-" }}</td>
+                            <td>{{ item.term2|default_if_none:"-" }}</td>
+                            <td>{{ item.term3_display }}</td>
+                            <td>{{ item.terms_used }} ({{ item.terms_label }})</td>
+                            <td><strong>{{ item.average_display }}%</strong></td>
                             <td><span class="badge bg-{{ item.status_color }}">{{ item.status_label }}</span></td>
                             <td>
                                 <div class="d-flex flex-wrap gap-1">
+                                    {% if item.is_final_class %}
+                                    <button type="submit" name="student_action" value="{{ item.student.pk }}:graduate"
+                                            class="btn btn-sm btn-success"
+                                            title="{% trans 'Graduate/complete this learner' %}">
+                                        <i class="fas fa-graduation-cap"></i> {% trans 'Graduate' %}
+                                    </button>
+                                    <button type="submit" name="student_action" value="{{ item.student.pk }}:hold"
+                                            class="btn btn-sm btn-outline-warning"
+                                            title="{% trans 'Keep in JHS 3 on hold (e.g. unable to register for BECE). Not a repeat.' %}">
+                                        <i class="fas fa-pause-circle"></i> {% trans 'Hold' %}
+                                    </button>
+                                    {% else %}
                                     <button type="submit" name="student_action" value="{{ item.student.pk }}:promote"
                                             class="btn btn-sm btn-success"
                                             title="{% trans 'Promote this student now' %}">
@@ -108,10 +139,19 @@
                                             title="{% trans 'Keep this student in the same class' %}">
                                         <i class="fas fa-rotate-left"></i> {% trans 'Repeat' %}
                                     </button>
+                                    {% endif %}
                                 </div>
                                 {% if item.promoted %}
                                 <small class="text-success d-block mt-1">
-                                    {% if item.is_graduating %}{% trans 'Will graduate' %}{% else %}{% trans 'Next:' %} {{ item.next_level }}{% endif %}
+                                    {% if item.is_graduating %}{% trans 'Will graduate/complete JHS 3' %}{% else %}{% trans 'Next:' %} {{ item.next_level }}{% endif %}
+                                </small>
+                                {% elif item.status == 'INCOMPLETE' %}
+                                <small class="text-warning d-block mt-1">
+                                    {% if item.is_final_class %}
+                                        {% trans 'On hold / needs review (not a repeat).' %}
+                                    {% else %}
+                                        {% trans 'Missing terms — review before deciding.' %}
+                                    {% endif %}
                                 </small>
                                 {% endif %}
                             </td>
@@ -121,10 +161,11 @@
                 </table>
             </div>
 
-            {% if is_third_term %}
+            {% if can_process %}
             <div class="mt-3">
                 <button type="submit" class="btn btn-primary">
-                    <i class="fas fa-check-circle"></i> {% trans 'Process Promotion' %}
+                    <i class="fas fa-check-circle"></i>
+                    {% if selected_is_final %}{% trans 'Process Final Class Completion' %}{% else %}{% trans 'Process Promotion' %}{% endif %}
                 </button>
             </div>
             {% endif %}

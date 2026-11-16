@@ -69,7 +69,17 @@ PROMOTION_STATUS_CHOICES = (
     ('BORDERLINE', _('Borderline (Needs Review)')),
     ('MANUAL_PASS', _('Manually Promoted')),
     ('MANUAL_FAIL', _('Manually Held Back')),
+    ('INCOMPLETE', _('Incomplete Results')),
+    ('COMPLETED', _('Completed Final Class')),
     ('PENDING', _('Pending Evaluation')),
+)
+
+# The final annual decision, separate from the per-term evaluation status.
+PROMOTION_DECISION_CHOICES = (
+    ('PROMOTE', _('Promote')),
+    ('REPEAT', _('Repeat')),
+    ('GRADUATE', _('Graduate')),
+    ('REVIEW', _('Needs Review')),
 )
 
 
@@ -388,7 +398,11 @@ class Result(models.Model):
         if not self.school and self.student:
             self.school = self.student.student.school
         # Sync promoted boolean from status
-        self.promoted = self.promotion_status in ('AUTO_PASS', 'MANUAL_PASS')
+        self.promoted = self.promotion_status in (
+            'AUTO_PASS',
+            'MANUAL_PASS',
+            'COMPLETED',
+        )
         super().save(*args, **kwargs)
         if update_position:
             self.calculate_overall_position()
@@ -448,9 +462,103 @@ class Result(models.Model):
             'AUTO_FAIL': 'danger',
             'MANUAL_FAIL': 'danger',
             'BORDERLINE': 'warning',
+            'INCOMPLETE': 'warning',
+            'COMPLETED': 'success',
             'PENDING': 'secondary',
         }
         return colors.get(self.promotion_status, 'secondary')
+
+
+class PromotionDecision(models.Model):
+    """Permanent annual promotion/graduation decision for one learner.
+
+    ``Result`` stores a per-term report-card status.  This model stores the
+    annual outcome, including final-class completion, even when a learner has
+    no Third Term result (for example JHS 3 candidates who leave after BECE).
+    """
+
+    student = models.ForeignKey(
+        Student,
+        on_delete=models.CASCADE,
+        related_name="promotion_decisions",
+    )
+    school = models.ForeignKey(
+        "school.School",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
+    session = models.CharField(max_length=100)
+    level = models.CharField(
+        max_length=25, choices=settings.LEVEL_CHOICES, null=True
+    )
+    next_level = models.CharField(
+        max_length=25, choices=settings.LEVEL_CHOICES, null=True, blank=True
+    )
+
+    term1 = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True
+    )
+    term2 = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True
+    )
+    term3 = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True
+    )
+    terms_used = models.PositiveSmallIntegerField(default=0)
+    average = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True
+    )
+
+    is_final_class = models.BooleanField(default=False)
+    status = models.CharField(
+        max_length=20,
+        choices=PROMOTION_STATUS_CHOICES,
+        default="PENDING",
+    )
+    decision = models.CharField(
+        max_length=20,
+        choices=PROMOTION_DECISION_CHOICES,
+        default="REVIEW",
+    )
+    decided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="promotion_decisions",
+    )
+    decided_at = models.DateTimeField(auto_now=True)
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        verbose_name = _("Promotion Decision")
+        verbose_name_plural = _("Promotion Decisions")
+        ordering = ["-session", "student__student__last_name", "student__student__first_name"]
+        unique_together = ["student", "school", "session"]
+
+    def __str__(self):
+        return (
+            f"{self.student} - {self.session}: "
+            f"{self.get_decision_display()} ({self.get_status_display()})"
+        )
+
+    @property
+    def status_label(self):
+        return self.get_status_display()
+
+    @property
+    def status_color(self):
+        return {
+            "AUTO_PASS": "success",
+            "MANUAL_PASS": "success",
+            "COMPLETED": "success",
+            "AUTO_FAIL": "danger",
+            "MANUAL_FAIL": "danger",
+            "BORDERLINE": "warning",
+            "INCOMPLETE": "warning",
+            "PENDING": "secondary",
+        }.get(self.status, "secondary")
 
 
 class PromotionRequest(models.Model):

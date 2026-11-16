@@ -8,7 +8,7 @@ from datetime import timedelta
 import json
 
 from accounts.decorators import admin_required, lecturer_required
-from accounts.models import User, Student
+from accounts.models import STUDENT_STATUS_ACTIVE, Student, User
 from course.models import Program, Course
 from .forms import SemesterForm, NewsAndEventsForm, TermWeekForm
 from .models import NewsAndEvents, ActivityLog, Semester, TermWeek
@@ -110,8 +110,14 @@ def dashboard_view(request):
     dashboard_school = request.school
     
     # 1. Base QuerySets
-    student_qs = Student.objects.filter(student__school=dashboard_school, student__is_active=True)
-    teacher_qs = User.objects.filter(school=dashboard_school, is_active=True).filter(Q(is_lecturer=True) | Q(is_teacher=True))
+    student_qs = Student.objects.filter(
+        student__school=dashboard_school,
+        student__is_active=True,
+        status=STUDENT_STATUS_ACTIVE,
+    )
+    teacher_qs = User.objects.filter(school=dashboard_school, is_active=True).filter(
+        Q(is_lecturer=True) | Q(is_teacher=True)
+    )
     
     # 2. Apply Division Filters
     if division in [settings.DIVISION_NURSERY, settings.DIVISION_PRIMARY, settings.DIVISION_JHS]:

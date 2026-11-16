@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
@@ -229,10 +230,9 @@ class Notification(models.Model):
     school = models.ForeignKey(
         "school.School",
         on_delete=models.CASCADE,
-        null=True,
-        blank=True,
         related_name="notifications",
         verbose_name=_("School"),
+        help_text=_("Every notification belongs to exactly one school."),
     )
     division = models.CharField(
         max_length=25,
@@ -281,6 +281,33 @@ class Notification(models.Model):
 
     def __str__(self):
         return self.title
+
+    def clean(self):
+        """Keep a notification and its people inside one tenant."""
+        super().clean()
+
+        if not self.school_id:
+            raise ValidationError(
+                {"school": _("A notification must belong to a school.")}
+            )
+
+        if self.recipient_id and self.recipient.school_id != self.school_id:
+            raise ValidationError(
+                {
+                    "recipient": _(
+                        "The recipient must belong to the notification's school."
+                    )
+                }
+            )
+
+        if (
+            self.actor_id
+            and not self.actor.is_superuser
+            and self.actor.school_id != self.school_id
+        ):
+            raise ValidationError(
+                {"actor": _("The actor must belong to the notification's school.")}
+            )
 
     def get_icon(self):
         """Return the Font Awesome icon used by the notification center."""

@@ -1,6 +1,12 @@
 from django.db.models import Q
 import django_filters
-from .models import User, Student
+
+from .models import (
+    STUDENT_STATUS_ACTIVE,
+    STUDENT_STATUS_CHOICES,
+    Student,
+    User,
+)
 
 
 class LecturerFilter(django_filters.FilterSet):
@@ -33,6 +39,8 @@ class LecturerFilter(django_filters.FilterSet):
 
 
 class StudentFilter(django_filters.FilterSet):
+    STATUS_CHOICES = (("ALL", "All statuses"),) + tuple(STUDENT_STATUS_CHOICES)
+
     id_no = django_filters.CharFilter(
         field_name="student__username", lookup_expr="exact", label=""
     )
@@ -45,6 +53,12 @@ class StudentFilter(django_filters.FilterSet):
     program = django_filters.CharFilter(
         field_name="program__title", lookup_expr="icontains", label=""
     )
+    status = django_filters.ChoiceFilter(
+        choices=STATUS_CHOICES,
+        method="filter_status",
+        label="",
+        empty_label="Active students",
+    )
 
     class Meta:
         model = Student
@@ -53,6 +67,7 @@ class StudentFilter(django_filters.FilterSet):
             "name",
             "email",
             "program",
+            "status",
         ]
 
     def __init__(self, *args, **kwargs):
@@ -71,6 +86,12 @@ class StudentFilter(django_filters.FilterSet):
         self.filters["program"].field.widget.attrs.update(
             {"class": "au-input", "placeholder": "Program"}
         )
+        self.filters["status"].field.widget.attrs.update({"class": "form-select"})
+
+    def filter_status(self, queryset, name, value):
+        if value == "ALL":
+            return queryset
+        return queryset.filter(status=value)
 
     def filter_by_name(self, queryset, name, value):
         return queryset.filter(

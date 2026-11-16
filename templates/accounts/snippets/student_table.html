@@ -8,6 +8,7 @@
                 <th> {% trans 'Full Name' %} </th>
                 <th> {% trans 'Email' %} </th>
                 <th> {% trans 'Program' %} </th>
+                <th> {% trans 'Status' %} </th>
                 <th> {% trans 'Mob No.' %} </th>
                 <th> {% trans 'Address/city' %} </th>
                 {% if request.user.is_superuser or request.user.is_school_admin %}
@@ -23,6 +24,11 @@
                 <td><a href="{% url 'profile_single' student.student.id %}">{{ student.student.get_full_name }}</a></td>
                 <td>{{ student.student.email }}</td>
                 <td>{{ student.program|default:"-" }}</td>
+                <td>
+                    <span class="badge {% if student.status == 'ACTIVE' %}bg-success{% elif student.status == 'GRADUATED' %}bg-primary{% else %}bg-secondary{% endif %}">
+                        {{ student.get_status_display }}
+                    </span>
+                </td>
                 <td>{{ student.student.phone }}</td>
                 <td>{{ student.student.address }}</td>
                 {% if request.user.is_superuser or request.user.is_school_admin %}
@@ -34,7 +40,11 @@
                         <ul class="dropdown-menu">
                           <li><a class="dropdown-item" href="{% url 'student_edit' pk=student.pk %}"><i class="unstyled me-2 fas fa-edit"></i>{% trans 'Update' %}</a></li>
                           <li><a class="dropdown-item" href="{% url 'profile_single' student.student.id %}?download_pdf=1"><i class="unstyled me-2 fas fa-download"></i>{% trans 'Download PDF' %}</a></li>
-                          <li><a class="dropdown-item text-danger" href="{% url 'student_delete' pk=student.pk %}"><i class="unstyled me-2 fas fa-trash-alt"></i> {% trans 'Delete' %}</a></li>
+                          <li><a class="dropdown-item text-danger" href="{% url 'student_delete' pk=student.pk %}"
+                                 data-confirm="{% blocktrans with name=student.student.get_full_name|default:student.student.username %}Delete {{ name }}? This student account and all related records will be permanently deleted. This cannot be undone.{% endblocktrans %}"
+                                 data-confirm-title="{% trans 'Delete student?' %}"
+                                 data-confirm-ok="{% trans 'Delete student' %}"
+                                 data-confirm-variant="danger" data-confirm-icon="trash"><i class="unstyled me-2 fas fa-trash-alt"></i> {% trans 'Delete' %}</a></li>
                         </ul>
                     </div>
                 </td>
@@ -42,7 +52,7 @@
             </tr>
             {% empty %}
             <tr>
-              <td colspan="8">
+              <td colspan="9">
               <span class="text-danger">
                 {% trans 'No Student(s) found in this category.' %}
               </span>

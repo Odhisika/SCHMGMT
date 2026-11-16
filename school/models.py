@@ -1,5 +1,6 @@
 from decimal import Decimal, InvalidOperation
 
+from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator, RegexValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -287,6 +288,26 @@ class PromotionPolicy(models.Model):
         default=True,
         verbose_name=_("Allow Teacher Promotion Requests"),
         help_text=_("Teachers can submit promotion exception requests for borderline/failed students.")
+    )
+    final_class_completion_term = models.CharField(
+        max_length=10,
+        choices=settings.TERM_CHOICES,
+        default=settings.SECOND_TERM,
+        verbose_name=_("Final Class Completion Term"),
+        help_text=_(
+            "Term in which the final class (for example JHS 3) is closed. "
+            "Final-class learners normally leave after BECE, so Term 3 is not required."
+        ),
+    )
+    final_class_requires_pass = models.BooleanField(
+        default=False,
+        verbose_name=_("Require Pass Mark to Graduate"),
+        help_text=_(
+            "Legacy option. JHS 3/final class has no academic repeat; learners with "
+            "a valid record are completed/graduated and the average is recorded for "
+            "the transcript. Administrative BECE registration holds should be managed "
+            "as a hold/review, not as a repeat."
+        ),
     )
     updated_at = models.DateTimeField(auto_now=True)
 

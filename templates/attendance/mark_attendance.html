@@ -151,18 +151,66 @@
         </div>
     </div>
 
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <form method="get" class="d-flex align-items-center gap-2">
+            <label for="attendance-date" class="small text-muted mb-0">{% trans 'Change date' %}</label>
+            <input id="attendance-date" type="date" name="date"
+                   value="{{ attendance_date|date:'Y-m-d' }}" max="{{ today|date:'Y-m-d' }}"
+                   class="form-control form-control-sm" style="max-width: 180px;">
+            <button class="btn btn-sm btn-outline-primary" type="submit">{% trans 'Go' %}</button>
+        </form>
+        <div class="small text-muted">
+            {% if attendance_term %}{% trans 'Term' %}: <strong>{{ attendance_term }}</strong>{% endif %}
+        </div>
+    </div>
+
+    {% if not can_mark and read_only_reason %}
+    <div class="alert alert-secondary d-flex align-items-start gap-2">
+        <i class="fas fa-lock mt-1"></i>
+        <div>{{ read_only_reason }}</div>
+    </div>
+    {% endif %}
+
+    {% if is_late %}
+    <div class="alert alert-warning d-flex align-items-start gap-2">
+        <i class="fas fa-clock mt-1"></i>
+        <div>
+            <strong>{% trans 'Late entry' %}</strong> &mdash;
+            {% trans 'This register is being marked' %} {{ late_days }}
+            {% trans 'day(s) after the attendance date.' %}
+            {% trans 'It will be saved against' %} {{ attendance_date|date:"F d, Y" }}
+            {% trans 'and recorded as a late entry.' %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if existing_session %}
+    <div class="alert alert-info d-flex align-items-start gap-2">
+        <i class="fas fa-circle-info mt-1"></i>
+        <div>
+            {% trans 'This register was originally opened by' %}
+            <strong>{{ existing_session.marked_by.get_full_name|default:"—" }}</strong>
+            {% trans 'on' %} {{ existing_session.marked_at|date:"M d, Y H:i" }}.
+            {% if existing_session.was_marked_late %}{% trans 'It was already a late entry.' %}{% endif %}
+        </div>
+    </div>
+    {% endif %}
+
     <div class="progress-bar-container">
         <div class="progress-bar-fill" id="marking-progress"></div>
     </div>
 
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div id="status-msg" class="text-muted small">
-            {% if total_count == marked_count %}
+            {% if not can_mark %}
+                <span class="text-muted"><i class="fas fa-eye"></i> {% trans 'Read-only view.' %}</span>
+            {% elif total_count == marked_count %}
                 <span class="text-success"><i class="fas fa-check-circle"></i> {% trans 'All students marked!' %}</span>
             {% else %}
                 {% trans 'Click a button to mark attendance for each student.' %}
             {% endif %}
         </div>
+        {% if can_mark %}
         <div>
             {% if not show_all %}
                 <a href="?date={{ attendance_date|date:'Y-m-d' }}&show_all=true" class="btn btn-sm btn-light border">
@@ -174,6 +222,7 @@
                 </a>
             {% endif %}
         </div>
+        {% endif %}
     </div>
 
     <div id="student-list">
@@ -187,10 +236,15 @@
                 <div>
                     <div class="fw-bold fs-5">{{ student.student.get_full_name }}</div>
                     <div class="text-muted small">{{ student.student.username }}</div>
+                    {% if can_mark %}
                     <input type="text" id="remarks-{{ student.id }}" class="remarks-input" placeholder="{% trans 'Optional remarks (e.g. Sick, Late 10min)' %}">
+                    {% elif record.remarks %}
+                    <div class="text-muted small mt-1"><i class="fas fa-comment-dots"></i> {{ record.remarks }}</div>
+                    {% endif %}
                 </div>
             </div>
             
+            {% if can_mark %}
             <div class="status-group">
                 <button class="status-btn present {% if record.status == 'Present' %}active{% endif %}" onclick="markStudent({{ student.id }}, 'Present', this)">
                     <i class="fas fa-check"></i> {% trans 'Present' %}
@@ -208,13 +262,29 @@
                     <i class="fas fa-comment-dots"></i>
                 </button>
             </div>
+            {% else %}
+            <div class="status-group">
+                {% if record %}
+                    <span class="badge {% if record.status == 'Present' %}bg-success{% elif record.status == 'Absent' %}bg-danger{% elif record.status == 'Late' %}bg-warning text-dark{% else %}bg-info text-dark{% endif %}">
+                        {{ record.get_status_display }}
+                    </span>
+                    {% if record.recorded_by %}
+                    <span class="small text-muted ms-2">
+                        {{ record.recorded_by.get_full_name }} &bull; {{ record.created_at|date:"M d, H:i" }}
+                    </span>
+                    {% endif %}
+                {% else %}
+                    <span class="small text-muted">{% trans 'Not marked' %}</span>
+                {% endif %}
+            </div>
+            {% endif %}
         </div>
         {% endwith %}
         {% empty %}
         <div class="empty-state text-center py-5 bg-white rounded-3 shadow-sm">
             <i class="fas fa-check-circle text-success mb-3" style="font-size: 50px;"></i>
             <h3>{% trans 'All Done!' %}</h3>
-            <p class="text-muted">{% trans 'All students in this class have been marked for today.' %}</p>
+            <p class="text-muted">{% trans 'All students in this class have been marked for this date.' %}</p>
             <a href="{% url 'attendance:dashboard' %}" class="btn btn-primary">
                 <i class="fas fa-arrow-left"></i> {% trans 'Go to Dashboard' %}
             </a>
@@ -316,7 +386,7 @@
                     <div class="empty-state text-center py-5 bg-white rounded-3 shadow-sm">
                         <i class="fas fa-check-circle text-success mb-3" style="font-size: 50px;"></i>
                         <h3>{% trans "All Done!" %}</h3>
-                        <p class="text-muted">{% trans "All students in this class have been marked for today." %}</p>
+                        <p class="text-muted">{% trans "All students in this class have been marked for this date." %}</p>
                         <a href="{% url 'attendance:dashboard' %}" class="btn btn-primary">
                             <i class="fas fa-arrow-left"></i> {% trans "Go to Dashboard" %}
                         </a>

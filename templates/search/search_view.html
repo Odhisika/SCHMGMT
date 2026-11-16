@@ -1,8 +1,6 @@
 {% extends "base.html" %}
 {% load i18n %}
-{% block title %}{% trans 'Search result for' %} {{ query }} | {% trans 'Learning management system' %}{% endblock title %}
-
-{% load class_name %}
+{% block title %}{% trans 'Search results for' %} {{ query }} | {% trans 'Learning management system' %}{% endblock title %}
 
 {% block content %}
 
@@ -11,88 +9,87 @@
         <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
         <li class="breadcrumb-item active" aria-current="page">{% trans 'Search' %}</li>
     </ol>
-</nav>  
+</nav>
 
 <div class="card p-3" style="box-shadow: 0px 2px 5px 0px rgba(0, 0, 0, 0.3); border-radius: 10px;">
-    <h5 class="text-muted m-0">{{ count }} {% trans 'result' %}{{ count|pluralize }} {% trans 'for' %} <b><em class="text-orange"> {{ query }}</em></b></h5>
-    <hr>
-    {% for object in object_list %}
-        {% with object|class_name as klass %}
-        {% if klass == "Program" %}
-            <div class="col-12 class-item">
-                <span class="bg-secondary text-light small px-2 rounded-pill">{% trans 'Program' %}</span>
-                <h5><a href="{{ object.get_absolute_url }}"><b>{{ object.title}}</b></a></h5>
-                <p>{{ object.summary }}</p>
-            </div><hr>
+    {% if query %}
+        <h5 class="text-muted m-0">
+            {{ count }} {% trans 'result' %}{{ count|pluralize }} {% trans 'for' %}
+            <b><em class="text-orange">{{ query }}</em></b>
+        </h5>
+        <hr>
 
-        {% elif klass == "Course" %}
-            <div class="col-12 class-item">
-                <span class="bg-secondary text-light small px-2 rounded-pill">{% trans 'Subject' %}</span>
-                <p><b>{% trans 'Program of' %}</b> {{ object.program }}</p>
-                <h5><a href="{{ object.get_absolute_url }}"><b>{{ object }}</b></a></h5>
-                <p>{{ object.summary }}</p>
-            </div><hr>
-            
-        {% elif klass == "NewsAndEvents" %}
-            <div class="col-12 class-item">
-                <span class="bg-secondary text-light small px-2 rounded-pill">{% trans 'News And Events' %}</span>
-                <p><b>{% trans 'Date:' %} </b> {{ object.updated_date|timesince }} ago</p>
-                <h5><a href="{{ object.get_absolute_url }}"><b>{{ object.title }}</b></a></h5>
-                <p>{{ object.summary }}</p>
-            </div><hr>
-
-        {% elif klass == "Quiz" %}
-            <div class="col-12 class-item">
-                <span class="bg-secondary text-light small px-2 rounded-pill">{% trans 'Quiz' %}</span>
-                <p>{{ object.category }} {% trans 'quiz' %},  <b>{% trans 'Course:' %}</b> {{ object.course }}</p>
-                <h5><a href="{{ object.get_absolute_url }}"><b>{{ object.title }}</b></a></h5>
-                <p>{{ object.description }}</p>
-            </div><hr>
-
-        {% else %}
-            <div class="col-12 col-lg-8 offset-lg-4">
-                <span class="bg-secondary text-light small px-2 rounded-pill">{% trans 'Program' %}</span>
-                <a href="{{ object.get_absolute_url }}" class="class-item d-flex">{{ object }} | {{ object|class_name }}</a>
-            </div><hr>
-            <div class="col-12 class-item">
-                <h5><a href="{{ object.get_absolute_url }}">{{ object }} | <b>{{ object|class_name }}</b></a></h5>
-                <p>{{ object.description }}</p>
-            </div><hr>
-        {% endif %}
-
-        {% endwith %}
-
-{% empty %}
-
-<div class="row">
-    <div class="col-12 col-md-6 mx-auto py-5">
-    <form method="GET" action=".">
-    
-        <div class="input-group form-group-no-border mx-auto" style="margin-bottom: 0px; font-size: 32px;">
-            <input type="text" name="q" data-toggle="popover" data-placement="bottom" 
-            data-content="Press enter to search" class="form-control cfe-nav" 
-            placeholder="Search..." value="{{ request.GET.q }}" data-original-title="" title="" 
-            autofocus="autofocus" required>
-            <button type="submit" class="btn btn-dark">
-                <i class="fa fa-search" aria-hidden="true"></i>
-            </button>
+        {% for result in results %}
+            <div class="d-flex align-items-start gap-3 py-3 {% if not forloop.last %}border-bottom{% endif %}">
+                <div class="flex-shrink-0 text-center" style="width: 2.25rem;">
+                    <i class="fas {{ result.icon }} fa-lg text-muted" aria-hidden="true"></i>
+                </div>
+                <div class="flex-grow-1 min-width-0">
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                        <span class="bg-secondary text-light small px-2 rounded-pill">{{ result.kind }}</span>
+                    </div>
+                    <h5 class="mb-1">
+                        <a href="{{ result.url }}" class="text-reset text-decoration-none">
+                            <b>{{ result.title }}</b>
+                        </a>
+                    </h5>
+                    {% if result.description %}
+                        <p class="text-muted mb-0">{{ result.description }}</p>
+                    {% endif %}
+                </div>
+                <a href="{{ result.url }}" class="btn btn-sm btn-outline-secondary flex-shrink-0"
+                   aria-label="{% trans 'Open result' %}">
+                    <i class="fas fa-arrow-right" aria-hidden="true"></i>
+                </a>
+            </div>
+        {% empty %}
+            <div class="row">
+                <div class="col-12 col-md-8 col-lg-6 mx-auto py-4">
+                    <p class="text-center mb-4">
+                        {% trans "No results matched your search. Try a different name, subject, class or keyword." %}
+                    </p>
+                    <form method="GET" action="{% url 'query' %}">
+                        <div class="input-group">
+                            <input type="search" name="q" class="form-control" value="{{ query }}"
+                                   placeholder="{% trans 'Search students, staff, classes, subjects, quizzes and news' %}"
+                                   aria-label="{% trans 'Search' %}" required>
+                            <button type="submit" class="btn btn-dark">
+                                <i class="fa fa-search" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        {% endfor %}
+    {% else %}
+        <div class="row">
+            <div class="col-12 col-md-8 col-lg-6 mx-auto py-4">
+                <h5 class="text-center mb-4">{% trans 'Search the school' %}</h5>
+                <form method="GET" action="{% url 'query' %}">
+                    <div class="input-group">
+                        <input type="search" name="q" class="form-control"
+                               placeholder="{% trans 'Search students, staff, classes, subjects, quizzes and news' %}"
+                               aria-label="{% trans 'Search' %}" autofocus required>
+                        <button type="submit" class="btn btn-dark">
+                            <i class="fa fa-search" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
+    {% endif %}
 
-    </form>
-
+    <div class="col-12 pt-4">
+        <h6>{% trans 'You can search by:' %}</h6>
+        <ul class="pl-3 mb-0 small text-muted">
+            <li>{% trans 'Student or staff name, username, email, phone, staff ID or admission number' %}</li>
+            <li>{% trans 'Class or division name, for example Primary, Nursery or JHS' %}</li>
+            <li>{% trans 'Program title or description' %}</li>
+            <li>{% trans 'Subject title, code or description' %}</li>
+            <li>{% trans 'Quiz title, description or category' %}</li>
+            <li>{% trans 'News and event title, summary or type' %}</li>
+        </ul>
     </div>
-    <div class="col-12 pl-5">
-    <h5>{% trans 'Search by:' %}</h5>
-    <ul class="pl-3">
-        <li>{% trans 'Program' %} <span class="text-orange">&gt;</span> {% trans 'Title or Description' %}</li>
-        <li>{% trans 'Subject' %} <span class="text-orange">&gt;</span>{% trans 'Title, Code or Description' %}</li>
-        <li>{% trans 'News And Events' %} <span class="text-orange">&gt;</span> {% trans 'Title, Description or just by typing news or event' %}li>
-        <li>{% trans 'Quiz' %} <span class="text-orange">&gt;</span>{% trans 'Title, Description or Category(practice, assignment and exam)' %}</li>
-    </ul>
-    </div>
-</div>
-
-{% endfor %}
 </div>
 
 {% endblock content %}

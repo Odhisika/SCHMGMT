@@ -61,11 +61,16 @@
                     <div class="col-md-6">{{ form.admission_date|as_crispy_field }}</div>
                 </div>
                 <div class="row">
+                    {% if form.division %}
+                        <div class="col-md-6">{{ form.division|as_crispy_field }}</div>
+                    {% endif %}
                     <div class="col-md-6">{{ form.level|as_crispy_field }}</div>
-                    <div class="col-md-6">{{ form.program|as_crispy_field }}</div>
                 </div>
                 <div class="row">
+                    <div class="col-md-6">{{ form.program|as_crispy_field }}</div>
                     <div class="col-md-6">{{ form.house|as_crispy_field }}</div>
+                </div>
+                <div class="row">
                     <div class="col-md-6">{{ form.boarding_status|as_crispy_field }}</div>
                 </div>
                 {{ form.previous_school|as_crispy_field }}
@@ -141,3 +146,58 @@
     </div>
     {% endif %}
 </div>
+
+<script>
+(function () {
+    "use strict";
+
+    // Keep the class/level list in sync with the chosen division.
+    function filterLevelsByDivision() {
+        var divisionSelect = document.getElementById("id_division");
+        var levelSelect = document.getElementById("id_level");
+        if (!divisionSelect || !levelSelect) {
+            return;
+        }
+
+        var division = divisionSelect.value;
+        var firstVisible = null;
+        var selectedIsHidden = false;
+
+        Array.prototype.forEach.call(levelSelect.options, function (option) {
+            if (!option.value) {
+                return;
+            }
+            var optionDivision = option.getAttribute("data-division");
+            var visible = !division || !optionDivision || optionDivision === division;
+            option.hidden = !visible;
+            option.disabled = !visible;
+            option.style.display = visible ? "" : "none";
+            if (visible && firstVisible === null) {
+                firstVisible = option;
+            }
+            if (option.selected && !visible) {
+                selectedIsHidden = true;
+            }
+        });
+
+        if (selectedIsHidden) {
+            levelSelect.value = firstVisible ? firstVisible.value : "";
+        }
+    }
+
+    function initLevelFilter() {
+        var divisionSelect = document.getElementById("id_division");
+        if (!divisionSelect) {
+            return;
+        }
+        divisionSelect.addEventListener("change", filterLevelsByDivision);
+        filterLevelsByDivision();
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", initLevelFilter);
+    } else {
+        initLevelFilter();
+    }
+})();
+</script>

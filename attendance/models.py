@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from accounts.models import Student
@@ -43,6 +44,19 @@ class AttendanceSession(models.Model):
     
     def __str__(self):
         return f"{dict(settings.LEVEL_CHOICES).get(self.level, self.level)} - {self.date}"
+
+    @property
+    def was_marked_late(self):
+        """True when the register was opened after the attendance date."""
+        if not self.marked_at:
+            return False
+
+        marked_on = (
+            timezone.localtime(self.marked_at).date()
+            if timezone.is_aware(self.marked_at)
+            else self.marked_at.date()
+        )
+        return marked_on != self.date
     
     @property
     def total_students(self):

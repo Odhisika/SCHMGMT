@@ -132,6 +132,16 @@ def notify(
     if school is None:
         return None
 
+    # A notification may only be attributed to a member of the tenant it is
+    # being published in. Superusers can operate across tenants and are
+    # therefore allowed to act as the sender from any school context.
+    if (
+        actor is not None
+        and not actor.is_superuser
+        and getattr(actor, "school_id", None) != school.pk
+    ):
+        return None
+
     return Notification.objects.create(
         school=school,
         recipient=recipient,

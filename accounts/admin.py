@@ -32,9 +32,9 @@ class UserAdmin(admin.ModelAdmin):
 admin.site.register(User, UserAdmin)
 @admin.register(Student)
 class StudentAdmin(admin.ModelAdmin):
-    list_display = ['student', 'level', 'program', 'school']
+    list_display = ['student', 'level', 'program', 'status', 'exit_session', 'school']
     search_fields = ['student__username', 'student__first_name', 'student__last_name']
-    list_filter = ['level', 'program', 'student__school']
+    list_filter = ['status', 'level', 'program', 'student__school']
     actions = ['sync_selected_students']
 
     def school(self, obj):

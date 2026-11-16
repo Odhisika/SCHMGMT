@@ -167,12 +167,38 @@ def _disable_password_inputs(form):
             form.fields[name].required = False
 
 
+def _make_picture_optional(form):
+    """Profile photos are useful but must never block a registration."""
+    picture = form.fields.get("picture")
+    if picture:
+        picture.required = False
+        picture.help_text = _(
+            "Optional. A default profile photo is used when none is uploaded."
+        )
+
+
+class DivisionLevelSelect(forms.Select):
+    """Select widget that tags each class level with its school division."""
+
+    def create_option(
+        self, name, value, label, selected, index, subindex=None, attrs=None
+    ):
+        option = super().create_option(
+            name, value, label, selected, index, subindex=subindex, attrs=attrs
+        )
+        division = get_division_for_level(value) if value else None
+        if division:
+            option["attrs"]["data-division"] = division
+        return option
+
+
 class StaffAddForm(UserCreationForm):
     def __init__(self, *args, **kwargs):
         self.school = kwargs.pop("school", None)
         super(StaffAddForm, self).__init__(*args, **kwargs)
         _disable_password_inputs(self)
         _apply_bootstrap_widgets(self)
+        _make_picture_optional(self)
 
     username = forms.CharField(
         max_length=30,
@@ -404,6 +430,7 @@ class NonTeachingStaffAddForm(UserCreationForm):
         super().__init__(*args, **kwargs)
         _disable_password_inputs(self)
         _apply_bootstrap_widgets(self)
+        _make_picture_optional(self)
 
     @transaction.atomic()
     def save(self, commit=True):
@@ -443,8 +470,29 @@ class StudentAddForm(UserCreationForm):
         super(StudentAddForm, self).__init__(*args, **kwargs)
         if self.school:
             self.fields['program'].queryset = Program.objects.filter(school=self.school)
+
+        # Narrow the class list to the chosen division. When the form is
+        # submitted without a division we keep every level available and
+        # derive the division from the selected class in ``clean``.
+        division_value = None
+        if self.is_bound:
+            division_value = self.data.get("division")
+        else:
+            division_value = self.initial.get("division")
+            if not division_value and self.initial.get("level"):
+                division_value = get_division_for_level(self.initial["level"])
+                if division_value:
+                    self.initial["division"] = division_value
+        allowed_levels = settings.DIVISION_LEVEL_MAPPING.get(division_value, [])
+        if allowed_levels:
+            level_labels = dict(LEVEL)
+            self.fields["level"].choices = [("", _("Select level"))] + [
+                (level, level_labels.get(level, level)) for level in allowed_levels
+            ]
+
         _disable_password_inputs(self)
         _apply_bootstrap_widgets(self)
+        _make_picture_optional(self)
 
     username = forms.CharField(
         max_length=30,
@@ -507,13 +555,27 @@ class StudentAddForm(UserCreationForm):
         ),
     )
 
-    level = forms.ChoiceField(
-        choices=LEVEL,
+    division = forms.ChoiceField(
+        choices=[("", _("Select division"))] + list(settings.DIVISION_CHOICES),
+        required=False,
+        label=_("Division / Section"),
+        help_text=_(
+            "Choose a division to narrow the class list. The division is set "
+            "automatically from the class when left blank."
+        ),
         widget=forms.Select(
+            attrs={"class": "browser-default custom-select form-control"}
+        ),
+    )
+
+    level = forms.ChoiceField(
+        choices=[("", _("Select level"))] + list(LEVEL),
+        widget=DivisionLevelSelect(
             attrs={
                 "class": "browser-default custom-select form-control",
             },
         ),
+        label=_("Class / Level"),
     )
 
     program = forms.ModelChoiceField(
@@ -577,6 +639,22 @@ class StudentAddForm(UserCreationForm):
         model = User
         fields = ("username",) + GES_STUDENT_FORM_FIELDS + ("picture",)
 
+    def clean(self):
+        cleaned = super().clean()
+        division = cleaned.get("division")
+        level = cleaned.get("level")
+        level_division = get_division_for_level(level) if level else None
+
+        if division and level_division and level_division != division:
+            self.add_error(
+                "level",
+                _("The selected class does not belong to the chosen division."),
+            )
+        elif not division and level_division:
+            cleaned["division"] = level_division
+
+        return cleaned
+
     @transaction.atomic()
     def save(self, commit=True):
         user = super().save(commit=False)
@@ -592,6 +670,9 @@ class StudentAddForm(UserCreationForm):
         user.phone = self.cleaned_data.get("phone")
         user.address = self.cleaned_data.get("address")
         user.email = self.cleaned_data.get("email")
+        user.division = self.cleaned_data.get("division") or get_division_for_level(
+            self.cleaned_data.get("level")
+        )
         
         # Generate a username when one was not supplied, but always make sure
         # the account has a usable password and that the credentials email is
@@ -765,6 +846,7 @@ class ProfileUpdateForm(UserChangeForm):
                     self.fields[field_name].help_text = _("This field can only be updated by an administrator.")
 
         _apply_bootstrap_widgets(self)
+        _make_picture_optional(self)
 
     email = forms.EmailField(
         widget=forms.TextInput(

@@ -232,6 +232,9 @@
             </div>
         </div>
     </div>
+    {% if user_type == 'Student' %}
+        {% include 'accounts/snippets/student_history.html' %}
+    {% endif %}
 </div>
 
 <style>

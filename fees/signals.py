@@ -3,7 +3,7 @@ from django.dispatch import receiver
 from django.db import transaction
 from decimal import Decimal
 
-from accounts.models import Student
+from accounts.models import STUDENT_STATUS_ACTIVE, Student
 from core.models import Term
 from .models import FeeStructure, StudentFeeAssignment, StudentPaymentReference
 
@@ -34,10 +34,11 @@ def auto_assign_fees_to_students(sender, instance, created, **kwargs):
     if not current_term:
         return
     
-    # Get all students in the specified level and school
+    # Get all active students in the specified level and school
     students = Student.objects.filter(
         student__school=instance.school,
-        level=instance.level
+        level=instance.level,
+        status=STUDENT_STATUS_ACTIVE,
     )
     
     # Create assignments in bulk for better performance

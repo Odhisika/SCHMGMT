@@ -4,6 +4,7 @@ from django.test import TestCase
 
 from accounts.forms import (
     EmailValidationOnForgotPassword,
+    NonTeachingStaffAddForm,
     ParentAddForm,
     StaffAddForm,
     StudentAddForm,
@@ -30,6 +31,16 @@ class AccountFormTestBase(TestCase):
                 rendered = str(form["date_of_birth"])
                 self.assertIn('type="date"', rendered)
                 self.assertIn('name="date_of_birth"', rendered)
+
+    def test_profile_picture_is_optional_for_all_registration_forms(self):
+        for form_class in (
+            StaffAddForm,
+            NonTeachingStaffAddForm,
+            StudentAddForm,
+        ):
+            with self.subTest(form=form_class.__name__):
+                form = form_class(school=self.school)
+                self.assertFalse(form.fields["picture"].required)
 
 
 class StaffAddFormTests(AccountFormTestBase):
@@ -241,6 +252,63 @@ class StudentAddFormTests(AccountFormTestBase):
 
         self.assertFalse(form.is_valid())
         self.assertIn("program", form.errors)
+
+    def test_level_options_are_tagged_with_their_division(self):
+        form = StudentAddForm(school=self.school)
+
+        rendered = str(form["level"])
+
+        self.assertIn('data-division="Nursery"', rendered)
+        self.assertIn('data-division="Primary"', rendered)
+        self.assertIn('data-division="JHS"', rendered)
+
+    def test_level_choices_are_limited_to_the_selected_division(self):
+        form = StudentAddForm(school=self.school, data={"division": "Nursery"})
+
+        selected_levels = [
+            value for value, _label in form.fields["level"].choices if value
+        ]
+
+        self.assertEqual(
+            selected_levels, ["Nursery 1", "Nursery 2", "KG 1", "KG 2"]
+        )
+
+    def test_level_must_belong_to_the_selected_division(self):
+        form = StudentAddForm(
+            data={
+                "first_name": "Mismatched",
+                "last_name": "Learner",
+                "gender": "M",
+                "division": "Nursery",
+                "level": "JHS 1",
+                "program": self.program.pk,
+                "address": "Accra",
+                "phone": "0240000003",
+            },
+            school=self.school,
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("level", form.errors)
+
+    def test_division_is_derived_from_the_level_when_left_blank(self):
+        form = StudentAddForm(
+            data={
+                "first_name": "Derived",
+                "last_name": "Division",
+                "gender": "F",
+                "level": "JHS 2",
+                "program": self.program.pk,
+                "address": "Accra",
+                "phone": "0240000004",
+            },
+            school=self.school,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        user = form.save()
+
+        self.assertEqual(user.division, "JHS")
 
 
 class ParentAddFormTests(AccountFormTestBase):

@@ -744,3 +744,140 @@ class CAScoresheetTests(DemoDataTestCase):
         self.assertEqual(self.taken.assignment_score, Decimal("70.00"))
         self.assertEqual(self.taken.exam_score, Decimal("50.00"))
         self.assertEqual(self.taken.total, Decimal("55.00"))
+
+
+class FinalClassPromotionTests(DemoDataTestCase):
+    def _make_jhs3_student(self):
+        from accounts.models import Student, User
+        from course.models import Program
+
+        level = "JHS 3"
+        division = settings.DIVISION_JHS
+        program = (
+            self.demo.programs.get(division)
+            or Program.objects.filter(school=self.school, division=division).first()
+            or Program.objects.create(
+                title="JHS",
+                summary="Junior High School",
+                school=self.school,
+                division=division,
+                is_academic_block=True,
+            )
+        )
+        index = Student.objects.filter(level=level).count() + 1
+        username = f"JHS3-{self.school.pk}-{index:03d}"
+        user = User.objects.create_user(
+            username=username,
+            email=f"{username.lower()}@example.com",
+            password="password",
+            first_name="Final",
+            last_name=f"Candidate {index}",
+            gender="M",
+            school=self.school,
+            is_student=True,
+            division=division,
+            must_change_password=False,
+        )
+        return Student.objects.create(
+            student=user,
+            level=level,
+            program=program,
+        )
+
+    def _add_term_result(self, student, term_name, average):
+        Result.objects.create(
+            student=student,
+            term=term_name,
+            session=self.current_term.year,
+            level=student.level,
+            term_average=Decimal(str(average)),
+            school=self.school,
+        )
+
+    def test_final_class_graduates_with_first_and_second_term_only(self):
+        student = self._make_jhs3_student()
+        self._add_term_result(student, settings.FIRST_TERM, "72.00")
+        self._add_term_result(student, settings.SECOND_TERM, "68.00")
+
+        candidates = build_candidates(
+            "JHS 3", self.current_term.year, self.school
+        )
+        candidate = next(c for c in candidates if c.student.pk == student.pk)
+
+        self.assertTrue(candidate.is_final_class)
+        self.assertTrue(candidate.promoted)
+        self.assertEqual(candidate.status, "COMPLETED")
+        self.assertEqual(candidate.decision, "GRADUATE")
+        self.assertEqual(candidate.terms_used, 2)
+        self.assertEqual(candidate.average, Decimal("70.00"))
+        self.assertIsNone(candidate.term3)
+
+        summary = apply_promotion(candidates)
+        student.refresh_from_db()
+
+        self.assertEqual(summary["graduated"], 1)
+        self.assertEqual(student.status, "GRADUATED")
+        self.assertEqual(student.exit_session, self.current_term.year)
+        self.assertEqual(student.level, "JHS 3")
+
+        decision = student.promotion_decisions.get(
+            session=self.current_term.year, school=self.school
+        )
+        self.assertEqual(decision.decision, "GRADUATE")
+        self.assertEqual(decision.status, "COMPLETED")
+        self.assertTrue(decision.is_final_class)
+        self.assertEqual(decision.terms_used, 2)
+
+    def test_non_final_class_missing_term_is_incomplete(self):
+        level = self.demo_levels[0]
+        student = self.demo.students[level][0]
+        Result.objects.filter(
+            student=student,
+            session=self.current_term.year,
+            term=settings.THIRD_TERM,
+            school=self.school,
+        ).delete()
+
+        candidates = build_candidates(level, self.current_term.year, self.school)
+        candidate = next(c for c in candidates if c.student.pk == student.pk)
+
+        self.assertFalse(candidate.is_final_class)
+        self.assertFalse(candidate.promoted)
+        self.assertEqual(candidate.status, "INCOMPLETE")
+        self.assertEqual(candidate.decision, "REVIEW")
+        self.assertEqual(candidate.terms_used, 2)
+
+        summary = apply_promotion([candidate])
+        student.refresh_from_db()
+        self.assertEqual(summary["incomplete"], 1)
+        self.assertEqual(summary["promoted"], 0)
+        self.assertEqual(student.level, level)
+        self.assertEqual(student.status, "ACTIVE")
+
+    def test_promote_students_final_only_runs_in_second_term(self):
+        # Make the second term current so only final-class completion is due.
+        from core.models import Term
+
+        Term.objects.filter(school=self.school).update(is_current_term=False)
+        Term.objects.filter(
+            school=self.school,
+            year=self.current_term.year,
+            term=settings.SECOND_TERM,
+        ).update(is_current_term=True)
+
+        student = self._make_jhs3_student()
+        self._add_term_result(student, settings.FIRST_TERM, "60.00")
+        self._add_term_result(student, settings.SECOND_TERM, "65.00")
+
+        stdout = StringIO()
+        call_command(
+            "promote_students",
+            "--final-only",
+            stdout=stdout,
+        )
+
+        output = stdout.getvalue()
+        self.assertIn("JHS 3", output)
+        self.assertIn("final class", output)
+        student.refresh_from_db()
+        self.assertEqual(student.status, "GRADUATED")

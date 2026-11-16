@@ -2,6 +2,7 @@ from django.db import models
 from django.urls import reverse
 from django.contrib.auth.models import AbstractUser, UserManager
 from django.conf import settings
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django.db.models import Q
 from PIL import Image
@@ -14,6 +15,21 @@ from .validators import ASCIIUsernameValidator
 from django.conf import settings
 
 LEVEL = settings.LEVEL_CHOICES
+
+# Student lifecycle.  A learner is normally ACTIVE; final-class learners are
+# marked GRADUATED when their records are closed, and early leavers are marked
+# TRANSFERRED or WITHDRAWN.  Records are retained for every status.
+STUDENT_STATUS_ACTIVE = "ACTIVE"
+STUDENT_STATUS_GRADUATED = "GRADUATED"
+STUDENT_STATUS_TRANSFERRED = "TRANSFERRED"
+STUDENT_STATUS_WITHDRAWN = "WITHDRAWN"
+
+STUDENT_STATUS_CHOICES = (
+    (STUDENT_STATUS_ACTIVE, _("Active")),
+    (STUDENT_STATUS_GRADUATED, _("Graduated")),
+    (STUDENT_STATUS_TRANSFERRED, _("Transferred")),
+    (STUDENT_STATUS_WITHDRAWN, _("Withdrawn")),
+)
 
 FATHER = _("Father")
 MOTHER = _("Mother")
@@ -157,7 +173,10 @@ class User(AbstractUser):
     phone = models.CharField(max_length=60, blank=True, null=True)
     address = models.CharField(max_length=255, blank=True, null=True)
     picture = models.ImageField(
-        upload_to="profile_pictures/%y/%m/%d/", default="default.png", null=True
+        upload_to="profile_pictures/%y/%m/%d/",
+        default="default.png",
+        null=True,
+        blank=True,
     )
     email = models.EmailField(blank=True, null=True)
 
@@ -419,12 +438,20 @@ class User(AbstractUser):
             pass
 
     def delete(self, *args, **kwargs):
-        if self.picture.url != settings.MEDIA_URL + "default.png":
-            self.picture.delete()
+        try:
+            if self.picture and self.picture.url != settings.MEDIA_URL + "default.png":
+                self.picture.delete(save=False)
+        except (ValueError, OSError):
+            # A missing or blank picture must not prevent account deletion.
+            pass
         super().delete(*args, **kwargs)
 
 
 class StudentManager(models.Manager):
+    def active(self):
+        """Return only learners who are still enrolled at the school."""
+        return self.get_queryset().filter(status=STUDENT_STATUS_ACTIVE)
+
     def search(self, query=None):
         qs = self.get_queryset()
         if query is not None:
@@ -441,6 +468,21 @@ class Student(models.Model):
     level = models.CharField(max_length=25, choices=LEVEL, null=True)
     program = models.ForeignKey(Program, on_delete=models.CASCADE, null=True)
     house = models.CharField(max_length=20, choices=settings.HOUSE_CHOICES, blank=True, null=True)
+
+    # Lifecycle / exit information.  Graduated learners keep their level as
+    # the last class attended; they are hidden from active rosters by status.
+    status = models.CharField(
+        max_length=20,
+        choices=STUDENT_STATUS_CHOICES,
+        default=STUDENT_STATUS_ACTIVE,
+        db_index=True,
+        verbose_name=_("Status"),
+    )
+    status_changed_at = models.DateTimeField(null=True, blank=True)
+    exit_date = models.DateField(null=True, blank=True)
+    exit_session = models.CharField(max_length=100, blank=True, default="")
+    exit_reason = models.TextField(blank=True, default="")
+    destination_school = models.CharField(max_length=200, blank=True, default="")
 
     objects = StudentManager()
 
@@ -468,6 +510,47 @@ class Student(models.Model):
             if self.level in levels:
                 return division
         return None
+
+    @property
+    def is_active_student(self):
+        return self.status == STUDENT_STATUS_ACTIVE
+
+    @property
+    def is_graduated(self):
+        return self.status == STUDENT_STATUS_GRADUATED
+
+    def mark_graduated(self, session="", exit_date=None):
+        """Close a final-class learner's record without deleting anything."""
+        self.status = STUDENT_STATUS_GRADUATED
+        self.status_changed_at = timezone.now()
+        self.exit_session = session or self.exit_session
+        self.exit_date = exit_date or self.exit_date
+        self.save(update_fields=[
+            "status",
+            "status_changed_at",
+            "exit_session",
+            "exit_date",
+        ])
+
+    def mark_left(self, status, *, reason="", destination="", exit_date=None):
+        """Record an early exit (transfer/withdrawal) for any class."""
+        if status not in (
+            STUDENT_STATUS_TRANSFERRED,
+            STUDENT_STATUS_WITHDRAWN,
+        ):
+            raise ValueError("Invalid exit status")
+        self.status = status
+        self.status_changed_at = timezone.now()
+        self.exit_date = exit_date or self.exit_date
+        self.exit_reason = reason or self.exit_reason
+        self.destination_school = destination or self.destination_school
+        self.save(update_fields=[
+            "status",
+            "status_changed_at",
+            "exit_date",
+            "exit_reason",
+            "destination_school",
+        ])
 
     def save(self, *args, **kwargs):
         # Keep the linked user's division in sync with the student's level.

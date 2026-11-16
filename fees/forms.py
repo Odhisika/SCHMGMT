@@ -22,7 +22,10 @@ class ManualPaymentForm(forms.ModelForm):
         self.school = school
         
         if school:
-            self.fields['student'].queryset = Student.objects.filter(student__school=school)
+            self.fields['student'].queryset = Student.objects.filter(
+                student__school=school,
+                status=STUDENT_STATUS_ACTIVE,
+            )
             
         if initial_student:
             self.fields['student'].initial = initial_student

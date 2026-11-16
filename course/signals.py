@@ -3,7 +3,7 @@ from django.dispatch import receiver
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 
-from accounts.models import Student
+from accounts.models import STUDENT_STATUS_ACTIVE, Student
 from course.models import Course
 from result.models import TakenCourse
 from core.models import Term, ActivityLog
@@ -23,6 +23,10 @@ def auto_enroll_student_in_courses(sender, instance, created, **kwargs):
     # Get the student's school
     school = instance.student.school
     if not school:
+        return
+
+    # Only keep active learners enrolled in the current class courses.
+    if getattr(instance, "status", STUDENT_STATUS_ACTIVE) != STUDENT_STATUS_ACTIVE:
         return
     
     # Get current term
@@ -80,11 +84,12 @@ def enroll_existing_students_in_new_course(sender, instance, created, **kwargs):
         # Only auto-enroll for current term courses
         return
     
-    # Find all students matching this course's level and program
+    # Find all active students matching this course's level and program
     students = Student.objects.filter(
         level=instance.level,
         program=instance.program,
-        student__school=instance.school
+        student__school=instance.school,
+        status=STUDENT_STATUS_ACTIVE,
     )
     
     # Enroll students in this course

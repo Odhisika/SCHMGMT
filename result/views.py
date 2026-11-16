@@ -31,12 +31,17 @@ from reportlab.lib import colors
 
 from core.models import Semester
 from course.models import Course
-from accounts.models import Student
+from accounts.models import STUDENT_STATUS_ACTIVE, Student
 from accounts.decorators import lecturer_required, student_required, admin_required
 from django.utils.translation import gettext as _
 from django.db.models import Count
 from .models import TakenCourse, Result
-from .promotion import apply_promotion, build_candidates
+from .promotion import (
+    apply_promotion,
+    build_candidates,
+    is_final_class,
+    term_rank,
+)
 from school.models import GradeWeightConfig
 
 
@@ -59,40 +64,66 @@ def get_next_level(current_level):
 @admin_required
 def create_promotion(request):
     """
-    Promote students from one class to another based on annual performance.
-    Only active during Third Term.
+    Promote learners in non-final classes or complete the final class.
+
+    Non-final classes use all three terms and are processed in the Third Term.
+    The final class (JHS 3) normally leaves after BECE, so its completion term
+    is configurable and defaults to the Second Term.  No BECE result is
+    required because BECE is handled by WAEC.
     """
     current_term = Semester.objects.filter(
         is_current_term=True, school=request.school
     ).first()
-    is_third_term = current_term and current_term.term == settings.THIRD_TERM
-
     policy = getattr(request.school, "promotion_policy", None)
     pass_mark = float(policy.promotion_cut_off) if policy else 50.0
     failure_mark = float(policy.failure_cut_off) if policy else 40.0
-    
+    completion_term = (
+        policy.final_class_completion_term
+        if policy
+        else settings.SECOND_TERM
+    )
+
+    current_term_rank = term_rank(current_term.term) if current_term else 0
+    completion_term_rank = term_rank(completion_term)
+    final_class_can_complete = current_term_rank >= completion_term_rank
+    is_third_term = bool(
+        current_term and current_term.term == settings.THIRD_TERM
+    )
+
     # Division filtering logic
     DEFAULT_DIV = settings.DIVISION_NURSERY
-    current_division = request.GET.get('division', DEFAULT_DIV)
-    division_levels_list = settings.DIVISION_LEVEL_MAPPING.get(current_division, [])
-    
-    # Filter level choices for the dropdown
+    current_division = request.GET.get("division", DEFAULT_DIV)
+    division_levels_list = settings.DIVISION_LEVEL_MAPPING.get(
+        current_division, []
+    )
+
     division_level_choices = []
     for code, name in settings.LEVEL_CHOICES:
         if code in division_levels_list:
             division_level_choices.append((code, name))
 
     selected_level = request.GET.get("level") or request.POST.get("level")
-    
-    # Ensure selected level belongs to current division if coming from tabs
+
     if selected_level and selected_level not in division_levels_list:
         selected_level = None
+
+    selected_is_final = (
+        is_final_class(selected_level) if selected_level else False
+    )
+    can_process = bool(current_term) and (
+        is_third_term
+        or (selected_is_final and final_class_can_complete)
+    )
 
     context = {
         "title": _("Promote Students"),
         "current_term": current_term,
         "is_third_term": is_third_term,
-        "levels": division_level_choices, # Filtered levels
+        "can_process": can_process,
+        "final_class_can_complete": final_class_can_complete,
+        "final_class_completion_term": completion_term,
+        "selected_is_final": selected_is_final,
+        "levels": division_level_choices,
         "pass_mark": pass_mark,
         "failure_mark": failure_mark,
         "current_division": current_division,
@@ -106,7 +137,9 @@ def create_promotion(request):
 
     if selected_level:
         students = Student.objects.filter(
-            level=selected_level, student__school=request.school
+            level=selected_level,
+            student__school=request.school,
+            status=STUDENT_STATUS_ACTIVE,
         ).order_by("student__last_name")
 
         promotion_list = build_candidates(
@@ -116,8 +149,22 @@ def create_promotion(request):
             policy,
         )
 
-        # Handle POST: Execute Promotion
-        if request.method == "POST" and is_third_term:
+        if request.method == "POST":
+            if not can_process:
+                messages.error(
+                    request,
+                    _(
+                        "This class cannot be processed in the current term. "
+                        "Non-final classes are processed in the Third Term; "
+                        "the final class can be completed from %(term)s."
+                    )
+                    % {"term": completion_term},
+                )
+                return HttpResponseRedirect(
+                    reverse_lazy("create_promotion")
+                    + f"?division={current_division}&level={selected_level}"
+                )
+
             student_action = request.POST.get("student_action", "")
             if ":" in student_action:
                 student_id, action = student_action.rsplit(":", 1)
@@ -125,7 +172,8 @@ def create_promotion(request):
                 student_id = request.POST.get("student_id")
                 action = request.POST.get("action")
 
-            if student_id and action in ("promote", "repeat"):
+            allowed_actions = ("promote", "repeat", "graduate", "hold")
+            if student_id and action in allowed_actions:
                 candidate = next(
                     (
                         item
@@ -135,36 +183,75 @@ def create_promotion(request):
                     None,
                 )
                 if candidate is None:
-                    messages.error(request, "That student is no longer in this class list.")
+                    messages.error(
+                        request,
+                        _("That student is no longer in this class list."),
+                    )
                 else:
-                    new_status = "MANUAL_PASS" if action == "promote" else "MANUAL_FAIL"
-                    if candidate.result is not None:
-                        candidate.result.promotion_status = new_status
-                        candidate.result.save(
-                            update_fields=["promotion_status", "promoted"]
+                    # JHS 3/final class has no academic repeat.  "Hold" keeps the
+                    # learner active in JHS 3 for administrative reasons (e.g. unable
+                    # to register for BECE due to illness, fees, or school decision).
+                    if candidate.is_final_class and action == "repeat":
+                        action = "hold"
+
+                    if action in ("promote", "graduate"):
+                        new_status = "MANUAL_PASS"
+                        candidate.status = new_status
+                        candidate.promoted = True
+                        candidate.decision = (
+                            "GRADUATE"
+                            if candidate.is_final_class
+                            else "PROMOTE"
                         )
-                    candidate.status = new_status
-                    candidate.promoted = action == "promote"
-                    summary = apply_promotion([candidate])
-                    verb = "promoted" if action == "promote" else "held back"
+                        verb = (
+                            _("graduated")
+                            if candidate.is_final_class
+                            else _("promoted")
+                        )
+                    elif action == "hold":
+                        new_status = "INCOMPLETE"
+                        candidate.status = new_status
+                        candidate.promoted = False
+                        candidate.decision = "REVIEW"
+                        verb = _("placed on hold")
+                    else:
+                        new_status = "MANUAL_FAIL"
+                        candidate.status = new_status
+                        candidate.promoted = False
+                        candidate.decision = "REPEAT"
+                        verb = _("held back")
+
+                    apply_promotion([candidate], decided_by=request.user)
                     messages.success(
                         request,
-                        f"{candidate.student.student.get_full_name()} was {verb}.",
+                        _("%(name)s was %(verb)s.")
+                        % {
+                            "name": candidate.student.student.get_full_name,
+                            "verb": verb,
+                        },
                     )
                 return HttpResponseRedirect(
                     reverse_lazy("create_promotion")
                     + f"?division={current_division}&level={selected_level}"
                 )
 
-            summary = apply_promotion(promotion_list)
+            summary = apply_promotion(
+                promotion_list, decided_by=request.user
+            )
             messages.success(
                 request,
-                (
-                    f"Promotion processed for {selected_level}: "
-                    f"{summary['promoted']} promoted, "
-                    f"{summary['graduated']} graduated, "
-                    f"{summary['held_back']} held back to repeat."
-                ),
+                _(
+                    "Processed %(level)s: %(promoted)s promoted, "
+                    "%(graduated)s graduated, %(held_back)s held back, "
+                    "%(incomplete)s needing review."
+                )
+                % {
+                    "level": selected_level,
+                    "promoted": summary["promoted"],
+                    "graduated": summary["graduated"],
+                    "held_back": summary["held_back"],
+                    "incomplete": summary["incomplete"],
+                },
             )
             return HttpResponseRedirect(
                 reverse_lazy("create_promotion")
@@ -172,7 +259,7 @@ def create_promotion(request):
             )
 
         context["promotion_list"] = promotion_list
-        context["students"] = students # Adding students to context to trigger list view
+        context["students"] = students
 
     return render(request, "result/create_promotion.html", context)
 
@@ -499,20 +586,38 @@ def grade_result(request):
 @login_required
 @student_required
 def assessment_result(request):
-    student = get_object_or_404(Student, student__pk=request.user.id, student__school=request.school)
-    
+    student = get_object_or_404(
+        Student, student__pk=request.user.id, student__school=request.school
+    )
+
+    # Graduated or exited learners keep access to historical results, but they
+    # are no longer enrolled in the current term's assessments.
+    if student.status != STUDENT_STATUS_ACTIVE:
+        messages.info(
+            request,
+            _(
+                "Your current class assessments are no longer active. "
+                "Showing your published results instead."
+            ),
+        )
+        return redirect("grade_result")
+
     # Similar logic for assessment view - only show if term released
-    current_term = Semester.objects.filter(is_current_term=True, school=request.school).first()
-    
+    current_term = Semester.objects.filter(
+        is_current_term=True, school=request.school
+    ).first()
+
     if current_term and current_term.result_released:
         courses = TakenCourse.objects.filter(
-            student=student, 
-            course__term=current_term.term, 
-            school=request.school
+            student=student,
+            course__term=current_term.term,
+            school=request.school,
         )
     else:
         courses = TakenCourse.objects.none()
-        messages.info(request, "Results for the current term have not been released yet.")
+        messages.info(
+            request, _("Results for the current term have not been released yet.")
+        )
 
     context = {
         "courses": courses,

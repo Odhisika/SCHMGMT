@@ -586,7 +586,10 @@ def student_search_api(request):
     if not query and not class_filter:
         return JsonResponse({'students': []})
     
-    students = Student.objects.filter(student__school=request.school).select_related('student')
+    students = Student.objects.filter(
+        student__school=request.school,
+        status=STUDENT_STATUS_ACTIVE,
+    ).select_related('student')
     
     # Apply search query
     if query:
@@ -734,7 +737,10 @@ def defaulters_list(request):
         division_levels = settings.DIVISION_LEVEL_MAPPING.get(current_division, [])
     
     # Base student queryset
-    students_qs = Student.objects.filter(student__school=request.school)
+    students_qs = Student.objects.filter(
+        student__school=request.school,
+        status=STUDENT_STATUS_ACTIVE,
+    )
     
     if current_division != 'all' and division_levels:
         students_qs = students_qs.filter(level__in=division_levels)

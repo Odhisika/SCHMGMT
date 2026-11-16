@@ -592,6 +592,27 @@
                </div>
             </div>
 
+            <div class="col-md-6">
+              <div class="p-3 border rounded-3 bg-white h-100">
+                <label class="form-label fw-bold mb-2">{% trans 'Final Class Completion Term' %}</label>
+                {{ form.final_class_completion_term }}
+                <p class="small text-muted mt-2 mb-0">
+                  {% trans 'The final class (for example JHS 3) is completed from this term. BECE results are handled by WAEC, so Term 3 is not required by default.' %}
+                </p>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="p-3 border rounded-3 bg-white h-100">
+                <div class="form-check form-switch mb-0">
+                  {{ form.final_class_requires_pass }}
+                  <label class="form-check-label fw-bold">{% trans 'Require Pass Mark to Graduate (legacy)' %}</label>
+                </div>
+                <p class="small text-muted mt-2 mb-0">
+                  {% trans 'JHS 3/final class has no academic repeat. Learners with a valid record are completed/graduated and the average is recorded for the transcript. Use a hold in the promotion screen only for administrative BECE registration issues.' %}
+                </p>
+              </div>
+            </div>
+
             <div class="col-12 mt-4">
               <button type="submit" class="btn btn-lg w-100 fw-bold border-0 shadow-sm" style="background: #1e293b; color: #fff;">
                 <i class="fas fa-save me-2"></i> {% trans 'Save Promotion Policy' %}

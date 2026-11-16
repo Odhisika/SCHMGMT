@@ -156,6 +156,8 @@ class PromotionPolicyForm(forms.ModelForm):
             }),
             'apply_to_all_terms': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'allow_teacher_requests': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'final_class_completion_term': forms.Select(attrs={'class': 'form-select'}),
+            'final_class_requires_pass': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
     def clean(self):

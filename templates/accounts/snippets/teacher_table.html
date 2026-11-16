@@ -35,7 +35,11 @@
                           <li><a class="dropdown-item" href="{% url 'staff_edit' pk=lecturer.pk %}?assignment=1"><i class="unstyled me-2 fas fa-arrows-rotate"></i>{% trans 'Change division/class' %}</a></li>
                           <li><a class="dropdown-item" href="{% url 'staff_edit' pk=lecturer.pk %}"><i class="unstyled me-2 fas fa-edit"></i>{% trans 'Update' %}</a></li>
                           <li><a class="dropdown-item" href="{% url 'profile_single' lecturer.id %}?download_pdf=1"><i class="unstyled me-2 fas fa-download"></i>{% trans 'Download PDF' %}</a></li>
-                          <li><a class="dropdown-item text-danger" href="{% url 'lecturer_delete' pk=lecturer.pk %}"><i class="unstyled me-2 fas fa-trash-alt"></i> {% trans 'Delete' %}</a></li>
+                          <li><a class="dropdown-item text-danger" href="{% url 'lecturer_delete' pk=lecturer.pk %}"
+                                 data-confirm="{% blocktrans with name=lecturer.get_full_name|default:lecturer.username %}Delete {{ name }}? This teacher account and all related records will be permanently deleted. This cannot be undone.{% endblocktrans %}"
+                                 data-confirm-title="{% trans 'Delete teacher?' %}"
+                                 data-confirm-ok="{% trans 'Delete teacher' %}"
+                                 data-confirm-variant="danger" data-confirm-icon="trash"><i class="unstyled me-2 fas fa-trash-alt"></i> {% trans 'Delete' %}</a></li>
                         </ul>
                     </div>
                 </td>
