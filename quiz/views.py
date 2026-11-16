@@ -410,6 +410,61 @@ def teacher_quiz_report(request):
     })
 
 
+@login_required
+@lecturer_required
+def teacher_quiz_dashboard(request):
+    """Landing page for teachers to create and manage quizzes per subject."""
+    from course.models import CourseAllocation
+
+    is_admin = request.user.is_superuser or request.user.is_school_admin
+
+    if is_admin:
+        # Admins already manage subjects from Classes & Subjects, so keep this
+        # page focused on subjects that actually have quizzes.
+        courses = (
+            Course.objects.filter(school=request.school, quiz__isnull=False)
+            .prefetch_related("quiz_set")
+            .distinct()
+            .order_by("level", "title")
+        )
+    else:
+        allocated_course_ids = CourseAllocation.objects.filter(
+            teacher=request.user,
+            courses__school=request.school,
+        ).values_list("courses", flat=True)
+        courses = (
+            Course.objects.filter(pk__in=allocated_course_ids, school=request.school)
+            .prefetch_related("quiz_set")
+            .distinct()
+            .order_by("level", "title")
+        )
+
+    course_rows = []
+    for course in courses:
+        quizzes = list(course.quiz_set.all())
+        course_rows.append(
+            {
+                "course": course,
+                "quiz_total": len(quizzes),
+                "draft_total": sum(1 for quiz in quizzes if quiz.draft),
+                "live_total": sum(
+                    1
+                    for quiz in quizzes
+                    if not quiz.draft and quiz.is_available() and not quiz.is_expired()
+                ),
+            }
+        )
+
+    return render(
+        request,
+        "quiz/teacher_quiz_dashboard.html",
+        {
+            "course_rows": course_rows,
+            "is_admin": is_admin,
+        },
+    )
+
+
 # ########################################################
 # Question Management Views
 # ########################################################

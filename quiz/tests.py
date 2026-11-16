@@ -426,3 +426,29 @@ class QuizViewTests(DemoDataTestCase):
         response = self.client.get(reverse("quiz_marking"))
 
         self.assertEqual(response.status_code, 200)
+
+
+class TeacherQuizDashboardTests(DemoDataTestCase):
+    def test_teacher_dashboard_lists_allocated_subjects(self):
+        self.client.force_login(self.teacher)
+
+        response = self.client.get(reverse("quiz_dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["course_rows"])
+        self.assertContains(response, self.primary_course.title)
+        self.assertContains(response, reverse("quiz_create", args=[self.primary_course.slug]))
+
+    def test_admin_dashboard_renders(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse("quiz_dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_student_cannot_open_teacher_dashboard(self):
+        self.client.force_login(self.student_user)
+
+        response = self.client.get(reverse("quiz_dashboard"))
+
+        self.assertEqual(response.status_code, 302)

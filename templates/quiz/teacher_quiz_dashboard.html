@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans 'Quizzes' %} | {% trans 'Learning management system' %}{% endblock %}
+
+{% block content %}
+
+<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
+        <li class="breadcrumb-item active" aria-current="page">{% trans 'Quizzes' %}</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h2 class="mb-0">{% trans 'Quizzes' %}</h2>
+        <p class="text-muted small mb-0">
+            {% trans 'Create and manage quizzes for your subjects.' %}
+        </p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{% url 'teacher_quiz_report' %}" class="btn btn-outline-info btn-sm">
+            <i class="fas fa-chart-bar me-1"></i>{% trans 'Quiz Reports' %}
+        </a>
+        {% if is_admin %}
+        <a href="{% url 'programs' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-book-open me-1"></i>{% trans 'Classes & Subjects' %}
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+{% include 'snippets/messages.html' %}
+
+{% if course_rows %}
+<div class="table-responsive">
+    <table class="table table-hover align-middle bg-white">
+        <thead class="table-light">
+            <tr>
+                <th style="width: 50px;">#</th>
+                <th>{% trans 'Subject' %}</th>
+                <th>{% trans 'Class / Level' %}</th>
+                <th class="text-center">{% trans 'Quizzes' %}</th>
+                <th class="text-center">{% trans 'Drafts' %}</th>
+                <th class="text-center">{% trans 'Live' %}</th>
+                <th class="text-end">{% trans 'Actions' %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in course_rows %}
+            <tr>
+                <td class="text-muted small">{{ forloop.counter }}</td>
+                <td>
+                    <span class="fw-semibold">{{ row.course.title }}</span>
+                    <br>
+                    <small class="text-muted">{{ row.course.code }}</small>
+                </td>
+                <td>
+                    <span class="badge bg-light text-dark border">
+                        {{ row.course.get_level_display }}
+                    </span>
+                </td>
+                <td class="text-center">
+                    <span class="fw-semibold">{{ row.quiz_total }}</span>
+                </td>
+                <td class="text-center">
+                    {% if row.draft_total %}
+                    <span class="badge bg-secondary">{{ row.draft_total }}</span>
+                    {% else %}
+                    <span class="text-muted">0</span>
+                    {% endif %}
+                </td>
+                <td class="text-center">
+                    {% if row.live_total %}
+                    <span class="badge bg-success">{{ row.live_total }}</span>
+                    {% else %}
+                    <span class="text-muted">0</span>
+                    {% endif %}
+                </td>
+                <td class="text-end">
+                    <a href="{% url 'quiz_index' row.course.slug %}"
+                       class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-list me-1"></i>{% trans 'Manage' %}
+                    </a>
+                    <a href="{% url 'quiz_create' row.course.slug %}"
+                       class="btn btn-sm btn-primary">
+                        <i class="fas fa-plus me-1"></i>{% trans 'Add Quiz' %}
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="card border-0 shadow-sm">
+    <div class="card-body text-center py-5">
+        <i class="fas fa-tasks fa-3x text-muted mb-3"></i>
+        {% if is_admin %}
+        <h5 class="mb-2">{% trans 'No quizzes yet' %}</h5>
+        <p class="text-muted mb-3">
+            {% trans 'No quizzes have been created for this school yet. Open a subject from Classes & Subjects to create one.' %}
+        </p>
+        <a href="{% url 'programs' %}" class="btn btn-primary">
+            <i class="fas fa-book-open me-1"></i>{% trans 'Classes & Subjects' %}
+        </a>
+        {% else %}
+        <h5 class="mb-2">{% trans 'No subjects allocated yet' %}</h5>
+        <p class="text-muted mb-0">
+            {% trans 'Ask your school administrator to allocate subjects to you, then you can create quizzes here.' %}
+        </p>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+{% endblock content %}
