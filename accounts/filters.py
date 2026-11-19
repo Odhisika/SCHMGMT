@@ -1,3 +1,5 @@
+from django import forms
+from django.conf import settings
 from django.db.models import Q
 import django_filters
 
@@ -5,6 +7,7 @@ from .models import (
     STUDENT_STATUS_ACTIVE,
     STUDENT_STATUS_CHOICES,
     Student,
+    SubClass,
     User,
 )
 
@@ -41,6 +44,15 @@ class LecturerFilter(django_filters.FilterSet):
 class StudentFilter(django_filters.FilterSet):
     STATUS_CHOICES = (("ALL", "All statuses"),) + tuple(STUDENT_STATUS_CHOICES)
 
+    # The division is selected from the tabs above this form, so it is carried
+    # as a hidden value while the remaining filters stay visible.
+    division = django_filters.ChoiceFilter(
+        field_name="student__division",
+        choices=settings.DIVISION_CHOICES,
+        label="",
+        empty_label="All divisions",
+        widget=forms.HiddenInput,
+    )
     id_no = django_filters.CharFilter(
         field_name="student__username", lookup_expr="exact", label=""
     )
@@ -59,34 +71,63 @@ class StudentFilter(django_filters.FilterSet):
         label="",
         empty_label="Active students",
     )
+    sub_class = django_filters.ModelChoiceFilter(
+        queryset=SubClass.objects.all(),
+        field_name="sub_class",
+        label="",
+        empty_label="All sub-classes",
+    )
 
     class Meta:
         model = Student
         fields = [
+            "division",
             "id_no",
             "name",
             "email",
             "program",
+            "sub_class",
             "status",
         ]
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, school=None, **kwargs):
         super().__init__(*args, **kwargs)
+
+        if school is not None:
+            sub_classes = SubClass.objects.filter(school=school, is_active=True)
+            # Sub-classes only belong to one division's class levels. Narrow the
+            # choices to the selected division so a Nursery roster can never be
+            # filtered with a Primary or JHS sub-class.
+            division = None
+            if self.is_bound:
+                division = self.data.get("division")
+            else:
+                division = self.form.initial.get("division")
+            if division in dict(settings.DIVISION_CHOICES):
+                sub_classes = sub_classes.filter(
+                    level__in=settings.DIVISION_LEVEL_MAPPING.get(division, [])
+                )
+            self.filters["sub_class"].queryset = sub_classes
 
         # Change html classes and placeholders
         self.filters["id_no"].field.widget.attrs.update(
-            {"class": "au-input", "placeholder": "ID No."}
+            {"class": "form-control form-control-sm", "placeholder": "Student ID"}
         )
         self.filters["name"].field.widget.attrs.update(
-            {"class": "au-input", "placeholder": "Name"}
+            {"class": "form-control form-control-sm", "placeholder": "Search by name"}
         )
         self.filters["email"].field.widget.attrs.update(
-            {"class": "au-input", "placeholder": "Email"}
+            {"class": "form-control form-control-sm", "placeholder": "Search by email"}
         )
         self.filters["program"].field.widget.attrs.update(
-            {"class": "au-input", "placeholder": "Program"}
+            {"class": "form-control form-control-sm", "placeholder": "Program"}
         )
-        self.filters["status"].field.widget.attrs.update({"class": "form-select"})
+        self.filters["status"].field.widget.attrs.update(
+            {"class": "form-select form-select-sm"}
+        )
+        self.filters["sub_class"].field.widget.attrs.update(
+            {"class": "form-select form-select-sm"}
+        )
 
     def filter_status(self, queryset, name, value):
         if value == "ALL":

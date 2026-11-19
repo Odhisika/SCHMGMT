@@ -18,7 +18,6 @@
 <h4 class="mb-3 fw-bold"><i class="fas fa-user-graduate me-2"></i>{% trans 'Student Admission / Registration Form' %}</h4>
 <p class="text-muted">{% trans 'Capture the learner’s bio-data, admission record, guardian details and health information required for GES reporting.' %}</p>
 
-{% include 'snippets/messages.html' %}
 
 <form action="" method="POST" enctype="multipart/form-data">{% csrf_token %}
     {% include 'accounts/snippets/student_ges_form.html' %}

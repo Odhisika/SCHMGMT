@@ -341,7 +341,7 @@
             <td class="info-label" style="width: 14%;">{% trans 'Student Name:' %}</td>
             <td class="info-value-line" style="width: 38%;"><b>{{ student.student.get_full_name|upper }}</b></td>
             <td class="info-label" style="width: 14%;">{% trans 'Class/Section:' %}</td>
-            <td class="info-value-line" style="width: 34%;">{{ student.level }}</td>
+            <td class="info-value-line" style="width: 34%;">{{ student.class_label }}</td>
         </tr>
         <tr>
             <td class="info-label">{% trans 'School Year:' %}</td>

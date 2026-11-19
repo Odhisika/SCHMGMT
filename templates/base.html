@@ -29,6 +29,7 @@
          navigation so every page's own scripts always load. -->
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     {% block header %}{% endblock %}
+    {% block extra_css %}{% endblock %}
 </head>
 
 <body>
@@ -51,6 +52,7 @@
              Boosted navigation swaps only this element and skips the
              page-specific scripts at the bottom of the document. -->
         <div class="container-fluid" id="main-content">
+            {% include 'snippets/messages.html' %}
             {% block content %}{% endblock content %}
         </div>
 

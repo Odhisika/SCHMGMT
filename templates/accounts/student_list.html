@@ -1,6 +1,11 @@
 {% extends 'base.html' %}
 {% load i18n %}
+{% load static %}
 {% block title %}{{ title }} | {% trans 'Learning management system' %}{% endblock title %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/plain-ui.css' %}">
+{% endblock %}
 
 {% block content %}
 
@@ -15,41 +20,73 @@
 <div class="manage-wrap">
     <a class="btn btn-primary" href="{% url 'add_student' %}"><i class="fas fa-plus"></i>{% trans 'Add Student' %}</a>
     <a class="btn btn-primary" download="students_list.pdf" href="{% url 'student_list_pdf' %}"><i class="fas fa-download"></i> {% trans 'Download pdf' %}</a>
+    <a class="btn btn-outline-primary" hx-boost="false" download="students.xlsx" href="{% url 'student_export' 'xlsx' %}"><i class="fas fa-file-excel"></i> {% trans 'Export Excel' %}</a>
+    <a class="btn btn-outline-primary" hx-boost="false" download="students.docx" href="{% url 'student_export' 'docx' %}"><i class="fas fa-file-word"></i> {% trans 'Export Word' %}</a>
+    <a class="btn btn-outline-secondary" hx-boost="false" href="{% url 'student_import' %}"><i class="fas fa-file-import"></i> {% trans 'Import Excel' %}</a>
 </div>
 {% endif %}
 
 <p class="title-1"><i class="fas fa-user-graduate"></i>{% trans 'Students' %}</p>
 
-{% include 'snippets/messages.html' %}
-{% include 'snippets/filter_form.html' %}
-
-<ul class="nav nav-tabs mt-4" id="studentTab" role="tablist">
-    <li class="nav-item" role="presentation">
-      <button class="nav-link active" id="nursery-tab" data-bs-toggle="tab" data-bs-target="#nursery" type="button" role="tab" aria-controls="nursery" aria-selected="true">
-        <i class="fas fa-baby me-2"></i>{% trans 'Nursery/Pre-School' %}
-      </button>
+<!-- Select the division first; the filters below apply to that division. -->
+<ul class="nav plain-division-tabs" id="studentDivisionTabs" aria-label="{% trans 'Select division' %}">
+    {% for tab in division_tabs %}
+    <li class="nav-item">
+        <a class="nav-link {% if active_division == tab.key %}active{% endif %}"
+           href="{{ tab.url }}"
+           {% if active_division == tab.key %}aria-current="page"{% endif %}>
+            <i class="{{ tab.icon }} me-2"></i>{% if tab.is_all %}{% trans 'All divisions' %}{% else %}{{ tab.label }}{% endif %}
+        </a>
     </li>
-    <li class="nav-item" role="presentation">
-      <button class="nav-link" id="primary-tab" data-bs-toggle="tab" data-bs-target="#primary" type="button" role="tab" aria-controls="primary" aria-selected="false">
-        <i class="fas fa-child me-2"></i>{% trans 'Primary School' %}
-      </button>
-    </li>
-    <li class="nav-item" role="presentation">
-      <button class="nav-link" id="jhs-tab" data-bs-toggle="tab" data-bs-target="#jhs" type="button" role="tab" aria-controls="jhs" aria-selected="false">
-        <i class="fas fa-user-graduate me-2"></i>{% trans 'JHS' %}
-      </button>
-    </li>
+    {% endfor %}
 </ul>
 
-<div class="tab-content" id="studentTabContent">
-    <div class="tab-pane fade show active" id="nursery" role="tabpanel">
-        {% include 'accounts/snippets/student_table.html' with students=nursery_students %}
-    </div>
-    <div class="tab-pane fade" id="primary" role="tabpanel">
-        {% include 'accounts/snippets/student_table.html' with students=primary_students %}
-    </div>
-    <div class="tab-pane fade" id="jhs" role="tabpanel">
-        {% include 'accounts/snippets/student_table.html' with students=jhs_students %}
+<div class="plain-card plain-filter-card mt-3">
+    <div class="card-body">
+        <form method="get" action="" class="row g-3 align-items-end">
+            {{ filter.form.division }}
+            <div class="col-12 col-md-6 col-xl-3">
+                <label class="form-label small text-muted" for="{{ filter.form.name.id_for_label }}">{% trans 'Name' %}</label>
+                {{ filter.form.name }}
+            </div>
+            <div class="col-12 col-md-6 col-xl-2">
+                <label class="form-label small text-muted" for="{{ filter.form.id_no.id_for_label }}">{% trans 'ID No.' %}</label>
+                {{ filter.form.id_no }}
+            </div>
+            <div class="col-12 col-md-6 col-xl-3">
+                <label class="form-label small text-muted" for="{{ filter.form.email.id_for_label }}">{% trans 'Email' %}</label>
+                {{ filter.form.email }}
+            </div>
+            <div class="col-12 col-md-6 col-xl-4">
+                <label class="form-label small text-muted" for="{{ filter.form.program.id_for_label }}">{% trans 'Program' %}</label>
+                {{ filter.form.program }}
+            </div>
+            <div class="col-12 col-md-6 col-xl-2">
+                <label class="form-label small text-muted" for="{{ filter.form.status.id_for_label }}">{% trans 'Status' %}</label>
+                {{ filter.form.status }}
+            </div>
+            <div class="col-12 col-md-6 col-xl-4">
+                <label class="form-label small text-muted" for="{{ filter.form.sub_class.id_for_label }}">{% trans 'Sub-class' %}</label>
+                {{ filter.form.sub_class }}
+                <div class="form-text small">{% trans 'Only sub-classes for the selected division are listed.' %}</div>
+            </div>
+            <div class="col-12 col-md-auto d-flex gap-2">
+                <button class="btn btn-primary btn-sm" type="submit"><i class="fas fa-sliders me-1"></i>{% trans 'Filter' %}</button>
+                <a class="btn btn-outline-secondary btn-sm" href="{{ clear_filters_url }}">{% trans 'Clear' %}</a>
+            </div>
+        </form>
     </div>
 </div>
+
+<div class="d-flex flex-wrap justify-content-between align-items-center mt-4">
+    <h2 class="plain-section-title mb-0">
+        {% if active_division %}{{ active_division_label }} {% trans 'students' %}{% else %}{% trans 'All students' %}{% endif %}
+    </h2>
+    <span class="plain-count">{{ active_students|length }} {% trans 'listed' %}</span>
+</div>
+
+<div class="plain-card plain-table-card mt-2">
+    {% include 'accounts/snippets/student_table.html' with students=active_students %}
+</div>
+
 {% endblock content %}

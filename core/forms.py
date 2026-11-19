@@ -1,7 +1,7 @@
 from django import forms
 from django.utils.translation import gettext_lazy as _
-from datetime import timedelta
 from .models import NewsAndEvents, Term, TERM, TermWeek, WEEK_ACTIVITY_TYPES
+from .utils import get_week_date_range
 
 # Keep Semester as alias for backward compatibility
 Semester = Term
@@ -164,11 +164,13 @@ class TermWeekForm(forms.ModelForm):
         if start_date and end_date and end_date < start_date:
             self.add_error("end_date", _("The end date must be on or after the start date."))
         if self.term and self.term.start_date and self.term.end_date and week_number:
-            generated_start = self.term.start_date + timedelta(days=(week_number - 1) * 7)
-            if generated_start > self.term.end_date:
+            generated_start, _ = get_week_date_range(self.term, week_number)
+            if generated_start and generated_start > self.term.end_date:
                 self.add_error("week_number", _("This week falls outside the term dates."))
-        if self.term and start_date and self.term.start_date and start_date < self.term.start_date:
-            self.add_error("start_date", _("The activity cannot start before the term."))
+        if self.term and start_date and week_number:
+            generated_start, _ = get_week_date_range(self.term, week_number)
+            if generated_start and start_date < generated_start:
+                self.add_error("start_date", _("The activity cannot start before its week begins."))
         if self.term and end_date and self.term.end_date and end_date > self.term.end_date:
             self.add_error("end_date", _("The activity cannot end after the term."))
         return cleaned

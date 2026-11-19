@@ -14,6 +14,7 @@ from .forms import SemesterForm, NewsAndEventsForm, TermWeekForm
 from .models import NewsAndEvents, ActivityLog, Semester, TermWeek
 from .models import Notification
 from .notifications import notify, notify_students, notify_parents
+from .utils import get_current_term_week, get_week_date_range, get_week_dates
 
 
 # ########################################################
@@ -67,15 +68,11 @@ def home_view(request):
     current_term = Semester.objects.filter(is_current_term=True, school=request.school).first()
     term_weeks = TermWeek.objects.filter(term=current_term, is_active=True).order_by("week_number") if current_term else []
 
-    current_week = None
-    if current_term and current_term.start_date:
-        today = timezone.now().date()
-        days_since_start = (today - current_term.start_date).days
-        if days_since_start >= 0:
-            week_num = (days_since_start // 7) + 1
-            current_week = term_weeks.filter(week_number=week_num).first() if term_weeks else None
-    if not current_week and term_weeks:
-        current_week = term_weeks.first()
+    current_week = get_current_term_week(current_term, term_weeks)
+    week_start, week_end = get_week_dates(current_term, current_week)
+    week_ranges = {
+        week.pk: get_week_dates(current_term, week) for week in term_weeks
+    }
 
     show_all = request.GET.get("show_all") == "1"
 
@@ -85,6 +82,10 @@ def home_view(request):
         "current_term": current_term,
         "term_weeks": term_weeks,
         "current_week": current_week,
+        "week_start": week_start,
+        "week_end": week_end,
+        "week_ranges": week_ranges,
+        "today": timezone.localdate(),
         "show_all": show_all,
     }
     return render(request, "core/index.html", context)
@@ -211,6 +212,8 @@ def dashboard_view(request):
     
     current_term = Semester.objects.filter(is_current_term=True, school=request.school).first()
     term_weeks = TermWeek.objects.filter(term=current_term, is_active=True).order_by("week_number") if current_term else []
+    current_week = get_current_term_week(current_term, term_weeks)
+    week_ranges = {week.pk: get_week_dates(current_term, week) for week in term_weeks}
 
     context = {
         "student_count": student_count,
@@ -222,7 +225,9 @@ def dashboard_view(request):
         "selected_division": division,
         "current_term": current_term,
         "term_weeks": term_weeks,
-        
+        "current_week": current_week,
+        "week_ranges": week_ranges,
+
         # Chart JSON
         "traffic_data": json.dumps({
             "labels": traffic_labels,
@@ -427,11 +432,10 @@ def unset_current_semester(school):
 # Term Weeks
 # ########################################################
 def _fill_week_dates_from_term(week, term):
-    """Fill omitted activity dates from the term's calendar week boundaries."""
-    if not term.start_date:
+    """Fill omitted activity dates from the term's Monday-Friday week."""
+    generated_start, generated_end = get_week_date_range(term, week.week_number)
+    if not generated_start:
         return
-    generated_start = term.start_date + timedelta(days=(week.week_number - 1) * 7)
-    generated_end = generated_start + timedelta(days=6)
     if term.end_date:
         generated_end = min(generated_end, term.end_date)
     if week.start_date is None:
@@ -497,7 +501,7 @@ def term_week_delete_view(request, term_pk, pk):
 @login_required
 @lecturer_required
 def term_week_init_view(request, term_pk):
-    """Auto-generate weeks from term start_date to end_date (one week per 7 days)"""
+    """Auto-generate Monday-Friday weeks from the term's date range."""
     term = get_object_or_404(Semester, pk=term_pk, school=request.school)
     if not term.start_date or not term.end_date:
         messages.error(request, "Set start and end dates for this term first.")
@@ -508,15 +512,16 @@ def term_week_init_view(request, term_pk):
         messages.warning(request, f"{existing} week(s) already exist. Delete them first to re-initialize.")
         return redirect("term_week_list", term_pk=term.pk)
 
-    delta = (term.end_date - term.start_date).days
-    num_weeks = max(1, (delta // 7) + 1)
+    first_monday = term.start_date - timedelta(days=term.start_date.weekday())
+    num_weeks = max(1, ((term.end_date - first_monday).days // 7) + 1)
 
     for w in range(1, num_weeks + 1):
+        week_start, week_end = get_week_date_range(term, w)
         TermWeek.objects.create(
             term=term,
             week_number=w,
-            start_date=term.start_date + timedelta(days=(w - 1) * 7),
-            end_date=min(term.start_date + timedelta(days=(w * 7) - 1), term.end_date),
+            start_date=week_start,
+            end_date=min(week_end, term.end_date),
             activity_type="normal_lesson",
             title=f"Week {w}",
         )

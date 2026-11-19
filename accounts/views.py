@@ -13,7 +13,7 @@ from django.views.generic import CreateView
 from django_filters.views import FilterView
 from xhtml2pdf import pisa
 from django.conf import settings
-from django.db.models import Q
+from django.db.models import Q, Count, Max
 from django.db import transaction
 from django.utils import timezone
 from io import BytesIO
@@ -24,25 +24,32 @@ from docx import Document
 from core.pdf_utils import get_school_document_frame, clean_hex_color
 from core.search import build_search_query
 
-from accounts.decorators import admin_required, lecturer_required
+from accounts.decorators import admin_required, lecturer_required, school_admin_required
 from accounts.filters import LecturerFilter, StudentFilter
 from accounts.forms import (
+    BulkSubClassForm,
     ParentAddForm,
     ProfileUpdateForm,
     ProgramUpdateForm,
     NonTeachingStaffAddForm,
+    SchoolAdminAddForm,
     StaffAddForm,
     StaffPromotionForm,
     StudentAddForm,
+    StudentTransferForm,
+    SubClassForm,
 )
 from accounts.models import (
+    ClassTransfer,
     NON_TEACHING_POSITIONS,
     Parent,
     PasswordResetAudit,
     STUDENT_STATUS_ACTIVE,
     Student,
+    SubClass,
     User,
 )
+from accounts.utils import generate_student_credentials, get_division_for_level
 from core.models import Semester
 from course.models import Course, CourseAllocation, Program
 from result.models import TakenCourse, Result
@@ -337,6 +344,18 @@ def _build_student_history_context(student, school, level=None, session=None, te
     fees_total = fees_qs.aggregate(total=Sum('amount'))['total'] or 0
     paid_total = payments_qs.filter(status='VERIFIED').aggregate(total=Sum('amount'))['total'] or 0
 
+    class_transfers = list(
+        student.class_transfers.select_related("transferred_by").order_by(
+            "created_at"
+        )
+    )
+    transfer_chain = ""
+    if class_transfers:
+        transfer_chain = " → ".join(
+            [class_transfers[0].from_label]
+            + [transfer.to_label for transfer in class_transfers]
+        )
+
     return {
         "history_filters": {"level": level or "", "session": session or "", "term": term or ""},
         "history_levels": all_levels,
@@ -356,6 +375,8 @@ def _build_student_history_context(student, school, level=None, session=None, te
         "history_admission_date": admission_date,
         "history_exit_session": getattr(student, "exit_session", None),
         "history_exit_date": getattr(student, "exit_date", None),
+        "history_class_transfers": class_transfers,
+        "history_transfer_chain": transfer_chain,
     }
 
 
@@ -447,6 +468,59 @@ def admin_panel(request):
     return render(request, "setting/admin_panel.html", {
         "title": "Admin Panel",
         "password_reset_events": reset_events[:10],
+    })
+
+
+# ########################################################
+# School Administrator Management
+# ########################################################
+
+
+@login_required
+@school_admin_required
+def school_admin_list(request):
+    """List the administrators belonging to the current school only."""
+    admins = User.objects.filter(
+        is_school_admin=True,
+        school=request.school,
+    ).order_by("first_name", "last_name", "username")
+    query = request.GET.get("q", "").strip()
+    if query:
+        admins = admins.filter(
+            build_search_query(query, ["first_name", "last_name", "username", "email", "phone"])
+        )
+    return render(request, "accounts/school_admin_list.html", {
+        "title": "School Administrators",
+        "school_admins": admins,
+        "search_query": query,
+    })
+
+
+@login_required
+@school_admin_required
+def school_admin_add(request):
+    """Let a school admin add another admin to their own school."""
+    if not request.school:
+        messages.error(request, "Select a school before adding an administrator.")
+        return redirect("admin_panel")
+
+    if request.method == "POST":
+        form = SchoolAdminAddForm(request.POST, school=request.school)
+        if form.is_valid():
+            new_admin = form.save()
+            return render_credential_handoff(
+                request,
+                new_admin,
+                form.temporary_password,
+                reverse("school_admin_list"),
+            )
+        messages.error(request, "Please correct the error(s) below.")
+    else:
+        form = SchoolAdminAddForm(school=request.school)
+
+    return render(request, "accounts/school_admin_form.html", {
+        "title": "Add School Administrator",
+        "form": form,
     })
 
 
@@ -855,50 +929,74 @@ def _clean_staff_import_value(field_name, value):
     return model_field.clean(value, None)
 
 
+def _tabular_export_response(columns, rows, title, filename, file_type, row_titles=None):
+    """Return a styled Excel or Word document built from tabular rows."""
+    if file_type == "xlsx":
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = title[:31]
+        sheet.append([heading for heading, _ in columns])
+        for cell in sheet[1]:
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill("solid", fgColor="24476B")
+        for row in rows:
+            sheet.append(row)
+        for column_cells in sheet.columns:
+            lengths = [len(str(cell.value or "")) for cell in column_cells[:100]]
+            sheet.column_dimensions[column_cells[0].column_letter].width = min(
+                max(max(lengths, default=10) + 2, 12), 32
+            )
+        sheet.freeze_panes = "A2"
+        sheet.auto_filter.ref = sheet.dimensions
+        output = BytesIO()
+        workbook.save(output)
+        response = HttpResponse(
+            output.getvalue(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response["Content-Disposition"] = f'attachment; filename="{filename}.xlsx"'
+        return response
+
+    document = Document()
+    document.add_heading(title, 0)
+    for index, values in enumerate(rows, start=1):
+        row_title = row_titles[index - 1] if row_titles else str(index)
+        document.add_heading(f"{index}. {row_title}", level=1)
+        table = document.add_table(rows=0, cols=2)
+        table.style = "Light Shading Accent 1"
+        for (heading, _), value in zip(columns, values):
+            cells = table.add_row().cells
+            cells[0].text = heading
+            cells[1].text = str(value)
+    output = BytesIO()
+    document.save(output)
+    response = HttpResponse(
+        output.getvalue(),
+        content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
+    response["Content-Disposition"] = f'attachment; filename="{filename}.docx"'
+    return response
+
+
 @login_required
 @admin_required
 def export_staff(request, staff_type, file_type):
     if staff_type not in {"teachers", "non-teaching"} or file_type not in {"xlsx", "docx"}:
         return HttpResponse(status=404)
-    staff = _staff_queryset(request, staff_type)
+    staff = list(_staff_queryset(request, staff_type))
     title = "Teachers" if staff_type == "teachers" else "Non-teaching Staff"
-    if file_type == "xlsx":
-        workbook = Workbook()
-        sheet = workbook.active
-        sheet.title = title[:31]
-        sheet.append([heading for heading, _ in STAFF_EXPORT_COLUMNS])
-        for cell in sheet[1]:
-            cell.font = Font(bold=True, color="FFFFFF")
-            cell.fill = PatternFill("solid", fgColor="24476B")
-        for person in staff:
-            sheet.append([_staff_export_value(person, field) for _, field in STAFF_EXPORT_COLUMNS])
-        for column_cells in sheet.columns:
-            values = [len(str(cell.value or "")) for cell in column_cells[:100]]
-            sheet.column_dimensions[column_cells[0].column_letter].width = min(max(max(values, default=10) + 2, 12), 32)
-        sheet.freeze_panes = "A2"
-        sheet.auto_filter.ref = sheet.dimensions
-        output = BytesIO()
-        workbook.save(output)
-        response = HttpResponse(output.getvalue(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-        response["Content-Disposition"] = f'attachment; filename="{staff_type}_staff.xlsx"'
-        return response
-    document = Document()
-    document.add_heading(title, 0)
-    for index, person in enumerate(staff, start=1):
-        document.add_heading(f"{index}. {person.get_full_name}", level=1)
-        table = document.add_table(rows=0, cols=2)
-        table.style = "Light Shading Accent 1"
-        for heading, field in STAFF_EXPORT_COLUMNS:
-            if field == "staff_id" and heading == "Staff ID":
-                continue
-            cells = table.add_row().cells
-            cells[0].text = heading
-            cells[1].text = str(_staff_export_value(person, field))
-    output = BytesIO()
-    document.save(output)
-    response = HttpResponse(output.getvalue(), content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-    response["Content-Disposition"] = f'attachment; filename="{staff_type}_staff.docx"'
-    return response
+    rows = [
+        [_staff_export_value(person, field) for _, field in STAFF_EXPORT_COLUMNS]
+        for person in staff
+    ]
+    return _tabular_export_response(
+        STAFF_EXPORT_COLUMNS,
+        rows,
+        title,
+        f"{staff_type}_staff",
+        file_type,
+        row_titles=[person.get_full_name for person in staff],
+    )
 
 
 @login_required
@@ -1054,6 +1152,362 @@ def download_staff_import_template(request):
     return response
 
 
+# ########################################################
+# Student Excel/Word export and Excel import
+# ########################################################
+
+
+STUDENT_EXPORT_COLUMNS = (
+    ("Username", "username"),
+    ("First name", "first_name"),
+    ("Other names", "other_names"),
+    ("Last name", "last_name"),
+    ("Gender", "gender"),
+    ("Date of birth", "date_of_birth"),
+    ("Place of birth", "place_of_birth"),
+    ("Nationality", "nationality"),
+    ("Hometown", "hometown"),
+    ("Region", "region"),
+    ("District", "district"),
+    ("Religion", "religion"),
+    ("Ghana Card number", "ghana_card_number"),
+    ("NHIS number", "nhis_number"),
+    ("GhanaPost GPS address", "gps_address"),
+    ("Phone", "phone"),
+    ("Alternate phone", "alternate_phone"),
+    ("Email", "email"),
+    ("Residential address", "address"),
+    ("Admission number", "admission_number"),
+    ("Admission date", "admission_date"),
+    ("Previous school", "previous_school"),
+    ("Previous class", "previous_class"),
+    ("BECE year", "bece_year"),
+    ("BECE index number", "bece_index_number"),
+    ("BECE aggregate", "bece_aggregate"),
+    ("Birth certificate number", "birth_certificate_number"),
+    ("Boarding status", "boarding_status"),
+    ("Guardian name", "guardian_name"),
+    ("Guardian relationship", "guardian_relationship"),
+    ("Guardian phone", "guardian_phone"),
+    ("Guardian email", "guardian_email"),
+    ("Guardian occupation", "guardian_occupation"),
+    ("Guardian address", "guardian_address"),
+    ("Guardian Ghana Card", "guardian_ghana_card"),
+    ("Second guardian name", "second_guardian_name"),
+    ("Second guardian relationship", "second_guardian_relationship"),
+    ("Second guardian phone", "second_guardian_phone"),
+    ("Second guardian occupation", "second_guardian_occupation"),
+    ("Blood group", "blood_group"),
+    ("Medical conditions", "medical_conditions"),
+    ("Allergies", "allergies"),
+    ("Special needs", "special_needs"),
+    ("Emergency contact name", "emergency_contact_name"),
+    ("Emergency contact relationship", "emergency_contact_relationship"),
+    ("Emergency contact phone", "emergency_contact_phone"),
+    ("Emergency contact address", "emergency_contact_address"),
+    ("Class / Level", "level"),
+    ("Sub-class / Arm", "sub_class"),
+    ("Program", "program"),
+    ("House", "house"),
+    ("Status", "status"),
+)
+
+STUDENT_RECORD_FIELDS = frozenset({"level", "sub_class", "program", "house", "status"})
+STUDENT_IMPORT_COLUMNS = [field for _, field in STUDENT_EXPORT_COLUMNS]
+STUDENT_REQUIRED_IMPORT_COLUMNS = {"first_name", "last_name", "level"}
+# These are looked up against the school's own programmes/sub-classes instead
+# of being cleaned directly from the workbook cell.
+STUDENT_LOOKUP_FIELDS = {"sub_class", "program", "username"}
+STUDENT_CLEAN_IMPORT_FIELDS = tuple(
+    field for field in STUDENT_IMPORT_COLUMNS if field not in STUDENT_LOOKUP_FIELDS
+)
+STUDENT_USER_IMPORT_FIELDS = tuple(
+    field for field in STUDENT_CLEAN_IMPORT_FIELDS if field not in STUDENT_RECORD_FIELDS
+)
+
+
+def _student_queryset(request):
+    """Mirror the student list so exports respect the current school/filter."""
+    qs = Student.objects.filter(student__school=request.school).select_related(
+        "student", "program", "sub_class"
+    )
+    if not request.GET.get("status"):
+        qs = qs.filter(status=STUDENT_STATUS_ACTIVE)
+    return qs
+
+
+def _student_export_value(student, field):
+    if field == "sub_class":
+        return student.sub_class.name if student.sub_class_id else ""
+    if field == "program":
+        return student.program.title if student.program_id else ""
+    if field in STUDENT_RECORD_FIELDS:
+        record, model = student, Student
+    else:
+        record, model = student.student, User
+    value = getattr(record, field, "")
+    if value in (None, ""):
+        return ""
+    if model._meta.get_field(field).choices:
+        return getattr(record, f"get_{field}_display")()
+    if isinstance(value, (date, datetime)):
+        return value.isoformat()
+    return value
+
+
+def _clean_student_import_value(field_name, value):
+    model = Student if field_name in STUDENT_RECORD_FIELDS else User
+    model_field = model._meta.get_field(field_name)
+    if value in (None, ""):
+        return None if model_field.null else ""
+    if model_field.choices:
+        candidate = str(value).strip()
+        choice_values = {str(key) for key, _ in model_field.flatchoices}
+        by_label = {str(label).casefold(): key for key, label in model_field.flatchoices}
+        if candidate in choice_values:
+            value = candidate
+        elif candidate.casefold() in by_label:
+            value = by_label[candidate.casefold()]
+        else:
+            raise ValueError("choose one of the listed values")
+    return model_field.clean(value, None)
+
+
+@login_required
+@admin_required
+def export_students(request, file_type):
+    if file_type not in {"xlsx", "docx"}:
+        return HttpResponse(status=404)
+    students = list(_student_queryset(request))
+    rows = [
+        [_student_export_value(student, field) for _, field in STUDENT_EXPORT_COLUMNS]
+        for student in students
+    ]
+    return _tabular_export_response(
+        STUDENT_EXPORT_COLUMNS,
+        rows,
+        "Students",
+        "students",
+        file_type,
+        row_titles=[student.student.get_full_name for student in students],
+    )
+
+
+@login_required
+@admin_required
+def import_students(request):
+    errors = []
+    imported = 0
+    if request.method == "POST" and request.FILES.get("workbook"):
+        try:
+            workbook = load_workbook(request.FILES["workbook"], read_only=True, data_only=True)
+            sheet = workbook.active
+            rows = sheet.iter_rows(values_only=True)
+            headers = [str(value or "").strip().lower() for value in next(rows, ())]
+            missing = STUDENT_REQUIRED_IMPORT_COLUMNS - set(headers)
+            if missing:
+                errors.append("Missing required columns: " + ", ".join(sorted(missing)))
+            else:
+                positions = {
+                    name: headers.index(name) for name in STUDENT_IMPORT_COLUMNS if name in headers
+                }
+                data = []
+                seen_usernames = set()
+                seen_admission_numbers = set()
+                for row_number, row in enumerate(rows, start=2):
+                    values = {
+                        name: (row[index] if index < len(row) else None)
+                        for name, index in positions.items()
+                    }
+                    for field_name in STUDENT_IMPORT_COLUMNS:
+                        values.setdefault(field_name, None)
+                    if not any(value not in (None, "") for value in values.values()):
+                        continue
+                    for phone_field in (
+                        "phone", "alternate_phone", "guardian_phone",
+                        "second_guardian_phone", "emergency_contact_phone",
+                    ):
+                        raw_phone = values.get(phone_field)
+                        if (
+                            isinstance(raw_phone, (int, float))
+                            and str(int(raw_phone)).isdigit()
+                            and len(str(int(raw_phone))) == 9
+                        ):
+                            values[phone_field] = f"0{int(raw_phone)}"
+                    values = {
+                        name: value.date().isoformat() if isinstance(value, datetime)
+                        else value.isoformat() if isinstance(value, date)
+                        else str(value).strip() if value is not None else ""
+                        for name, value in values.items()
+                    }
+                    cleaned = {}
+                    row_errors = []
+                    if not values["first_name"] or not values["last_name"]:
+                        row_errors.append("first_name and last_name are required.")
+                    if not values["level"]:
+                        row_errors.append("level is required.")
+                    for field_name in STUDENT_CLEAN_IMPORT_FIELDS:
+                        try:
+                            cleaned[field_name] = _clean_student_import_value(
+                                field_name, values[field_name]
+                            )
+                        except Exception as exc:
+                            row_errors.append(f"{field_name}: {exc}")
+
+                    username = values["username"].strip()
+                    if username and User.objects.filter(username__iexact=username).exists():
+                        row_errors.append(f"username {username} already exists.")
+                    elif username and username.casefold() in seen_usernames:
+                        row_errors.append(f"username {username} is repeated in this workbook.")
+
+                    admission_number = str(cleaned.get("admission_number") or "").strip()
+                    if admission_number and User.objects.filter(
+                        school=request.school, admission_number__iexact=admission_number
+                    ).exists():
+                        row_errors.append(f"admission_number {admission_number} already exists.")
+                    elif admission_number and admission_number.casefold() in seen_admission_numbers:
+                        row_errors.append(
+                            f"admission_number {admission_number} is repeated in this workbook."
+                        )
+
+                    program_title = values["program"].strip()
+                    if program_title:
+                        program = Program.objects.filter(
+                            school=request.school, title__iexact=program_title
+                        ).first()
+                        if not program:
+                            row_errors.append(
+                                f"program {program_title} does not exist in this school."
+                            )
+                        else:
+                            cleaned["program_id"] = program.pk
+                    else:
+                        cleaned["program_id"] = None
+
+                    sub_class_name = values["sub_class"].strip()
+                    if sub_class_name:
+                        sub_class = SubClass.objects.filter(
+                            school=request.school,
+                            level=cleaned.get("level"),
+                            name__iexact=sub_class_name,
+                        ).first()
+                        if not sub_class:
+                            row_errors.append(
+                                f"sub_class {sub_class_name} is not configured for "
+                                f"{values['level']} in this school."
+                            )
+                        else:
+                            cleaned["sub_class_id"] = sub_class.pk
+                    else:
+                        cleaned["sub_class_id"] = None
+
+                    if row_errors:
+                        errors.extend(f"Row {row_number}: {error}" for error in row_errors)
+                        continue
+
+                    cleaned["username"] = username
+                    cleaned["status"] = cleaned.get("status") or STUDENT_STATUS_ACTIVE
+                    if username:
+                        seen_usernames.add(username.casefold())
+                    if admission_number:
+                        seen_admission_numbers.add(admission_number.casefold())
+                    data.append(cleaned)
+
+                if not errors:
+                    with transaction.atomic():
+                        for values in data:
+                            division = get_division_for_level(values["level"])
+                            username = values["username"] or generate_student_credentials(
+                                school=request.school, division=division
+                            )[0]
+                            user = User.objects.create_user(
+                                username=username,
+                                password=User.objects.make_random_password(length=16),
+                                school=request.school,
+                                is_student=True,
+                                must_change_password=True,
+                            )
+                            for field_name in STUDENT_USER_IMPORT_FIELDS:
+                                setattr(user, field_name, values.get(field_name))
+                            if not user.admission_number:
+                                user.admission_number = username
+                            if not user.admission_date:
+                                user.admission_date = timezone.localdate()
+                            user.save()
+                            Student.objects.create(
+                                student=user,
+                                level=values["level"],
+                                sub_class_id=values["sub_class_id"],
+                                program_id=values["program_id"],
+                                house=values.get("house") or None,
+                                status=values["status"],
+                            )
+                            imported += 1
+                    messages.success(
+                        request,
+                        f"Imported {imported} student account(s). Temporary passwords must be "
+                        "reset by an administrator before first sign-in.",
+                    )
+                    return redirect("student_list")
+        except Exception as exc:
+            errors.append(f"Could not read this Excel workbook: {exc}")
+    return render(request, "accounts/import_students.html", {
+        "title": "Import students from Excel", "errors": errors,
+        "import_columns": STUDENT_IMPORT_COLUMNS,
+    })
+
+
+@login_required
+@admin_required
+def download_student_import_template(request):
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Student import"
+    sheet.append(STUDENT_IMPORT_COLUMNS)
+    program_title = Program.objects.filter(
+        school=request.school, is_academic_block=True
+    ).values_list("title", flat=True).first() or ""
+    sub_class_name = SubClass.objects.filter(
+        school=request.school, level="Primary 1"
+    ).values_list("name", flat=True).first() or ""
+    example = {
+        "first_name": "Ama", "last_name": "Mensah", "gender": "F",
+        "date_of_birth": "2012-05-14", "phone": "0200000000", "address": "Accra",
+        "level": "Primary 1", "program": program_title, "sub_class": sub_class_name,
+        "house": "Red", "status": "Active", "guardian_name": "Kwame Mensah",
+        "guardian_relationship": "Father", "guardian_phone": "0240000000",
+    }
+    sheet.append([example.get(column, "") for column in STUDENT_IMPORT_COLUMNS])
+    for cell in sheet[1]:
+        cell.font = Font(bold=True)
+        cell.fill = PatternFill("solid", fgColor="DCEAF7")
+    sheet.freeze_panes = "A2"
+    sheet.auto_filter.ref = sheet.dimensions
+    for field_name in {
+        "phone", "alternate_phone", "guardian_phone", "second_guardian_phone",
+        "emergency_contact_phone", "ghana_card_number", "nhis_number",
+        "guardian_ghana_card", "bece_index_number", "birth_certificate_number",
+        "admission_number",
+    }:
+        if field_name in STUDENT_IMPORT_COLUMNS:
+            column_index = STUDENT_IMPORT_COLUMNS.index(field_name) + 1
+            sheet.cell(row=2, column=column_index).number_format = "@"
+    for column_cells in sheet.columns:
+        lengths = [len(str(cell.value or "")) for cell in column_cells[:3]]
+        letter = column_cells[0].column_letter
+        sheet.column_dimensions[letter].width = max(
+            min(max(lengths) + 2, 28), sheet.column_dimensions[letter].width or 10
+        )
+    output = BytesIO()
+    workbook.save(output)
+    response = HttpResponse(
+        output.getvalue(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = 'attachment; filename="student_import_template.xlsx"'
+    return response
+
+
 @login_required
 @admin_required
 def render_lecturer_pdf_list(request):
@@ -1108,7 +1562,20 @@ def student_add_view(request):
         level_param = request.GET.get("level")
         if level_param:
             initial_data["level"] = level_param
-        
+
+        # Pre-fill the sub-class when the admin acted from a filtered roster.
+        sub_class_param = request.GET.get("sub_class")
+        if sub_class_param:
+            try:
+                sub_class = SubClass.objects.filter(
+                    school=request.school, pk=sub_class_param, is_active=True
+                ).first()
+            except (TypeError, ValueError):
+                sub_class = None
+            if sub_class:
+                initial_data["sub_class"] = sub_class
+                initial_data.setdefault("level", sub_class.level)
+
         form = StudentAddForm(initial=initial_data, school=request.school)
     return render(
         request, "accounts/add_student.html", {"title": "Add Student", "form": form}
@@ -1139,6 +1606,40 @@ def edit_student(request, pk):
     )
 
 
+def _division_links(request, url_name, drop_params=()):
+    """Division selector links that preserve the other active query params."""
+    params = request.GET.copy()
+    for name in ("page",) + tuple(drop_params):
+        params.pop(name, None)
+
+    icons = {
+        "": "fas fa-layer-group",
+        settings.DIVISION_NURSERY: "fas fa-baby",
+        settings.DIVISION_PRIMARY: "fas fa-child",
+        settings.DIVISION_JHS: "fas fa-user-graduate",
+    }
+    options = (("", "All divisions"),) + tuple(settings.DIVISION_CHOICES)
+    links = []
+    for key, label in options:
+        link_params = params.copy()
+        if key:
+            link_params["division"] = key
+        else:
+            link_params.pop("division", None)
+        query = link_params.urlencode()
+        url = reverse(url_name)
+        if query:
+            url = f"{url}?{query}"
+        links.append({
+            "key": key,
+            "label": label,
+            "icon": icons[key],
+            "url": url,
+            "is_all": not key,
+        })
+    return links
+
+
 @method_decorator([login_required, admin_required], name="dispatch")
 class StudentListView(FilterView):
     filterset_class = StudentFilter
@@ -1148,11 +1649,16 @@ class StudentListView(FilterView):
     def get_queryset(self):
         qs = Student.objects.filter(
             student__school=self.request.school
-        ).select_related("student", "program")
+        ).select_related("student", "program", "sub_class")
         status = self.request.GET.get("status")
         if not status:
             qs = qs.filter(status=STUDENT_STATUS_ACTIVE)
         return qs
+
+    def get_filterset_kwargs(self, filterset_class):
+        kwargs = super().get_filterset_kwargs(filterset_class)
+        kwargs["school"] = self.request.school
+        return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -1164,7 +1670,9 @@ class StudentListView(FilterView):
         status = self.request.GET.get("status")
         if not status:
             qs = qs.filter(status=STUDENT_STATUS_ACTIVE)
-        filtered_qs = self.filterset_class(self.request.GET, queryset=qs).qs
+        filtered_qs = self.filterset_class(
+            self.request.GET, queryset=qs, school=self.request.school
+        ).qs
 
         context["nursery_students"] = filtered_qs.filter(
             student__division=settings.DIVISION_NURSERY
@@ -1177,6 +1685,36 @@ class StudentListView(FilterView):
         )
         context["other_students"] = filtered_qs.filter(
             student__division__isnull=True
+        )
+
+        active_division = self.request.GET.get("division", "")
+        if active_division not in dict(settings.DIVISION_CHOICES):
+            active_division = ""
+        context["active_division"] = active_division
+        context["division_tabs"] = _division_links(
+            self.request, "student_list", drop_params=("sub_class",)
+        )
+        context["active_division_label"] = next(
+            (
+                tab["label"]
+                for tab in context["division_tabs"]
+                if tab["key"] == active_division
+            ),
+            "All divisions",
+        )
+        context["clear_filters_url"] = reverse("student_list")
+        if active_division:
+            context["clear_filters_url"] += f"?division={active_division}"
+
+        division_context_keys = {
+            settings.DIVISION_NURSERY: "nursery_students",
+            settings.DIVISION_PRIMARY: "primary_students",
+            settings.DIVISION_JHS: "jhs_students",
+        }
+        context["active_students"] = (
+            context[division_context_keys[active_division]]
+            if active_division
+            else filtered_qs
         )
 
         return context
@@ -1209,6 +1747,68 @@ def delete_student(request, pk):
     student.delete()
     messages.success(request, f"Student {full_name} has been deleted.")
     return redirect("student_list")
+
+
+@login_required
+@admin_required
+def student_transfer_view(request, pk):
+    """Move a learner to another sub-class (and optionally another class)."""
+    student = get_object_or_404(Student, pk=pk, student__school=request.school)
+    student_name = student.student.get_full_name or student.student.username
+
+    if request.method == "POST":
+        form = StudentTransferForm(
+            request.POST, school=request.school, student=student
+        )
+        if form.is_valid():
+            target_level = form.cleaned_data["to_level"]
+            target_sub_class = form.cleaned_data["to_sub_class"]
+            previous_class = student.class_label or "Unassigned"
+            new_class = (
+                f"{target_level} {target_sub_class.name}".strip()
+            )
+
+            with transaction.atomic():
+                ClassTransfer.objects.create(
+                    student=student,
+                    from_level=student.level or "",
+                    from_sub_class_name=(
+                        student.sub_class.name if student.sub_class_id else ""
+                    ),
+                    from_sub_class=student.sub_class,
+                    to_level=target_level,
+                    to_sub_class_name=target_sub_class.name,
+                    to_sub_class=target_sub_class,
+                    note=form.cleaned_data.get("note", ""),
+                    transferred_by=request.user,
+                )
+                student.level = target_level
+                student.sub_class = target_sub_class
+                student.save()
+
+            messages.success(
+                request,
+                f"Transferred {student_name} from {previous_class} to {new_class}.",
+            )
+            return redirect(
+                f"{reverse('class_detail', args=[target_level])}"
+                f"?sub_class={target_sub_class.pk}"
+            )
+        messages.error(request, "Please correct the error below.")
+    else:
+        form = StudentTransferForm(school=request.school, student=student)
+
+    return render(
+        request,
+        "accounts/transfer_student.html",
+        {
+            "title": f"Transfer {student_name}",
+            "student": student,
+            "form": form,
+            "current_class": student.class_label or "Unassigned",
+        },
+    )
+
 
 @login_required
 @admin_required
@@ -1264,23 +1864,27 @@ class ParentAdd(CreateView):
 @lecturer_required
 def class_list_view(request):
     """Dashboard showing all classes (levels) - filtered by division"""
-    
-    if request.user.is_superuser or request.user.is_school_admin:
+    is_admin = request.user.is_superuser or request.user.is_school_admin
+
+    if is_admin:
         # Admins see all classes
         levels = settings.LEVEL_CHOICES
     elif request.user.division:
         # Teachers see only classes in their assigned division
         accessible_levels = request.user.get_division_levels()
-        levels = [(code, name) for code, name in settings.LEVEL_CHOICES if code in accessible_levels]
+        levels = [
+            (code, name) for code, name in settings.LEVEL_CHOICES
+            if code in accessible_levels
+        ]
     else:
         # Teachers without division assigned see no classes
         # (Admin needs to assign them a division first)
         messages.warning(
-            request, 
+            request,
             "You have not been assigned to a division yet. Please contact your administrator."
         )
         levels = []
-    
+
     # Calculate student counts per class efficiently
     students_counts = {}
     for level_code, _ in levels:
@@ -1291,12 +1895,58 @@ def class_list_view(request):
         ).count()
         students_counts[level_code] = count
 
+    # Sub-classes (for example Primary 1A / 1B) are managed per class level.
+    level_codes = [code for code, _ in levels]
+    sub_classes = SubClass.objects.filter(
+        school=request.school, is_active=True
+    ).annotate(
+        roster_count=Count(
+            "students", filter=Q(students__status=STUDENT_STATUS_ACTIVE)
+        )
+    ).order_by("level", "display_order", "name")
+    sub_classes_by_level = {code: [] for code in level_codes}
+    for sub_class in sub_classes:
+        if sub_class.level in sub_classes_by_level:
+            sub_classes_by_level[sub_class.level].append(sub_class)
+
+    valid_divisions = dict(settings.DIVISION_CHOICES)
+    active_division = request.GET.get("division", "")
+    if active_division not in valid_divisions:
+        active_division = ""
+    if not active_division and not is_admin and request.user.division in valid_divisions:
+        active_division = request.user.division
+
+    division_tabs = _division_links(request, "class_list")
+    if not is_admin and request.user.division:
+        division_tabs = [
+            tab for tab in division_tabs
+            if tab["is_all"] or tab["key"] == request.user.division
+        ]
+
+    division_levels = settings.DIVISION_LEVEL_MAPPING.get(active_division, [])
+    active_levels = [
+        (code, name) for code, name in levels
+        if not active_division or code in division_levels
+    ]
+    clear_filters_url = reverse("class_list")
+    if active_division:
+        clear_filters_url += f"?division={active_division}"
+
     context = {
         "title": "Manage Classes",
         "levels": levels,
+        "active_levels": active_levels,
         "students_counts": students_counts,
-        "is_teacher": not (request.user.is_superuser or request.user.is_school_admin),
+        "sub_classes_by_level": sub_classes_by_level,
+        "is_teacher": not is_admin,
         "user_division": request.user.division if hasattr(request.user, 'division') else None,
+        "division_tabs": division_tabs,
+        "active_division": active_division,
+        "active_division_label": next(
+            (tab["label"] for tab in division_tabs if tab["key"] == active_division),
+            "All divisions",
+        ),
+        "clear_filters_url": clear_filters_url,
     }
     return render(request, "accounts/class_list.html", context)
 
@@ -1311,7 +1961,6 @@ def class_detail_view(request, level_code):
 
     # Access Control: Verify teacher can access this level based on division
     if not request.user.can_access_level(level_code):
-        from accounts.utils import get_division_for_level
         level_division = get_division_for_level(level_code)
         
         if not request.user.division:
@@ -1331,10 +1980,50 @@ def class_detail_view(request, level_code):
         level=level_code,
         student__school=request.school,
         status=STUDENT_STATUS_ACTIVE,
-    ).select_related('student', 'program')
+    ).select_related('student', 'program', 'sub_class')
+
+    # Sub-classes for this level and their roster counts.
+    sub_classes = list(
+        SubClass.objects.filter(
+            school=request.school, level=level_code, is_active=True
+        ).order_by("display_order", "name")
+    )
+    sub_class_counts = {
+        row["sub_class_id"]: row["count"]
+        for row in students.exclude(sub_class__isnull=True)
+        .values("sub_class_id")
+        .annotate(count=Count("id"))
+    }
+    unassigned_count = students.filter(sub_class__isnull=True).count()
+    total_students = students.count()
+    for sub_class in sub_classes:
+        sub_class.roster_count = sub_class_counts.get(sub_class.pk, 0)
+
+    # Optional roster filter: ?sub_class=<id> or ?sub_class=unassigned
+    roster_filter = (request.GET.get("sub_class") or "").strip()
+    selected_sub_class = None
+    if roster_filter == "unassigned":
+        students = students.filter(sub_class__isnull=True)
+    elif roster_filter:
+        try:
+            selected_sub_class = next(
+                (item for item in sub_classes if str(item.pk) == roster_filter), None
+            )
+        except (TypeError, ValueError):
+            selected_sub_class = None
+        if selected_sub_class:
+            students = students.filter(sub_class=selected_sub_class)
 
     current_term = Semester.objects.filter(is_current_term=True, school=request.school).first()
     is_third_term = current_term and current_term.term == settings.THIRD_TERM
+
+    level_division = get_division_for_level(level_code)
+    level_teachers = User.objects.filter(
+        school=request.school,
+        is_teacher=True,
+        is_active=True,
+        division=level_division,
+    ).order_by("first_name", "last_name")
     
     # Get subjects for this class level (filtered by role)
     if request.user.is_superuser or request.user.is_school_admin:
@@ -1390,9 +2079,181 @@ def class_detail_view(request, level_code):
         "level_name": level_name,
         "students": students,
         "subjects": subjects,
+        "active_tab": "subclasses" if request.GET.get("tab") == "subclasses" else "roster",
+        "sub_classes": sub_classes,
+        "sub_class_counts": sub_class_counts,
+        "unassigned_count": unassigned_count,
+        "total_students": total_students,
+        "roster_filter": roster_filter,
+        "selected_sub_class": selected_sub_class,
+        "level_teachers": level_teachers,
         "current_term": current_term,
         "is_third_term": is_third_term,
         "broadsheet_data": broadsheet_data,
         "is_teacher": not (request.user.is_superuser or request.user.is_school_admin),
     }
     return render(request, "accounts/class_detail.html", context)
+
+
+def _sub_class_letters(index):
+    """Return spreadsheet-style labels: 1 -> A, 26 -> Z, 27 -> AA."""
+    letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    label = ""
+    while index > 0:
+        index, remainder = divmod(index - 1, 26)
+        label = letters[remainder] + label
+    return label
+
+
+def _next_sub_class_names(existing_names, count, scheme):
+    """Pick the next available sub-class names without reusing existing ones."""
+    existing = {str(name).strip().lower() for name in existing_names}
+    names = []
+
+    if scheme == "numbers":
+        numeric = [int(name) for name in existing if name.isdigit()]
+        candidate = max(numeric, default=0) + 1
+        while len(names) < count:
+            name = str(candidate)
+            if name.lower() not in existing:
+                names.append(name)
+            candidate += 1
+        return names
+
+    candidate = 1
+    while len(names) < count:
+        name = _sub_class_letters(candidate)
+        if name.lower() not in existing:
+            names.append(name)
+        candidate += 1
+    return names
+
+
+def _validated_level_code(level_code):
+    return level_code if level_code in dict(settings.LEVEL_CHOICES) else None
+
+
+def _sub_class_manager_redirect(level_code):
+    """Return to the class workspace with the sub-class manager tab open."""
+    return redirect(
+        f"{reverse('class_detail', args=[level_code])}?tab=subclasses"
+    )
+
+
+@login_required
+@admin_required
+@require_POST
+def sub_class_create(request, level_code):
+    """Create one sub-class (arm) for a class level."""
+    level_code = _validated_level_code(level_code)
+    if not level_code:
+        messages.error(request, "Invalid class level.")
+        return redirect("class_list")
+
+    form = SubClassForm(request.POST, school=request.school, level=level_code)
+    if form.is_valid():
+        sub_class = form.save(commit=False)
+        sub_class.school = request.school
+        sub_class.level = level_code
+        last_order = SubClass.objects.filter(
+            school=request.school, level=level_code
+        ).aggregate(Max("display_order"))["display_order__max"] or 0
+        sub_class.display_order = last_order + 1
+        sub_class.save()
+        messages.success(
+            request, f"Sub-class '{sub_class.name}' added to {level_code}."
+        )
+    else:
+        first_error = next(iter(form.errors.values()))[0]
+        messages.error(request, first_error)
+    return _sub_class_manager_redirect(level_code)
+
+
+@login_required
+@admin_required
+@require_POST
+def sub_class_bulk_create(request, level_code):
+    """Create several sub-classes for a class level in one request."""
+    level_code = _validated_level_code(level_code)
+    if not level_code:
+        messages.error(request, "Invalid class level.")
+        return redirect("class_list")
+
+    form = BulkSubClassForm(request.POST)
+    if form.is_valid():
+        count = form.cleaned_data["count"]
+        scheme = form.cleaned_data["scheme"]
+        capacity = form.cleaned_data.get("capacity")
+        existing_names = list(
+            SubClass.objects.filter(
+                school=request.school, level=level_code
+            ).values_list("name", flat=True)
+        )
+        names = _next_sub_class_names(existing_names, count, scheme)
+        last_order = SubClass.objects.filter(
+            school=request.school, level=level_code
+        ).aggregate(Max("display_order"))["display_order__max"] or 0
+
+        created = []
+        with transaction.atomic():
+            for offset, name in enumerate(names, start=1):
+                created.append(
+                    SubClass(
+                        school=request.school,
+                        level=level_code,
+                        name=name,
+                        capacity=capacity,
+                        display_order=last_order + offset,
+                    )
+                )
+            SubClass.objects.bulk_create(created)
+
+        messages.success(
+            request,
+            f"Added {len(created)} sub-class(es) to {level_code}: "
+            + ", ".join(names),
+        )
+    else:
+        first_error = next(iter(form.errors.values()))[0]
+        messages.error(request, first_error)
+    return _sub_class_manager_redirect(level_code)
+
+
+@login_required
+@admin_required
+@require_POST
+def sub_class_edit(request, pk):
+    """Rename a sub-class or update its capacity/class teacher."""
+    sub_class = get_object_or_404(SubClass, pk=pk, school=request.school)
+    level_code = sub_class.level
+    form = SubClassForm(
+        request.POST, instance=sub_class, school=request.school, level=level_code
+    )
+    if form.is_valid():
+        form.save()
+        messages.success(request, f"Sub-class '{sub_class.name}' updated.")
+    else:
+        first_error = next(iter(form.errors.values()))[0]
+        messages.error(request, first_error)
+    return _sub_class_manager_redirect(level_code)
+
+
+@login_required
+@admin_required
+@require_POST
+def sub_class_delete(request, pk):
+    """Delete a sub-class; assigned students become unassigned, not deleted."""
+    sub_class = get_object_or_404(SubClass, pk=pk, school=request.school)
+    level_code = sub_class.level
+    name = sub_class.name
+    student_count = sub_class.students.count()
+    sub_class.delete()
+    if student_count:
+        messages.warning(
+            request,
+            f"Sub-class '{name}' deleted. {student_count} student(s) are now "
+            "unassigned and can be moved to another sub-class.",
+        )
+    else:
+        messages.success(request, f"Sub-class '{name}' deleted.")
+    return _sub_class_manager_redirect(level_code)

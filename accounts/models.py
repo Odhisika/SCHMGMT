@@ -447,6 +447,84 @@ class User(AbstractUser):
         super().delete(*args, **kwargs)
 
 
+class SubClass(models.Model):
+    """A subdivision of a class level, for example Primary 1A or Primary 1B.
+
+    Class levels themselves come from ``settings.LEVEL_CHOICES``; a sub-class
+    records how many parallel groups a school runs for one level.  Students
+    are linked to their sub-class through :attr:`Student.sub_class`.
+    """
+
+    school = models.ForeignKey(
+        "school.School",
+        on_delete=models.CASCADE,
+        related_name="sub_classes",
+        verbose_name=_("School"),
+    )
+    level = models.CharField(
+        max_length=25,
+        choices=LEVEL,
+        verbose_name=_("Class / Level"),
+    )
+    name = models.CharField(
+        max_length=20,
+        verbose_name=_("Sub-class name"),
+        help_text=_("Short label such as A, B, C or 1, 2, 3."),
+    )
+    capacity = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name=_("Capacity"),
+        help_text=_("Optional maximum number of students for this sub-class."),
+    )
+    class_teacher = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="managed_sub_classes",
+        limit_choices_to={"is_teacher": True},
+        verbose_name=_("Class teacher"),
+    )
+    display_order = models.PositiveSmallIntegerField(
+        default=0,
+        verbose_name=_("Display order"),
+    )
+    is_active = models.BooleanField(default=True, verbose_name=_("Active"))
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = _("Sub-class")
+        verbose_name_plural = _("Sub-classes")
+        ordering = ("level", "display_order", "name")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("school", "level", "name"),
+                name="unique_sub_class_per_level_and_school",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.level} {self.name}"
+
+    @property
+    def display_name(self):
+        return f"{self.level} {self.name}"
+
+    @property
+    def student_count(self):
+        return self.students.filter(status=STUDENT_STATUS_ACTIVE).count()
+
+    @property
+    def is_full(self):
+        return bool(self.capacity and self.student_count >= self.capacity)
+
+    def save(self, *args, **kwargs):
+        self.name = (self.name or "").strip()
+        super().save(*args, **kwargs)
+
+
 class StudentManager(models.Manager):
     def active(self):
         """Return only learners who are still enrolled at the school."""
@@ -466,6 +544,14 @@ class Student(models.Model):
     student = models.OneToOneField(User, on_delete=models.CASCADE)
     # id_number = models.CharField(max_length=20, unique=True, blank=True)
     level = models.CharField(max_length=25, choices=LEVEL, null=True)
+    sub_class = models.ForeignKey(
+        SubClass,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="students",
+        verbose_name=_("Sub-class"),
+    )
     program = models.ForeignKey(Program, on_delete=models.CASCADE, null=True)
     house = models.CharField(max_length=20, choices=settings.HOUSE_CHOICES, blank=True, null=True)
 
@@ -501,6 +587,13 @@ class Student(models.Model):
 
     def get_absolute_url(self):
         return reverse("profile_single", kwargs={"user_id": self.student_id})
+
+    @property
+    def class_label(self):
+        """Human readable class name including the sub-class when assigned."""
+        if self.sub_class_id and self.sub_class:
+            return f"{self.level} {self.sub_class.name}"
+        return self.level or ""
 
     def get_division(self):
         """Derive the school division (Nursery/Primary/JHS) from the level."""
@@ -553,6 +646,17 @@ class Student(models.Model):
         ])
 
     def save(self, *args, **kwargs):
+        # A sub-class belongs to one class level.  Promotions and manual level
+        # corrections can leave an old sub-class behind, so detach it instead
+        # of keeping an inconsistent class assignment.
+        if self.sub_class_id:
+            sub_class = self.sub_class
+            school_id = self.student.school_id if self.student_id else None
+            if sub_class.level != self.level or (
+                school_id and sub_class.school_id != school_id
+            ):
+                self.sub_class = None
+
         # Keep the linked user's division in sync with the student's level.
         # Views group students by the user's division (e.g. the student list
         # tabs), so a missing division makes students invisible there.
@@ -566,6 +670,68 @@ class Student(models.Model):
     def delete(self, *args, **kwargs):
         self.student.delete()
         super().delete(*args, **kwargs)
+
+
+class ClassTransfer(models.Model):
+    """Audit trail for moving a learner between classes or sub-classes.
+
+    The class and arm names are snapshotted so the history stays readable even
+    if the sub-class is later renamed or deleted.
+    """
+
+    student = models.ForeignKey(
+        Student,
+        on_delete=models.CASCADE,
+        related_name="class_transfers",
+        verbose_name=_("Student"),
+    )
+    from_level = models.CharField(max_length=25, choices=LEVEL, blank=True)
+    from_sub_class_name = models.CharField(max_length=20, blank=True)
+    to_level = models.CharField(max_length=25, choices=LEVEL)
+    to_sub_class_name = models.CharField(max_length=20, blank=True)
+    from_sub_class = models.ForeignKey(
+        SubClass,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="transfers_out",
+    )
+    to_sub_class = models.ForeignKey(
+        SubClass,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="transfers_in",
+    )
+    note = models.TextField(blank=True, default="")
+    transferred_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="class_transfers_made",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("Class transfer")
+        verbose_name_plural = _("Class transfers")
+        ordering = ("-created_at",)
+
+    def __str__(self):
+        return f"{self.student}: {self.from_label} -> {self.to_label}"
+
+    @staticmethod
+    def _label(level, sub_class_name):
+        return f"{level or ''} {sub_class_name or ''}".strip()
+
+    @property
+    def from_label(self):
+        return self._label(self.from_level, self.from_sub_class_name) or _("Unassigned")
+
+    @property
+    def to_label(self):
+        return self._label(self.to_level, self.to_sub_class_name) or _("Unassigned")
 
 
 class Parent(models.Model):

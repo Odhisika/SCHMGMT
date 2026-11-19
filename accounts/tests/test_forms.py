@@ -6,10 +6,11 @@ from accounts.forms import (
     EmailValidationOnForgotPassword,
     NonTeachingStaffAddForm,
     ParentAddForm,
+    SchoolAdminAddForm,
     StaffAddForm,
     StudentAddForm,
 )
-from accounts.models import Parent, Student, User
+from accounts.models import Parent, Student, SubClass, User
 from course.models import Program
 from school.models import School
 
@@ -120,6 +121,66 @@ class StaffAddFormTests(AccountFormTestBase):
         send_email.assert_called_once_with(user, form.temporary_password)
         self.assertFalse(user.check_password(PASSWORD))
         self.assertTrue(user.must_change_password)
+
+
+class SchoolAdminAddFormTests(AccountFormTestBase):
+    @patch("accounts.forms.send_new_account_email")
+    def test_creates_admin_in_current_school_with_generated_password(self, send_email):
+        form = SchoolAdminAddForm(
+            data={
+                "username": "new.admin",
+                "first_name": "New",
+                "last_name": "Administrator",
+                "email": "new.admin@example.test",
+                "phone": "0240000200",
+            },
+            school=self.school,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        user = form.save()
+
+        self.assertEqual(user.school, self.school)
+        self.assertTrue(user.is_school_admin)
+        self.assertTrue(user.is_staff)
+        self.assertFalse(user.is_superuser)
+        self.assertFalse(user.is_teacher)
+        self.assertFalse(user.is_student)
+        self.assertTrue(user.must_change_password)
+        self.assertTrue(user.check_password(form.temporary_password))
+
+    def test_generates_username_when_blank(self):
+        form = SchoolAdminAddForm(
+            data={"first_name": "Generated", "last_name": "Administrator"},
+            school=self.school,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        user = form.save()
+
+        self.assertTrue(user.username.startswith("ADM-"))
+        self.assertTrue(user.has_usable_password())
+        self.assertTrue(user.check_password(form.temporary_password))
+
+    @patch("accounts.forms.send_new_account_email")
+    def test_school_from_submitted_data_is_ignored(self, send_email):
+        other_school = School.objects.create(name="Other Academy")
+        form = SchoolAdminAddForm(
+            data={
+                "username": "scoped.admin",
+                "first_name": "Scoped",
+                "last_name": "Administrator",
+                "email": "scoped.admin@example.test",
+                "school": other_school.pk,
+            },
+            school=self.school,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        user = form.save()
+
+        self.assertEqual(user.school, self.school)
+        send_email.assert_called_once_with(user, form.temporary_password)
 
 
 class StudentAddFormTests(AccountFormTestBase):
@@ -261,6 +322,69 @@ class StudentAddFormTests(AccountFormTestBase):
         self.assertIn('data-division="Nursery"', rendered)
         self.assertIn('data-division="Primary"', rendered)
         self.assertIn('data-division="JHS"', rendered)
+
+    def test_sub_class_options_are_scoped_to_the_school_and_tagged_with_level(self):
+        sub_class = SubClass.objects.create(
+            school=self.school, level="Primary 1", name="A"
+        )
+        other_school = School.objects.create(name="Other Sub-class Academy")
+        other_sub_class = SubClass.objects.create(
+            school=other_school, level="Primary 1", name="A"
+        )
+
+        form = StudentAddForm(school=self.school)
+
+        self.assertIn(sub_class, form.fields["sub_class"].queryset)
+        self.assertNotIn(other_sub_class, form.fields["sub_class"].queryset)
+        self.assertIn('data-level="Primary 1"', str(form["sub_class"]))
+
+    def test_creates_student_with_a_sub_class(self):
+        sub_class = SubClass.objects.create(
+            school=self.school, level="Primary 1", name="B"
+        )
+
+        form = StudentAddForm(
+            data={
+                "first_name": "Arm",
+                "last_name": "Learner",
+                "gender": "F",
+                "level": "Primary 1",
+                "sub_class": sub_class.pk,
+                "program": self.program.pk,
+                "address": "Accra",
+                "phone": "0240000006",
+            },
+            school=self.school,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        user = form.save()
+
+        student = Student.objects.get(student=user)
+        self.assertEqual(student.sub_class, sub_class)
+        self.assertEqual(student.class_label, "Primary 1 B")
+
+    def test_rejects_a_sub_class_from_another_level(self):
+        sub_class = SubClass.objects.create(
+            school=self.school, level="Primary 2", name="A"
+        )
+
+        form = StudentAddForm(
+            data={
+                "first_name": "Wrong",
+                "last_name": "Arm",
+                "gender": "M",
+                "level": "Primary 1",
+                "sub_class": sub_class.pk,
+                "program": self.program.pk,
+                "address": "Accra",
+                "phone": "0240000007",
+            },
+            school=self.school,
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("sub_class", form.errors)
 
     def test_level_choices_are_limited_to_the_selected_division(self):
         form = StudentAddForm(school=self.school, data={"division": "Nursery"})

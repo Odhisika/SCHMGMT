@@ -1480,6 +1480,12 @@ video {
       color: #ffffff;
     }
   }
+
+  // Standalone top-level links (Dashboard, Home) are main items too
+  .sidebar-top-items > li > a {
+    font-size: 15px;
+    font-weight: 700;
+  }
 }
 
 // Adjust main content to accommodate sidebar
@@ -1573,10 +1579,11 @@ html.sidebar-resizing .sidebar-tab-toggle {
   align-items: center;
   justify-content: space-between;
   padding: 10px 16px;
-  color: #cfcfcf;
+  color: #ffffff;
   cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
   border-radius: 6px;
   margin: 4px 8px;
   transition: all 0.2s ease;
@@ -1617,6 +1624,20 @@ html.sidebar-resizing .sidebar-tab-toggle {
   list-style: none;
   padding-left: 20px;
   margin: 0;
+
+  // Nested links stay lighter and smaller than the group headers
+  li a {
+    font-size: 13px;
+    font-weight: 400;
+    color: #cfcfcf;
+    padding-left: 26px;
+
+    i {
+      width: 30px;
+      height: 30px;
+      font-size: 13px;
+    }
+  }
 }
 .menu-group-header.expanded + .menu-group-items {
   max-height: 1000px;

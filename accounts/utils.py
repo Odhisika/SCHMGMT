@@ -98,6 +98,17 @@ def generate_parent_credentials():
         counter += 1
 
 
+def generate_admin_credentials():
+    """Generate a unique username and temporary password for a school admin."""
+    registered_year = datetime.now().strftime("%Y")
+    counter = 1
+    while True:
+        username = f"{settings.ADMIN_ID_PREFIX}-{registered_year}-{counter}"
+        if not get_user_model().objects.filter(username=username).exists():
+            return username, generate_password()
+        counter += 1
+
+
 class EmailThread(threading.Thread):
     def __init__(self, subject, recipient_list, template_name, context):
         self.subject = subject
@@ -135,6 +146,8 @@ def send_new_account_email(user, password):
         template_name = "accounts/email/new_student_account_confirmation.html"
     elif user.is_parent:
         template_name = "accounts/email/new_parent_account_confirmation.html"
+    elif user.is_school_admin:
+        template_name = "accounts/email/new_school_admin_account_confirmation.html"
     else:
         template_name = "accounts/email/new_lecturer_account_confirmation.html"
 

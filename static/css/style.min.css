@@ -1337,7 +1337,7 @@ html.sidebar-resizing .sidebar-tab-toggle {
 }
 
 .menu-group{margin-bottom:5px}
-.menu-group-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;color:#444;cursor:pointer;font-size:14px;font-weight:700;border-radius:6px;margin:4px 8px;transition:all .2s ease;user-select:none}
+.menu-group-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;color:#111;cursor:pointer;font-size:15px;font-weight:700;letter-spacing:.01em;border-radius:6px;margin:4px 8px;transition:all .2s ease;user-select:none}
 .menu-group-header:hover{background-color:rgba(0,0,0,.04);color:#222}
 .menu-group-header:hover i.group-icon{background-color:rgba(0,111,255,.12);color:#fff}
 .menu-group-header i.group-icon{width:34px;height:34px;margin-right:12px;font-size:16px;background-color:rgba(0,0,0,.06);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
@@ -1347,3 +1347,9 @@ html.sidebar-resizing .sidebar-tab-toggle {
 .menu-group-header.expanded .chevron-icon{transform:rotate(90deg);color:#fff}
 .menu-group-items{max-height:0;overflow:hidden;transition:max-height .3s cubic-bezier(0,1,0,1);list-style:none;padding-left:20px;margin:0}
 .menu-group-header.expanded + .menu-group-items{max-height:1000px;transition:max-height .3s ease-in-out}
+/* Main sidebar items stand out from the nested links underneath them */
+#side-nav .sidebar-top-items > li > a{font-weight:700;font-size:15px}
+#side-nav .menu-group-items li a{font-weight:400;font-size:13px;color:#555;padding-left:1.6rem}
+#side-nav .menu-group-items li a i,
+#side-nav .menu-group-items li a .fas,
+#side-nav .menu-group-items li a .fa{width:30px;height:30px;font-size:13px}

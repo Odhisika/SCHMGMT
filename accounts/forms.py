@@ -10,7 +10,7 @@ from django.contrib.auth.forms import PasswordResetForm
 from django.conf import settings
 from course.models import Program
 from .models import (
-    User, Student, Parent, RELATION_SHIP, LEVEL, GENDERS,
+    User, Student, SubClass, Parent, RELATION_SHIP, LEVEL, GENDERS,
     NON_TEACHING_POSITIONS,
 )
 from .utils import (
@@ -18,6 +18,7 @@ from .utils import (
     generate_student_credentials,
     generate_lecturer_credentials,
     generate_parent_credentials,
+    generate_admin_credentials,
     send_new_account_email,
     get_division_for_level,
 )
@@ -189,6 +190,22 @@ class DivisionLevelSelect(forms.Select):
         division = get_division_for_level(value) if value else None
         if division:
             option["attrs"]["data-division"] = division
+        return option
+
+
+class SubClassSelect(forms.Select):
+    """Select widget that tags each sub-class option with its class level."""
+
+    def create_option(
+        self, name, value, label, selected, index, subindex=None, attrs=None
+    ):
+        option = super().create_option(
+            name, value, label, selected, index, subindex=subindex, attrs=attrs
+        )
+        # ModelChoiceIteratorValue exposes the model instance through .instance.
+        instance = getattr(value, "instance", None)
+        if instance is not None:
+            option["attrs"]["data-level"] = instance.level
         return option
 
 
@@ -464,12 +481,110 @@ class NonTeachingStaffAddForm(UserCreationForm):
         return user
 
 
+class SchoolAdminAddForm(UserCreationForm):
+    """Create a second (or subsequent) administrator for the current school.
+
+    The school and role are always forced by the form/view, never taken from
+    submitted data, so a school admin cannot create accounts for other tenants.
+    Passwords are system generated and must be changed at first login.
+    """
+
+    username = forms.CharField(
+        max_length=30,
+        required=False,
+        label=_("Username (optional)"),
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+    )
+    first_name = forms.CharField(
+        max_length=150,
+        label=_("First name"),
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+    )
+    last_name = forms.CharField(
+        max_length=150,
+        label=_("Last name"),
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+    )
+    email = forms.EmailField(
+        max_length=254,
+        required=False,
+        label=_("Email address"),
+        widget=forms.EmailInput(attrs={"class": "form-control"}),
+        help_text=_("Optional. Credentials can also be handed over in person."),
+    )
+    phone = forms.CharField(
+        max_length=60,
+        required=False,
+        label=_("Phone number"),
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+    )
+    password1 = forms.CharField(
+        required=False,
+        label=_("Temporary password (generated)"),
+        widget=forms.PasswordInput(attrs={"class": "form-control"}),
+    )
+    password2 = forms.CharField(
+        required=False,
+        label=_("Confirm temporary password"),
+        widget=forms.PasswordInput(attrs={"class": "form-control"}),
+    )
+
+    class Meta(UserCreationForm.Meta):
+        model = User
+        fields = ("username", "first_name", "last_name", "email", "phone")
+
+    def __init__(self, *args, **kwargs):
+        self.school = kwargs.pop("school", None)
+        super().__init__(*args, **kwargs)
+        _disable_password_inputs(self)
+        _apply_bootstrap_widgets(self)
+
+    @transaction.atomic()
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        user.school = self.school
+        user.is_school_admin = True
+        user.is_staff = True
+        # Never let this form create a superuser or combine admin with another
+        # role; the account must only have school-administrator privileges.
+        user.is_superuser = False
+        user.is_student = False
+        user.is_teacher = False
+        user.is_lecturer = False
+        user.is_parent = False
+        user.is_non_teaching_staff = False
+        user.is_dep_head = False
+        user.is_class_teacher = False
+
+        user.first_name = self.cleaned_data.get("first_name", "")
+        user.last_name = self.cleaned_data.get("last_name", "")
+        user.email = self.cleaned_data.get("email") or None
+        user.phone = self.cleaned_data.get("phone") or None
+
+        generated_username, generated_password = generate_admin_credentials()
+        if not user.username:
+            user.username = generated_username
+        # Password inputs are disabled, so a fresh one-time password is always
+        # issued and surfaced through the credential handoff screen.
+        self.temporary_password = generated_password
+        user.must_change_password = True
+        user.set_password(generated_password)
+
+        if commit:
+            user.save()
+            send_new_account_email(user, generated_password)
+        return user
+
+
 class StudentAddForm(UserCreationForm):
     def __init__(self, *args, **kwargs):
         self.school = kwargs.pop('school', None)
         super(StudentAddForm, self).__init__(*args, **kwargs)
         if self.school:
             self.fields['program'].queryset = Program.objects.filter(school=self.school)
+            self.fields["sub_class"].queryset = SubClass.objects.filter(
+                school=self.school, is_active=True
+            ).order_by("level", "display_order", "name")
 
         # Narrow the class list to the chosen division. When the form is
         # submitted without a division we keep every level available and
@@ -578,6 +693,18 @@ class StudentAddForm(UserCreationForm):
         label=_("Class / Level"),
     )
 
+    sub_class = forms.ModelChoiceField(
+        queryset=SubClass.objects.none(),
+        required=False,
+        label=_("Sub-class / Arm"),
+        help_text=_("Optional. Choose the sub-class (for example A or B) for this learner."),
+        widget=SubClassSelect(
+            attrs={
+                "class": "browser-default custom-select form-control",
+            },
+        ),
+    )
+
     program = forms.ModelChoiceField(
         queryset=Program.objects.all(),
         widget=forms.Select(
@@ -643,6 +770,7 @@ class StudentAddForm(UserCreationForm):
         cleaned = super().clean()
         division = cleaned.get("division")
         level = cleaned.get("level")
+        sub_class = cleaned.get("sub_class")
         level_division = get_division_for_level(level) if level else None
 
         if division and level_division and level_division != division:
@@ -652,6 +780,23 @@ class StudentAddForm(UserCreationForm):
             )
         elif not division and level_division:
             cleaned["division"] = level_division
+
+        if sub_class:
+            if not level:
+                self.add_error(
+                    "sub_class",
+                    _("Choose the class / level before choosing a sub-class."),
+                )
+            elif sub_class.level != level:
+                self.add_error(
+                    "sub_class",
+                    _("The selected sub-class does not belong to the chosen class."),
+                )
+            if self.school and sub_class.school_id != self.school.pk:
+                self.add_error(
+                    "sub_class",
+                    _("The selected sub-class does not belong to this school."),
+                )
 
         return cleaned
 
@@ -705,6 +850,7 @@ class StudentAddForm(UserCreationForm):
             Student.objects.create(
                 student=user,
                 level=self.cleaned_data.get("level"),
+                sub_class=self.cleaned_data.get("sub_class"),
                 program=self.cleaned_data.get("program"),
                 house=self.cleaned_data.get("house") or None,
             )
@@ -812,6 +958,20 @@ class ProfileUpdateForm(UserChangeForm):
                 label=_("House"),
                 widget=forms.Select(attrs={"class": "form-select"}),
             )
+            sub_class_qs = SubClass.objects.none()
+            if self.school:
+                sub_class_qs = SubClass.objects.filter(
+                    school=self.school, is_active=True
+                ).order_by("level", "display_order", "name")
+            self.fields["sub_class"] = forms.ModelChoiceField(
+                queryset=sub_class_qs,
+                required=False,
+                label=_("Sub-class / Arm"),
+                help_text=_(
+                    "Optional. Choose the sub-class (for example A or B) for this learner."
+                ),
+                widget=SubClassSelect(attrs={"class": "form-select"}),
+            )
             try:
                 student = instance.student
             except Student.DoesNotExist:
@@ -820,6 +980,7 @@ class ProfileUpdateForm(UserChangeForm):
                 self.fields["level"].initial = student.level
                 self.fields["program"].initial = student.program_id
                 self.fields["house"].initial = student.house
+                self.fields["sub_class"].initial = student.sub_class_id
 
         # Restrict fields for non-admin users
         if not self.is_admin:
@@ -957,6 +1118,26 @@ class ProfileUpdateForm(UserChangeForm):
 
             if department and division and department.division and department.division != division:
                 self.add_error("department", _("The department must belong to the selected division."))
+
+        if self.is_admin and getattr(self.instance, "is_student", False):
+            level = cleaned.get("level")
+            sub_class = cleaned.get("sub_class")
+            if sub_class:
+                if not level:
+                    self.add_error(
+                        "sub_class",
+                        _("Choose the class / level before choosing a sub-class."),
+                    )
+                elif sub_class.level != level:
+                    self.add_error(
+                        "sub_class",
+                        _("The selected sub-class does not belong to the chosen class."),
+                    )
+                if self.school and sub_class.school_id != self.school.pk:
+                    self.add_error(
+                        "sub_class",
+                        _("The selected sub-class does not belong to this school."),
+                    )
         return cleaned
 
     def save(self, commit=True):
@@ -991,6 +1172,8 @@ class ProfileUpdateForm(UserChangeForm):
                     student.program = self.cleaned_data.get("program") or student.program
                 if "house" in self.cleaned_data and "house" in self.data:
                     student.house = self.cleaned_data.get("house") or None
+                if "sub_class" in self.cleaned_data and "sub_class" in self.data:
+                    student.sub_class = self.cleaned_data.get("sub_class")
                 student.save()
 
         return user
@@ -1016,6 +1199,169 @@ class ProfileUpdateForm(UserChangeForm):
                 + list(GES_ALL_FIELDS)
             )
         )
+
+
+class SubClassForm(forms.ModelForm):
+    """Create or edit a single sub-class for a class level."""
+
+    class Meta:
+        model = SubClass
+        fields = ("name", "capacity", "class_teacher")
+        widgets = {
+            "name": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": _("e.g. A"),
+                    "maxlength": 20,
+                }
+            ),
+            "capacity": forms.NumberInput(
+                attrs={"class": "form-control", "min": 1, "placeholder": _("Optional")}
+            ),
+            "class_teacher": forms.Select(attrs={"class": "form-select"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.school = kwargs.pop("school", None)
+        self.level = kwargs.pop("level", None)
+        super().__init__(*args, **kwargs)
+        if self.school:
+            teachers = User.objects.filter(
+                school=self.school, is_teacher=True, is_active=True
+            )
+            if self.level:
+                division = get_division_for_level(self.level)
+                if division:
+                    teachers = teachers.filter(division=division)
+            self.fields["class_teacher"].queryset = teachers.order_by(
+                "first_name", "last_name"
+            )
+
+    def clean_name(self):
+        name = (self.cleaned_data.get("name") or "").strip()
+        if not name:
+            raise forms.ValidationError(_("Enter a name for the sub-class."))
+        return name
+
+    def clean(self):
+        cleaned = super().clean()
+        name = cleaned.get("name")
+        capacity = cleaned.get("capacity")
+        if capacity is not None and capacity < 1:
+            self.add_error("capacity", _("Capacity must be at least 1."))
+        if self.school and self.level and name:
+            existing = SubClass.objects.filter(
+                school=self.school, level=self.level, name__iexact=name
+            )
+            if self.instance.pk:
+                existing = existing.exclude(pk=self.instance.pk)
+            if existing.exists():
+                self.add_error(
+                    "name",
+                    _("A sub-class with this name already exists for this class."),
+                )
+        return cleaned
+
+
+class BulkSubClassForm(forms.Form):
+    """Create several sub-classes at once using letters or numbers."""
+
+    SCHEME_CHOICES = (
+        ("letters", _("Letters (A, B, C...)")),
+        ("numbers", _("Numbers (1, 2, 3...)")),
+    )
+
+    count = forms.IntegerField(
+        min_value=1,
+        max_value=100,
+        initial=2,
+        label=_("Number of sub-classes to add"),
+        widget=forms.NumberInput(attrs={"class": "form-control", "min": 1, "max": 100}),
+    )
+    scheme = forms.ChoiceField(
+        choices=SCHEME_CHOICES,
+        initial="letters",
+        label=_("Naming style"),
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    capacity = forms.IntegerField(
+        required=False,
+        min_value=1,
+        label=_("Capacity per sub-class"),
+        help_text=_("Optional. Leave blank for no limit."),
+        widget=forms.NumberInput(
+            attrs={"class": "form-control", "min": 1, "placeholder": _("Optional")}
+        ),
+    )
+
+
+class StudentTransferForm(forms.Form):
+    """Move a learner to a different sub-class, optionally in another class."""
+
+    to_level = forms.ChoiceField(
+        choices=LEVEL,
+        label=_("New class / level"),
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    to_sub_class = forms.ModelChoiceField(
+        queryset=SubClass.objects.none(),
+        label=_("New sub-class / arm"),
+        widget=SubClassSelect(attrs={"class": "form-select"}),
+    )
+    note = forms.CharField(
+        required=False,
+        label=_("Reason / note"),
+        widget=forms.Textarea(
+            attrs={
+                "class": "form-control",
+                "rows": 2,
+                "placeholder": _("Optional note for the transfer history"),
+            }
+        ),
+    )
+
+    def __init__(self, *args, school=None, student=None, **kwargs):
+        self.school = school
+        self.student = student
+        super().__init__(*args, **kwargs)
+
+        queryset = SubClass.objects.none()
+        if school is not None:
+            queryset = SubClass.objects.filter(
+                school=school, is_active=True
+            ).order_by("level", "display_order", "name")
+        self.fields["to_sub_class"].queryset = queryset
+
+        if student is not None and not self.is_bound:
+            self.fields["to_level"].initial = student.level
+            self.fields["to_sub_class"].initial = student.sub_class_id
+
+    def clean(self):
+        cleaned = super().clean()
+        level = cleaned.get("to_level")
+        sub_class = cleaned.get("to_sub_class")
+
+        if sub_class:
+            if level and sub_class.level != level:
+                self.add_error(
+                    "to_sub_class",
+                    _("The selected sub-class does not belong to the chosen class."),
+                )
+            if self.school and sub_class.school_id != self.school.pk:
+                self.add_error(
+                    "to_sub_class",
+                    _("The selected sub-class does not belong to this school."),
+                )
+            if (
+                self.student
+                and level == self.student.level
+                and sub_class.pk == self.student.sub_class_id
+            ):
+                self.add_error(
+                    "to_sub_class",
+                    _("The learner is already in this class and sub-class."),
+                )
+        return cleaned
 
 
 class StaffPromotionForm(forms.Form):

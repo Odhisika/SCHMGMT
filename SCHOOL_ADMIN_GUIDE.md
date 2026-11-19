@@ -90,6 +90,7 @@ As a school admin, you can now:
 ### What School Admins CAN Do:
 ✅ Manage their school completely
 ✅ Create students, teachers, courses
+✅ Create additional school administrators for their own school
 ✅ View only their school's data
 ✅ Full administrative access to school features
 ✅ Generate reports for their school

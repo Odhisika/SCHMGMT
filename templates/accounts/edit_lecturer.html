@@ -16,7 +16,6 @@
 
 <h4 class="fw-bold mb-3"><i class="fas fa-user-edit me-2"></i>{% trans 'Teacher Update Form' %}</h4>
 
-{% include 'snippets/messages.html' %}
 
 <form action="" method="POST" enctype="multipart/form-data">{% csrf_token %}
     {% include 'accounts/snippets/staff_ges_form.html' %}

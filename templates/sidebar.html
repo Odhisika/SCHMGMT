@@ -178,6 +178,9 @@
 				</li>
 				{% endif %}
 				{% if request.user.is_superuser or request.user.is_school_admin %}
+				<li class="{% if '/accounts/school-admins/' in request.path %}active{% endif %}">
+					<a href="{% url 'school_admin_list' %}"><i class="fas fa-user-shield"></i>{% trans 'School Administrators' %}</a>
+				</li>
 				<li class="{% if request.path == lec %}active{% endif %}">
 					<a href="{% url 'lecturer_list' %}"><i class="fas fa-chalkboard-teacher"></i>{% trans 'Teachers' %}</a>
 				</li>
@@ -235,12 +238,24 @@
 		});
 	}
 
-	// Toggle collapse groups
+	// Toggle collapse groups (only one group can be open at a time)
+	let sidebarUserToggled = false;
 	function toggleMenuGroup(header) {
-	    header.classList.toggle("expanded");
+	    sidebarUserToggled = true;
+	    const shouldExpand = !header.classList.contains("expanded");
+
+	    // Close every other group so the sidebar doesn't fill up with nested items
+	    document.querySelectorAll('#side-nav .menu-group-header').forEach(other => {
+	        if (other !== header) {
+	            other.classList.remove("expanded");
+	            sessionStorage.removeItem(`sidebar_group_${other.getAttribute("data-group")}`);
+	        }
+	    });
+
+	    header.classList.toggle("expanded", shouldExpand);
 
 	    const groupName = header.getAttribute("data-group");
-	    if (header.classList.contains("expanded")) {
+	    if (shouldExpand) {
 	        sessionStorage.setItem(`sidebar_group_${groupName}`, "open");
 	    } else {
 	        sessionStorage.removeItem(`sidebar_group_${groupName}`);
@@ -284,27 +299,42 @@
 
 		// 2. Restore Sidebar State (scroll + expanded groups)
 		function restoreSidebarState() {
+			// Don't override a group the user has just opened/collapsed
+			if (sidebarUserToggled) return;
+
 			const activeItem = markActiveItem();
-
-			// Restore previously expanded states from sessionStorage
 			const headers = sidebar.querySelectorAll(".menu-group-header");
-			headers.forEach(header => {
-				const groupName = header.getAttribute("data-group");
-				if (sessionStorage.getItem(`sidebar_group_${groupName}`) === "open") {
-					header.classList.add("expanded");
-				}
-			});
 
-			// Ensure the group containing the active item is expanded
+			// Pick a single group to open: the current page's group takes priority,
+			// otherwise use the last group saved in sessionStorage.
+			let groupToOpen = null;
 			if (activeItem) {
 				const parentGroup = activeItem.closest(".menu-group-items");
 				if (parentGroup) {
 					const header = parentGroup.previousElementSibling;
 					if (header && header.classList.contains("menu-group-header")) {
-						header.classList.add("expanded");
+						groupToOpen = header;
 					}
 				}
 			}
+			if (!groupToOpen) {
+				headers.forEach(header => {
+					if (!groupToOpen && sessionStorage.getItem(`sidebar_group_${header.getAttribute("data-group")}`) === "open") {
+						groupToOpen = header;
+					}
+				});
+			}
+
+			// Collapse all other groups and clear their saved state
+			headers.forEach(header => {
+				const shouldOpen = header === groupToOpen;
+				header.classList.toggle("expanded", shouldOpen);
+				if (shouldOpen) {
+					sessionStorage.setItem(`sidebar_group_${header.getAttribute("data-group")}`, "open");
+				} else {
+					sessionStorage.removeItem(`sidebar_group_${header.getAttribute("data-group")}`);
+				}
+			});
 
 			const savedPos = sessionStorage.getItem(key);
 			if (savedPos && parseInt(savedPos) > 0) {

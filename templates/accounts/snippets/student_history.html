@@ -127,6 +127,34 @@
       <p class="text-muted small">{% trans 'No academic records found for the selected filters.' %}</p>
     {% endif %}
 
+    <h6 class="fw-bold mt-4 mb-2"><i class="fas fa-right-left me-2 text-primary"></i>{% trans 'Class & Sub-class Transfers' %}</h6>
+    {% if history_class_transfers %}
+      {% if history_transfer_chain %}
+      <div class="alert alert-light border small mb-3">
+        <span class="text-muted">{% trans 'Transfer history' %}:</span>
+        <span class="fw-semibold">{{ history_transfer_chain }}</span>
+      </div>
+      {% endif %}
+      <div class="table-responsive mb-3">
+        <table class="table table-sm table-bordered align-middle">
+          <thead class="table-light"><tr><th>{% trans 'Date' %}</th><th>{% trans 'From' %}</th><th>{% trans 'To' %}</th><th>{% trans 'Transferred by' %}</th><th>{% trans 'Note' %}</th></tr></thead>
+          <tbody>
+            {% for transfer in history_class_transfers %}
+              <tr>
+                <td>{{ transfer.created_at|date:"M d, Y H:i" }}</td>
+                <td>{{ transfer.from_label }}</td>
+                <td>{{ transfer.to_label }}</td>
+                <td class="small">{{ transfer.transferred_by.get_full_name|default:transfer.transferred_by.username|default:"—" }}</td>
+                <td class="small">{{ transfer.note|default:"—" }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="text-muted small">{% trans 'No class or sub-class transfers recorded.' %}</p>
+    {% endif %}
+
     <h6 class="fw-bold mt-4 mb-2"><i class="fas fa-route me-2 text-primary"></i>{% trans 'Promotion & Completion Decisions' %}</h6>
     {% if history_decisions %}
       <div class="table-responsive mb-3">

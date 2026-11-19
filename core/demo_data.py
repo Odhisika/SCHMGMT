@@ -24,6 +24,7 @@ from attendance.models import Attendance as AttendanceRecord
 from attendance.models import AttendanceSession as AttendanceSessionModel
 from attendance.models import AttendanceSummary
 from core.models import House, NewsAndEvents, Term, TermWeek
+from core.utils import get_week_date_range
 from course.models import (
     Course,
     CourseAllocation,
@@ -357,9 +358,12 @@ def build_demo_data(
             else:
                 activity = "normal_lesson"
                 title = ""
+            week_start, week_end = get_week_date_range(term, week)
             TermWeek.objects.create(
                 term=term,
                 week_number=week,
+                start_date=week_start,
+                end_date=min(week_end, end),
                 activity_type=activity,
                 title=title,
                 description=f"Week {week} activities",

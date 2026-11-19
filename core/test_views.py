@@ -85,6 +85,67 @@ class HomeViewTests(DemoDataTestCase):
         self.assertEqual(response.context["term_weeks"].count(), 14)
         self.assertIsNotNone(response.context["current_week"])
 
+    def test_current_week_advances_on_monday_boundaries(self):
+        self.client.force_login(self.admin)
+        today = timezone.localdate()
+        this_monday = today - timedelta(days=today.weekday())
+        # The term starts on the Thursday of the previous calendar week, so
+        # today falls in week 2 when weeks are counted Monday to Friday.
+        self.current_term.start_date = this_monday - timedelta(days=4)
+        self.current_term.end_date = today + timedelta(days=30)
+        self.current_term.save()
+        self.current_term.weeks.all().delete()
+        for number in range(1, 4):
+            TermWeek.objects.create(term=self.current_term, week_number=number)
+
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.context["current_week"].week_number, 2)
+        self.assertEqual(
+            (response.context["week_start"], response.context["week_end"]),
+            (this_monday, this_monday + timedelta(days=4)),
+        )
+        self.assertContains(response, "Week 2")
+
+    def test_configured_activity_dates_choose_the_current_week(self):
+        self.client.force_login(self.admin)
+        today = timezone.localdate()
+        this_monday = today - timedelta(days=today.weekday())
+        self.current_term.start_date = this_monday - timedelta(days=7)
+        self.current_term.end_date = today + timedelta(days=30)
+        self.current_term.save()
+        self.current_term.weeks.all().delete()
+        TermWeek.objects.create(
+            term=self.current_term,
+            week_number=1,
+            start_date=this_monday,
+            end_date=this_monday + timedelta(days=4),
+        )
+        TermWeek.objects.create(
+            term=self.current_term,
+            week_number=2,
+            start_date=this_monday + timedelta(days=7),
+            end_date=this_monday + timedelta(days=11),
+        )
+
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.context["current_week"].week_number, 1)
+
+    def test_current_week_does_not_fall_back_to_week_one(self):
+        self.client.force_login(self.admin)
+        today = timezone.localdate()
+        self.current_term.start_date = today - timedelta(days=60)
+        self.current_term.end_date = today - timedelta(days=1)
+        self.current_term.save()
+        self.current_term.weeks.all().delete()
+        TermWeek.objects.create(term=self.current_term, week_number=1)
+        TermWeek.objects.create(term=self.current_term, week_number=2)
+
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.context["current_week"].week_number, 2)
+
 
 class PostDetailTests(DemoDataTestCase):
     def test_detail_page_shows_the_full_announcement(self):
@@ -284,6 +345,16 @@ class TermWeekViewTests(DemoDataTestCase):
         self.assertTrue(
             all(week.activity_type == "normal_lesson" for week in self.term.weeks.all())
         )
+
+    def test_initialize_generates_monday_to_friday_weeks(self):
+        self.client.get(reverse("term_week_init", args=[self.term.pk]))
+
+        first_week = self.term.weeks.get(week_number=1)
+        second_week = self.term.weeks.get(week_number=2)
+        self.assertEqual(first_week.start_date.weekday(), 0)
+        self.assertEqual(first_week.end_date.weekday(), 4)
+        self.assertEqual((first_week.end_date - first_week.start_date).days, 4)
+        self.assertEqual((second_week.start_date - first_week.start_date).days, 7)
 
     def test_initialize_is_refused_when_weeks_already_exist(self):
         TermWeek.objects.create(term=self.term, week_number=1)

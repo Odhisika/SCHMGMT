@@ -67,10 +67,13 @@
                     <div class="col-md-6">{{ form.level|as_crispy_field }}</div>
                 </div>
                 <div class="row">
+                    {% if form.sub_class %}
+                        <div class="col-md-6">{{ form.sub_class|as_crispy_field }}</div>
+                    {% endif %}
                     <div class="col-md-6">{{ form.program|as_crispy_field }}</div>
-                    <div class="col-md-6">{{ form.house|as_crispy_field }}</div>
                 </div>
                 <div class="row">
+                    <div class="col-md-6">{{ form.house|as_crispy_field }}</div>
                     <div class="col-md-6">{{ form.boarding_status|as_crispy_field }}</div>
                 </div>
                 {{ form.previous_school|as_crispy_field }}
@@ -182,16 +185,54 @@
 
         if (selectedIsHidden) {
             levelSelect.value = firstVisible ? firstVisible.value : "";
+            filterSubClassesByLevel();
+        }
+    }
+
+    // Keep the sub-class list in sync with the chosen class/level.
+    function filterSubClassesByLevel() {
+        var levelSelect = document.getElementById("id_level");
+        var subClassSelect = document.getElementById("id_sub_class");
+        if (!levelSelect || !subClassSelect) {
+            return;
+        }
+
+        var level = levelSelect.value;
+        var visibleOptions = [];
+
+        Array.prototype.forEach.call(subClassSelect.options, function (option) {
+            if (!option.value) {
+                return;
+            }
+            var optionLevel = option.getAttribute("data-level");
+            var visible = !level || !optionLevel || optionLevel === level;
+            option.hidden = !visible;
+            option.disabled = !visible;
+            option.style.display = visible ? "" : "none";
+            if (visible) {
+                visibleOptions.push(option);
+            }
+        });
+
+        if (subClassSelect.selectedOptions.length) {
+            var selected = subClassSelect.selectedOptions[0];
+            if (selected.value && (selected.hidden || selected.disabled)) {
+                subClassSelect.value = visibleOptions.length ? visibleOptions[0].value : "";
+            }
         }
     }
 
     function initLevelFilter() {
         var divisionSelect = document.getElementById("id_division");
-        if (!divisionSelect) {
-            return;
+        var levelSelect = document.getElementById("id_level");
+        if (divisionSelect) {
+            divisionSelect.addEventListener("change", filterLevelsByDivision);
         }
-        divisionSelect.addEventListener("change", filterLevelsByDivision);
+        if (levelSelect) {
+            levelSelect.addEventListener("change", filterSubClassesByLevel);
+        }
         filterLevelsByDivision();
+        filterSubClassesByLevel();
     }
 
     if (document.readyState === "loading") {

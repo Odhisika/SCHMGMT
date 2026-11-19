@@ -14,11 +14,19 @@
 <div class="row mb-4">
     <div class="col-md-8">
         <h2 class="text-primary"><i class="fas fa-chalkboard"></i> {{ level_name }} {% trans 'Workspace' %}</h2>
-        <p class="text-muted">{% trans 'Managing' %} {{ students.count }} {% trans 'students' %}</p>
+        <p class="text-muted">
+            {% if selected_sub_class %}
+                {{ selected_sub_class.roster_count }} {% trans 'students in' %} {{ level_name }} {{ selected_sub_class.name }}
+            {% elif roster_filter == 'unassigned' %}
+                {{ unassigned_count }} {% trans 'unassigned students in' %} {{ level_name }}
+            {% else %}
+                {% trans 'Managing' %} {{ total_students }} {% trans 'students' %}
+            {% endif %}
+        </p>
     </div>
     <div class="col-md-4 text-end">
         {% if request.user.is_superuser or request.user.is_school_admin %}
-        <a href="{% url 'add_student' %}?level={{ level_code }}" class="btn btn-success shadow-sm">
+        <a href="{% url 'add_student' %}?level={{ level_code|urlencode }}{% if selected_sub_class %}&sub_class={{ selected_sub_class.pk }}{% endif %}" class="btn btn-success shadow-sm">
             <i class="fas fa-user-plus"></i> {% trans 'Add New Student' %}
         </a>
         {% endif %}
@@ -34,8 +42,14 @@
 <!-- Tabs -->
 <ul class="nav nav-tabs mb-4" id="classTabs" role="tablist">
     <li class="nav-item" role="presentation">
-        <button class="nav-link active" id="roster-tab" data-bs-toggle="tab" data-bs-target="#roster" type="button" role="tab" aria-controls="roster" aria-selected="true">
+        <button class="nav-link {% if active_tab != 'subclasses' %}active{% endif %}" id="roster-tab" data-bs-toggle="tab" data-bs-target="#roster" type="button" role="tab" aria-controls="roster" aria-selected="{% if active_tab != 'subclasses' %}true{% else %}false{% endif %}">
             <i class="fas fa-list"></i> {% trans 'Student Roster' %}
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link {% if active_tab == 'subclasses' %}active{% endif %}" id="subclasses-tab" data-bs-toggle="tab" data-bs-target="#subclasses" type="button" role="tab" aria-controls="subclasses" aria-selected="{% if active_tab == 'subclasses' %}true{% else %}false{% endif %}">
+            <i class="fas fa-layer-group"></i> {% trans 'Sub-classes' %}
+            {% if sub_classes %}<span class="badge bg-secondary ms-1">{{ sub_classes|length }}</span>{% endif %}
         </button>
     </li>
     <li class="nav-item" role="presentation">
@@ -55,7 +69,26 @@
 <div class="tab-content" id="classTabsContent">
     
     <!-- Roster Tab -->
-    <div class="tab-pane fade show active" id="roster" role="tabpanel" aria-labelledby="roster-tab">
+    <div class="tab-pane fade {% if active_tab != 'subclasses' %}show active{% endif %}" id="roster" role="tabpanel" aria-labelledby="roster-tab">
+        {% if sub_classes %}
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+            <span class="text-muted small me-1">{% trans 'Filter:' %}</span>
+            <a href="{% url 'class_detail' level_code %}"
+               class="btn btn-sm {% if not roster_filter %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                {% trans 'All' %} ({{ total_students }})
+            </a>
+            {% for sub in sub_classes %}
+            <a href="{% url 'class_detail' level_code %}?sub_class={{ sub.pk }}"
+               class="btn btn-sm {% if selected_sub_class.pk == sub.pk %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                {{ sub.name }} ({{ sub.roster_count }})
+            </a>
+            {% endfor %}
+            <a href="{% url 'class_detail' level_code %}?sub_class=unassigned"
+               class="btn btn-sm {% if roster_filter == 'unassigned' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                {% trans 'Unassigned' %} ({{ unassigned_count }})
+            </a>
+        </div>
+        {% endif %}
         <div class="card shadow-sm border-0">
             <div class="card-body p-0">
                 <div class="table-responsive">
@@ -66,6 +99,7 @@
                                 <th>{% trans 'Photo' %}</th>
                                 <th>{% trans 'Full Name' %}</th>
                                 <th>{% trans 'ID Number' %}</th>
+                                <th>{% trans 'Sub-class' %}</th>
                                 <th>{% trans 'Program' %}</th>
                                 <th>{% trans 'Gender' %}</th>
                                 <th class="text-center">{% trans 'Actions' %}</th>
@@ -88,36 +122,60 @@
                                     <div class="fw-bold text-dark">{{ student.student.get_full_name }}</div>
                                 </td>
                                 <td><span class="badge bg-light text-muted fw-normal">{{ student.student.username }}</span></td>
+                                <td>
+                                    {% if student.sub_class %}
+                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle">{{ student.sub_class.name }}</span>
+                                    {% else %}
+                                    <span class="text-muted small">{% trans 'Unassigned' %}</span>
+                                    {% endif %}
+                                </td>
                                 <td>{{ student.program }}</td>
                                 <td>{{ student.student.get_gender_display }}</td>
                                 <td class="text-center">
-                                    <div class="btn-group">
-                                        <a href="{% url 'profile_single' student.student.id %}" class="btn btn-sm btn-outline-clean me-1" title="{% trans 'View Profile' %}">
-                                            <i class="fas fa-eye text-primary"></i>
-                                        </a>
-                                        {% if request.user.is_superuser or request.user.is_school_admin %}
-                                        <a href="{% url 'student_edit' student.student.id %}" class="btn btn-sm btn-outline-clean me-1" title="{% trans 'Edit' %}">
-                                            <i class="fas fa-edit text-warning"></i>
-                                        </a>
-                                        <a href="{% url 'student_delete' student.student.id %}" class="btn btn-sm btn-outline-clean" title="{% trans 'Delete' %}"
-                                           data-confirm="{% blocktrans with name=student.student.get_full_name|default:student.student.username %}Delete {{ name }}? This student account and all related records will be permanently deleted. This cannot be undone.{% endblocktrans %}"
-                                           data-confirm-title="{% trans 'Delete student?' %}"
-                                           data-confirm-ok="{% trans 'Delete student' %}"
-                                           data-confirm-variant="danger" data-confirm-icon="trash">
-                                            <i class="fas fa-trash text-danger"></i>
-                                        </a>
-                                        {% endif %}
+                                    <div class="dropdown d-inline-block">
+                                        <button class="btn btn-sm btn-light border" type="button" data-bs-toggle="dropdown" data-bs-boundary="window" data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false" title="{% trans 'Actions' %}">
+                                            <i class="fas fa-ellipsis-vertical"></i>
+                                        </button>
+                                        <ul class="dropdown-menu shadow-sm">
+                                            <li>
+                                                <a class="dropdown-item" href="{% url 'profile_single' student.student.id %}">
+                                                    <i class="fas fa-eye me-2 text-primary"></i>{% trans 'View profile' %}
+                                                </a>
+                                            </li>
+                                            {% if request.user.is_superuser or request.user.is_school_admin %}
+                                            <li>
+                                                <a class="dropdown-item" href="{% url 'student_edit' student.student.id %}">
+                                                    <i class="fas fa-pen me-2 text-warning"></i>{% trans 'Edit student' %}
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a class="dropdown-item" href="{% url 'student_transfer' student.pk %}">
+                                                    <i class="fas fa-right-left me-2 text-info"></i>{% trans 'Transfer sub-class' %}
+                                                </a>
+                                            </li>
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li>
+                                                <a class="dropdown-item text-danger" href="{% url 'student_delete' student.pk %}"
+                                                   data-confirm="{% blocktrans with name=student.student.get_full_name|default:student.student.username %}Delete {{ name }}? This student account and all related records will be permanently deleted. This cannot be undone.{% endblocktrans %}"
+                                                   data-confirm-title="{% trans 'Delete student?' %}"
+                                                   data-confirm-ok="{% trans 'Delete student' %}"
+                                                   data-confirm-variant="danger" data-confirm-icon="trash">
+                                                    <i class="fas fa-trash me-2"></i>{% trans 'Delete student' %}
+                                                </a>
+                                            </li>
+                                            {% endif %}
+                                        </ul>
                                     </div>
                                 </td>
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="7" class="text-center py-5">
+                                <td colspan="8" class="text-center py-5">
                                     <div class="empty-state">
                                         <div class="empty-state-icon"><i class="fas fa-users-slash"></i></div>
                                         <h5 class="text-muted">{% trans 'No students found in' %} {{ level_name }}</h5>
                                         {% if request.user.is_superuser or request.user.is_school_admin %}
-                                        <a href="{% url 'add_student' %}?level={{ level_code }}" class="btn-outline-clean mt-2 d-inline-block">{% trans 'Register First Student' %}</a>
+                                        <a href="{% url 'add_student' %}?level={{ level_code|urlencode }}{% if selected_sub_class %}&sub_class={{ selected_sub_class.pk }}{% endif %}" class="btn-outline-clean mt-2 d-inline-block">{% trans 'Register First Student' %}</a>
                                         {% endif %}
                                     </div>
                                 </td>
@@ -127,6 +185,192 @@
                     </table>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Sub-classes Tab -->
+    <div class="tab-pane fade {% if active_tab == 'subclasses' %}show active{% endif %}" id="subclasses" role="tabpanel" aria-labelledby="subclasses-tab">
+        <div class="row g-4">
+            <div class="col-xl-7">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-layer-group me-2 text-primary"></i>{% trans 'Sub-classes in' %} {{ level_name }}</h5>
+                        <span class="badge bg-light text-dark">{{ sub_classes|length }} {% trans 'total' %}</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th class="ps-4">{% trans 'Sub-class' %}</th>
+                                        <th>{% trans 'Students' %}</th>
+                                        <th>{% trans 'Capacity' %}</th>
+                                        <th>{% trans 'Class teacher' %}</th>
+                                        <th class="text-end pe-4">{% trans 'Actions' %}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for sub in sub_classes %}
+                                    <tr>
+                                        <td class="ps-4">
+                                            <a href="{% url 'class_detail' level_code %}?sub_class={{ sub.pk }}" class="text-decoration-none">
+                                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle fs-6">{{ sub.name }}</span>
+                                            </a>
+                                        </td>
+                                        <td>
+                                            <a href="{% url 'class_detail' level_code %}?sub_class={{ sub.pk }}" class="text-decoration-none text-dark">
+                                                {{ sub.roster_count }}
+                                            </a>
+                                        </td>
+                                        <td>
+                                            {% if sub.capacity %}
+                                                <span class="{% if sub.roster_count >= sub.capacity %}text-danger fw-semibold{% endif %}">
+                                                    {{ sub.roster_count }} / {{ sub.capacity }}
+                                                </span>
+                                                {% if sub.roster_count >= sub.capacity %}<i class="fas fa-triangle-exclamation text-danger ms-1" title="{% trans 'At capacity' %}"></i>{% endif %}
+                                            {% else %}
+                                                <span class="text-muted">{% trans 'No limit' %}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if sub.class_teacher %}
+                                                {{ sub.class_teacher.get_full_name|default:sub.class_teacher.username }}
+                                            {% else %}
+                                                <span class="text-muted small">{% trans 'Not assigned' %}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-end pe-4">
+                                            {% if request.user.is_superuser or request.user.is_school_admin %}
+                                            <div class="d-flex justify-content-end gap-2">
+                                                <details class="text-start">
+                                                    <summary class="btn btn-sm btn-outline-secondary" style="list-style: none;">
+                                                        <i class="fas fa-pen"></i>
+                                                    </summary>
+                                                    <form action="{% url 'sub_class_edit' sub.pk %}" method="post" class="mt-2 p-2 border rounded bg-light" style="min-width: 220px;">
+                                                        {% csrf_token %}
+                                                        <label class="form-label small mb-1">{% trans 'Name' %}</label>
+                                                        <input type="text" name="name" value="{{ sub.name }}" maxlength="20" required class="form-control form-control-sm mb-2">
+                                                        <label class="form-label small mb-1">{% trans 'Capacity' %}</label>
+                                                        <input type="number" name="capacity" value="{{ sub.capacity|default_if_none:'' }}" min="1" class="form-control form-control-sm mb-2" placeholder="{% trans 'No limit' %}">
+                                                        <label class="form-label small mb-1">{% trans 'Class teacher' %}</label>
+                                                        <select name="class_teacher" class="form-select form-select-sm mb-2">
+                                                            <option value="">{% trans 'Not assigned' %}</option>
+                                                            {% for teacher in level_teachers %}
+                                                            <option value="{{ teacher.pk }}" {% if sub.class_teacher_id == teacher.pk %}selected{% endif %}>{{ teacher.get_full_name|default:teacher.username }}</option>
+                                                            {% endfor %}
+                                                        </select>
+                                                        <button type="submit" class="btn btn-sm btn-primary w-100">{% trans 'Save' %}</button>
+                                                    </form>
+                                                </details>
+                                                <form action="{% url 'sub_class_delete' sub.pk %}" method="post" class="d-inline">
+                                                    {% csrf_token %}
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger"
+                                                            data-confirm="{% blocktrans with name=sub.name count=sub.roster_count %}Delete sub-class {{ name }}? Its {{ count }} student(s) will become unassigned.{% endblocktrans %}"
+                                                            data-confirm-title="{% trans 'Delete sub-class?' %}"
+                                                            data-confirm-ok="{% trans 'Delete' %}"
+                                                            data-confirm-variant="danger"
+                                                            data-confirm-icon="trash">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                            {% else %}
+                                            <span class="text-muted small">—</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="5" class="text-center py-5">
+                                            <div class="empty-state">
+                                                <div class="empty-state-icon"><i class="fas fa-layer-group"></i></div>
+                                                <h5 class="text-muted">{% trans 'No sub-classes yet for' %} {{ level_name }}</h5>
+                                                <p class="text-muted mb-0">{% trans 'Use the forms on the right to add one or create several at once.' %}</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% if request.user.is_superuser or request.user.is_school_admin %}
+            <div class="col-xl-5">
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-header bg-white py-3">
+                        <h6 class="mb-0"><i class="fas fa-plus me-2 text-success"></i>{% trans 'Add a single sub-class' %}</h6>
+                    </div>
+                    <div class="card-body">
+                        <form action="{% url 'sub_class_create' level_code %}" method="post">
+                            {% csrf_token %}
+                            <div class="row g-2">
+                                <div class="col-sm-5">
+                                    <label class="form-label small">{% trans 'Name' %}</label>
+                                    <input type="text" name="name" required maxlength="20" class="form-control" placeholder="{% trans 'e.g. A' %}">
+                                </div>
+                                <div class="col-sm-7">
+                                    <label class="form-label small">{% trans 'Capacity (optional)' %}</label>
+                                    <input type="number" name="capacity" min="1" class="form-control" placeholder="{% trans 'No limit' %}">
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label small">{% trans 'Class teacher (optional)' %}</label>
+                                    <select name="class_teacher" class="form-select">
+                                        <option value="">{% trans 'Not assigned' %}</option>
+                                        {% for teacher in level_teachers %}
+                                        <option value="{{ teacher.pk }}">{{ teacher.get_full_name|default:teacher.username }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-12">
+                                    <button type="submit" class="btn btn-success w-100">
+                                        <i class="fas fa-plus me-1"></i>{% trans 'Add sub-class' %}
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-white py-3">
+                        <h6 class="mb-0"><i class="fas fa-wand-magic-sparkles me-2 text-primary"></i>{% trans 'Create several sub-classes' %}</h6>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small">
+                            {% trans 'The next available names are generated automatically, so existing sub-classes are never overwritten.' %}
+                        </p>
+                        <form action="{% url 'sub_class_bulk_create' level_code %}" method="post">
+                            {% csrf_token %}
+                            <div class="row g-2">
+                                <div class="col-sm-4">
+                                    <label class="form-label small">{% trans 'How many?' %}</label>
+                                    <input type="number" name="count" value="3" min="1" max="100" required class="form-control">
+                                </div>
+                                <div class="col-sm-8">
+                                    <label class="form-label small">{% trans 'Naming style' %}</label>
+                                    <select name="scheme" class="form-select">
+                                        <option value="letters">{% trans 'Letters (A, B, C...)' %}</option>
+                                        <option value="numbers">{% trans 'Numbers (1, 2, 3...)' %}</option>
+                                    </select>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label small">{% trans 'Capacity per sub-class (optional)' %}</label>
+                                    <input type="number" name="capacity" min="1" class="form-control" placeholder="{% trans 'No limit' %}">
+                                </div>
+                                <div class="col-12">
+                                    <button type="submit" class="btn btn-primary w-100">
+                                        <i class="fas fa-layer-group me-1"></i>{% trans 'Create sub-classes' %}
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
 

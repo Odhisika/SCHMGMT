@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import User, Student, Parent
+from .models import User, Student, SubClass, ClassTransfer, Parent
 
 
 class UserAdmin(admin.ModelAdmin):
@@ -30,11 +30,21 @@ class UserAdmin(admin.ModelAdmin):
 
 
 admin.site.register(User, UserAdmin)
+
+
+@admin.register(SubClass)
+class SubClassAdmin(admin.ModelAdmin):
+    list_display = ['level', 'name', 'school', 'capacity', 'class_teacher', 'is_active']
+    list_filter = ['school', 'level', 'is_active']
+    search_fields = ['name', 'level', 'class_teacher__first_name', 'class_teacher__last_name']
+    ordering = ['school', 'level', 'display_order', 'name']
+
+
 @admin.register(Student)
 class StudentAdmin(admin.ModelAdmin):
-    list_display = ['student', 'level', 'program', 'status', 'exit_session', 'school']
+    list_display = ['student', 'level', 'sub_class', 'program', 'status', 'exit_session', 'school']
     search_fields = ['student__username', 'student__first_name', 'student__last_name']
-    list_filter = ['status', 'level', 'program', 'student__school']
+    list_filter = ['status', 'level', 'sub_class', 'program', 'student__school']
     actions = ['sync_selected_students']
 
     def school(self, obj):
@@ -88,6 +98,21 @@ class StudentAdmin(admin.ModelAdmin):
         
         self.message_user(request, f"Successfully synchronized {success_count} students.", messages.SUCCESS)
     sync_selected_students.short_description = "Sync Enrollments, Fees & Attendance"
+
+
+@admin.register(ClassTransfer)
+class ClassTransferAdmin(admin.ModelAdmin):
+    list_display = [
+        'student', 'from_level', 'from_sub_class_name',
+        'to_level', 'to_sub_class_name', 'transferred_by', 'created_at',
+    ]
+    list_filter = ['from_level', 'to_level', 'created_at']
+    search_fields = [
+        'student__student__username', 'student__student__first_name',
+        'student__student__last_name',
+    ]
+    readonly_fields = ['created_at']
+    ordering = ['-created_at']
 
 
 admin.site.register(Parent)

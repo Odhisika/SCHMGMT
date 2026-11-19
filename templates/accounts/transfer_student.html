@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}{{ title }} | {{ block.super }}{% endblock title %}
+
+{% block content %}
+<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">{% trans 'Home' %}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'class_list' %}">{% trans 'Classes' %}</a></li>
+        {% if student.level %}
+        <li class="breadcrumb-item"><a href="{% url 'class_detail' student.level %}">{{ student.level }}</a></li>
+        {% endif %}
+        <li class="breadcrumb-item active" aria-current="page">{% trans 'Transfer' %}</li>
+    </ol>
+</nav>
+
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-header bg-white border-0 py-3">
+                <h5 class="mb-0 fw-bold"><i class="fas fa-right-left text-primary me-2"></i>{% trans 'Transfer student' %}</h5>
+                <p class="text-muted small mb-0 mt-1">
+                    {{ student.student.get_full_name|default:student.student.username }}
+                    <span class="text-muted">({{ student.student.username }})</span>
+                </p>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-light border d-flex align-items-center gap-2 mb-4">
+                    <i class="fas fa-location-dot text-primary"></i>
+                    <span>{% trans 'Current class' %}: <strong>{{ current_class }}</strong></span>
+                </div>
+
+                <form method="post" novalidate>
+                    {% csrf_token %}
+
+                    {% if form.non_field_errors %}
+                    <div class="alert alert-danger py-2">{{ form.non_field_errors }}</div>
+                    {% endif %}
+
+                    <div class="mb-3">
+                        <label for="{{ form.to_level.id_for_label }}" class="form-label">{% trans 'New class / level' %}</label>
+                        {{ form.to_level }}
+                        {% for error in form.to_level.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="{{ form.to_sub_class.id_for_label }}" class="form-label">{% trans 'New sub-class / arm' %}</label>
+                        {{ form.to_sub_class }}
+                        <div class="form-text">{% trans 'Only sub-classes that belong to the selected class are shown.' %}</div>
+                        <div id="noSubClassWarning" class="alert alert-warning small mt-2 d-none">
+                            <i class="fas fa-triangle-exclamation me-1"></i>
+                            {% trans 'This class has no sub-classes yet. Create one from the class Sub-classes tab first.' %}
+                        </div>
+                        {% for error in form.to_sub_class.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="{{ form.note.id_for_label }}" class="form-label">{% trans 'Reason / note' %} <span class="text-muted small">({% trans 'optional' %})</span></label>
+                        {{ form.note }}
+                        {% for error in form.note.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                    </div>
+
+                    <div class="alert alert-info small">
+                        <i class="fas fa-circle-info me-1"></i>
+                        {% trans 'This move is recorded in the student profile so you can see the full transfer history.' %}
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-right-left me-1"></i>{% trans 'Transfer student' %}
+                        </button>
+                        <a href="{% url 'class_list' %}" class="btn btn-light">{% trans 'Cancel' %}</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function () {
+        var levelSelect = document.getElementById("id_to_level");
+        var subClassSelect = document.getElementById("id_to_sub_class");
+        if (!levelSelect || !subClassSelect) {
+            return;
+        }
+
+        function filterSubClasses() {
+            var level = levelSelect.value;
+            var firstVisible = null;
+            var selectedVisible = false;
+
+            Array.prototype.forEach.call(subClassSelect.options, function (option) {
+                if (!option.value) {
+                    return;
+                }
+                var optionLevel = option.getAttribute("data-level");
+                var visible = !level || !optionLevel || optionLevel === level;
+                option.hidden = !visible;
+                option.disabled = !visible;
+                option.style.display = visible ? "" : "none";
+                if (visible) {
+                    if (!firstVisible) {
+                        firstVisible = option;
+                    }
+                    if (option.selected) {
+                        selectedVisible = true;
+                    }
+                }
+            });
+
+            if (!selectedVisible) {
+                subClassSelect.value = firstVisible ? firstVisible.value : "";
+            }
+
+            var warning = document.getElementById("noSubClassWarning");
+            if (warning) {
+                warning.classList.toggle("d-none", firstVisible !== null);
+            }
+        }
+
+        levelSelect.addEventListener("change", filterSubClasses);
+        filterSubClasses();
+    })();
+</script>
+{% endblock content %}

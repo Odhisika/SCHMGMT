@@ -30,7 +30,6 @@
 <h4 class="title-1">{% trans 'Students result form' %} | {{ course|truncatechars:15 }}</h4>
 <p>{{ course.summary }}</p>
 
-{% include 'snippets/messages.html' %}
 
 <form action="" method="POST">
     {% csrf_token %}

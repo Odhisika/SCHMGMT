@@ -4,79 +4,236 @@
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/clean-ui.css' %}">
 <style>
-    /* Dashboard specific styles matching the requested design */
-    .dashboard-container {
-        padding: 20px 0;
-    }
-    
-    /* Action bar refined style */
-    .action-bar {
-        background: white;
-        padding: 24px;
-        border-radius: 12px;
-        margin-bottom: 32px;
+    /* ===== Payment dashboard layout ===== */
+    .pay-dashboard { padding: 4px 0 24px; }
+
+    .pay-page-header {
         display: flex;
+        flex-wrap: wrap;
+        align-items: center;
         justify-content: space-between;
-        align-items: center;
-        /* Matches bg-white shadow-sm border-0 rounded-3 look roughly, but keeping customized for bar */
-        box-shadow: 0 .125rem .25rem rgba(0,0,0,.075);
-        border: 0;
+        gap: 16px;
+        background: #fff;
+        border: 1px solid #eef0f3;
+        border-radius: 16px;
+        padding: 20px 24px;
+        margin-bottom: 26px;
+        box-shadow: 0 6px 18px rgba(26, 115, 232, .08);
     }
-    
-    .section-title {
-        font-size: 18px;
-        font-weight: 600;
-        color: #202124;
-        margin-bottom: 16px;
-    }
-
-    /* Modern 3D Buttons Styling */
-    .btn-3d {
-        position: relative;
-        display: inline-flex;
-        align-items: center;
-        gap: 10px;
-        padding: 10px 20px;
-        border-radius: 12px;
-        font-weight: 600;
-        text-decoration: none;
-        transition: all 0.2s ease;
-        border: none;
-        cursor: pointer;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
-        transform: translateY(0);
-    }
-    
-    .btn-3d:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 7px 14px rgba(0, 0, 0, 0.1), 0 3px 6px rgba(0, 0, 0, 0.08);
-    }
-    
-    .btn-3d:active {
-        transform: translateY(1px);
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-
-    .btn-3d i {
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
+    .pay-page-heading { display: flex; align-items: center; gap: 14px; }
+    .pay-page-icon {
+        width: 52px;
+        height: 52px;
+        border-radius: 14px;
         display: flex;
         align-items: center;
         justify-content: center;
-        background: rgba(255, 255, 255, 0.2);
-        font-size: 14px;
+        font-size: 22px;
+        color: #fff;
+        background: linear-gradient(135deg, #1a73e8, #4c9aff);
+        box-shadow: 0 6px 16px rgba(26, 115, 232, .28);
+    }
+    .pay-page-heading h2 { margin: 0; font-size: 21px; font-weight: 700; color: #202124; }
+    .pay-page-heading p { margin: 3px 0 0; font-size: 13px; color: #5f6368; }
+    .pay-page-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        background: #e8f0fe;
+        color: #1a73e8;
+        border-radius: 999px;
+        padding: 7px 14px;
+        font-size: 12px;
+        font-weight: 600;
     }
 
-    .btn-3d-primary { background-color: #1a73e8; color: white; }
-    .btn-3d-success { background-color: #34a853; color: white; }
-    .btn-3d-info { background-color: #00bcd4; color: white; }
-    .btn-3d-danger { background-color: #ea4335; color: white; }
-
-    .action-group {
+    .pay-section-head {
         display: flex;
         flex-wrap: wrap;
-        gap: 20px; /* Better spacing between buttons */
+        align-items: baseline;
+        gap: 10px;
+        margin-bottom: 14px;
+    }
+    .pay-section-head h3 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 700;
+        color: #202124;
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+    }
+    .pay-section-head h3 i { color: #1a73e8; font-size: 15px; }
+    .pay-section-head span { font-size: 13px; color: #80868b; }
+
+    /* ===== Quick action buttons (fully clickable) ===== */
+    .pay-actions {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
+        gap: 16px;
+    }
+    .pay-action {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        min-height: 132px;
+        padding: 18px;
+        border-radius: 14px;
+        overflow: hidden;
+        box-shadow: 0 6px 16px rgba(0, 0, 0, .12);
+        transition: transform .2s ease, box-shadow .2s ease;
+    }
+    .pay-action::after {
+        content: '';
+        position: absolute;
+        right: -30px;
+        top: -34px;
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, .12);
+    }
+    .pay-action,
+    .pay-action:hover,
+    .pay-action:focus,
+    .pay-action:active { color: #fff; text-decoration: none; }
+    .pay-action:hover { transform: translateY(-4px); box-shadow: 0 14px 26px rgba(0, 0, 0, .18); }
+    .pay-action:active { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0, 0, 0, .14); }
+    .pay-action:focus-visible { outline: 3px solid rgba(255, 255, 255, .85); outline-offset: 3px; }
+    .pay-action-icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 11px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, .2);
+        font-size: 17px;
+        margin-bottom: 14px;
+        position: relative;
+        z-index: 1;
+    }
+    .pay-action-label { font-size: 15px; font-weight: 700; line-height: 1.25; position: relative; z-index: 1; }
+    .pay-action-sub { font-size: 12px; opacity: .85; margin-top: 4px; position: relative; z-index: 1; }
+    .pay-action-arrow {
+        position: absolute;
+        right: 17px;
+        bottom: 17px;
+        font-size: 12px;
+        opacity: .85;
+        transition: transform .2s ease;
+    }
+    .pay-action:hover .pay-action-arrow { transform: translateX(4px); }
+    .pay-action--primary { background: linear-gradient(135deg, #1a73e8, #4c9aff); }
+    .pay-action--success { background: linear-gradient(135deg, #2e9e4f, #5cbf6b); }
+    .pay-action--info { background: linear-gradient(135deg, #0891b2, #22c1d6); }
+    .pay-action--danger { background: linear-gradient(135deg, #d93a2b, #f26a4b); }
+
+    /* ===== Visible separation from the divisions below ===== */
+    .pay-divider { display: flex; align-items: center; gap: 14px; margin: 30px 0 24px; }
+    .pay-divider::before,
+    .pay-divider::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, #dadce0, transparent);
+    }
+    .pay-divider span {
+        background: #fff;
+        border: 1px solid #e8eaed;
+        border-radius: 999px;
+        padding: 6px 18px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: .1em;
+        text-transform: uppercase;
+        color: #5f6368;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, .04);
+    }
+
+    /* ===== Division buttons: Nursery / Primary / JHS ===== */
+    .pay-divisions {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+        gap: 12px;
+    }
+    .pay-division {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 16px;
+        border-radius: 12px;
+        background: #fff;
+        border: 1.5px solid #e8eaed;
+        color: #3c4043;
+        font-size: 14px;
+        font-weight: 600;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, .04);
+        transition: all .2s ease;
+    }
+    .pay-division,
+    .pay-division:hover,
+    .pay-division:focus { text-decoration: none; }
+    .pay-division:hover {
+        border-color: #1a73e8;
+        color: #1a73e8;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 18px rgba(26, 115, 232, .13);
+    }
+    .pay-division.active {
+        background: #e8f0fe;
+        border-color: #1a73e8;
+        color: #1a73e8;
+        box-shadow: 0 4px 12px rgba(26, 115, 232, .14);
+    }
+    .pay-division:focus-visible { outline: 3px solid rgba(26, 115, 232, .35); outline-offset: 2px; }
+    .pay-division-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f1f3f4;
+        color: #5f6368;
+        font-size: 15px;
+        transition: all .2s ease;
+    }
+    .pay-division:hover .pay-division-icon,
+    .pay-division.active .pay-division-icon { background: #1a73e8; color: #fff; }
+    .pay-division-text { display: flex; flex-direction: column; line-height: 1.2; }
+    .pay-division-text small { font-size: 11px; font-weight: 500; color: #80868b; margin-top: 2px; }
+    .pay-division:hover .pay-division-text small,
+    .pay-division.active .pay-division-text small { color: #5f6368; }
+    .pay-division-arrow { margin-left: auto; font-size: 11px; opacity: .55; }
+
+    /* ===== Filter toolbar ===== */
+    .pay-filter-bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        background: #f8faff;
+        border: 1px solid #e8eaed;
+        border-radius: 12px;
+        padding: 16px 20px;
+        margin: 24px 0;
+    }
+    .pay-filter-info h5 { margin: 0; font-size: 15px; font-weight: 700; color: #202124; }
+    .pay-filter-info p { margin: 3px 0 0; font-size: 12px; color: #5f6368; }
+    .pay-filter-control { display: flex; align-items: center; gap: 10px; min-width: 230px; }
+    .pay-filter-control label { margin: 0; font-size: 12px; font-weight: 600; color: #5f6368; white-space: nowrap; }
+    .pay-filter-control .form-select { border-color: #dadce0; border-radius: 9px; font-size: 13px; }
+
+    .section-title { font-size: 18px; font-weight: 600; color: #202124; margin-bottom: 16px; }
+
+    @media (max-width: 576px) {
+        .pay-page-header { padding: 16px; }
+        .pay-action { min-height: 118px; }
+        .pay-filter-control { width: 100%; }
     }
 </style>
 {% endblock %}
@@ -91,68 +248,107 @@
     </ol>
 </nav>
 
-{% include 'snippets/messages.html' %}
 
-<div class="action-bar">
-    <div>
-        <h2 style="margin: 0; font-size: 22px; color: #202124;"><i class="fas fa-money-bill-wave" style="margin-right: 10px; color: #1a73e8;"></i>{% trans 'Payment Management' %}</h2>
-        <p style="margin: 4px 0 0; color: #5f6368; font-size: 14px;">{{ current_term }}</p>
-    </div>
-    <div class="action-group">
-        <a href="{% url 'fees:fee_list' %}" class="btn-3d btn-3d-primary">
-            <i class="fas fa-cog"></i> 
-            <span>{% trans 'Fee Structure' %}</span>
-        </a>
-        <a href="{% url 'fees:record_payment' %}" class="btn-3d btn-3d-success">
-            <i class="fas fa-plus"></i>
-            <span>{% trans 'Record Payment' %}</span>
-        </a>
-        <a href="{% url 'fees:bank_account_list' %}" class="btn-3d btn-3d-info">
-            <i class="fas fa-university"></i>
-            <span>{% trans 'Bank Accounts' %}</span>
-        </a>
-        <a href="{% url 'fees:defaulters_list' %}" class="btn-3d btn-3d-danger">
-            <i class="fas fa-user-times"></i>
-            <span>{% trans 'View Defaulters' %}</span>
-        </a>
-    </div>
-</div>
-
-<!-- Division Tabs -->
-<ul class="nav nav-pills mb-4" id="pills-tab" role="tablist">
-    {% for division_code, division_name in divisions %}
-    <li class="nav-item" role="presentation">
-        <a class="nav-link {% if current_division == division_code %}active{% endif %}" 
-           href="?division={{ division_code }}" role="tab">
-            {{ division_name }}
-        </a>
-    </li>
-    {% endfor %}
-</ul>
-
-<!-- Filter Toolbar -->
-<div class="card p-3 shadow-sm border-0 bg-light mb-4">
-    <form method="get" class="row align-items-center">
-        <input type="hidden" name="division" value="{{ current_division }}">
-        <div class="col-md-8">
-            <h5 class="mb-0">{% trans 'Term Statistics' %}: <strong>{{ current_term|default:"Not Set" }}</strong></h5>
-            <p class="text-muted mb-0 small">{% trans 'Showing data for' %} <strong>{{ current_division_name }}</strong></p>
-        </div>
-        <div class="col-md-4">
-            <div class="input-group">
-                <span class="input-group-text bg-white"><i class="fas fa-filter"></i></span>
-                <select name="level" class="form-select" onchange="this.form.submit()">
-                    <option value="">{% trans 'All Levels' %}</option>
-                    {% for code, name in division_levels %}
-                    <option value="{{ code }}" {% if selected_level == code %}selected{% endif %}>
-                        {{ name }}
-                    </option>
-                    {% endfor %}
-                </select>
+<div class="pay-dashboard">
+    <div class="pay-page-header">
+        <div class="pay-page-heading">
+            <div class="pay-page-icon"><i class="fas fa-money-bill-wave"></i></div>
+            <div>
+                <h2>{% trans 'Payment Management' %}</h2>
+                <p>{{ current_term }}</p>
             </div>
         </div>
+        <span class="pay-page-badge"><i class="fas fa-circle-check"></i> {% trans 'School Fees Dashboard' %}</span>
+    </div>
+
+    <!-- Section 1: payment actions -->
+    <section class="pay-section" aria-labelledby="pay-actions-title">
+        <div class="pay-section-head">
+            <h3 id="pay-actions-title"><i class="fas fa-bolt"></i>{% trans 'Quick Actions' %}</h3>
+            <span>{% trans 'Manage fees, payments, defaulters and bank accounts' %}</span>
+        </div>
+        <div class="pay-actions">
+            <a href="{% url 'fees:fee_list' %}" class="pay-action pay-action--primary">
+                <span class="pay-action-icon"><i class="fas fa-cog"></i></span>
+                <span class="pay-action-label">{% trans 'Fee Structure' %}</span>
+                <span class="pay-action-sub">{% trans 'Set up and manage fees' %}</span>
+                <i class="fas fa-arrow-right pay-action-arrow"></i>
+            </a>
+            <a href="{% url 'fees:record_payment' %}" class="pay-action pay-action--success">
+                <span class="pay-action-icon"><i class="fas fa-plus"></i></span>
+                <span class="pay-action-label">{% trans 'Record Payment' %}</span>
+                <span class="pay-action-sub">{% trans 'Add a new payment' %}</span>
+                <i class="fas fa-arrow-right pay-action-arrow"></i>
+            </a>
+            <a href="{% url 'fees:bank_account_list' %}" class="pay-action pay-action--info">
+                <span class="pay-action-icon"><i class="fas fa-university"></i></span>
+                <span class="pay-action-label">{% trans 'Bank Accounts' %}</span>
+                <span class="pay-action-sub">{% trans 'Manage collection accounts' %}</span>
+                <i class="fas fa-arrow-right pay-action-arrow"></i>
+            </a>
+            <a href="{% url 'fees:defaulters_list' %}" class="pay-action pay-action--danger">
+                <span class="pay-action-icon"><i class="fas fa-user-times"></i></span>
+                <span class="pay-action-label">{% trans 'View Defaulters' %}</span>
+                <span class="pay-action-sub">{% trans 'Review unpaid fees' %}</span>
+                <i class="fas fa-arrow-right pay-action-arrow"></i>
+            </a>
+        </div>
+    </section>
+
+    <!-- Clear division between the actions above and the divisions below -->
+    <div class="pay-divider"><span>{% trans 'Divisions' %}</span></div>
+
+    <!-- Section 2: school divisions -->
+    <section class="pay-section" aria-labelledby="pay-divisions-title">
+        <div class="pay-section-head">
+            <h3 id="pay-divisions-title"><i class="fas fa-layer-group"></i>{% trans 'School Divisions' %}</h3>
+            <span>{% trans 'Filter the dashboard by division' %}</span>
+        </div>
+        <div class="pay-divisions" role="tablist">
+            {% for division_code, division_name in divisions %}
+            <a class="pay-division {% if current_division == division_code %}active{% endif %}"
+               href="?division={{ division_code }}" role="tab"
+               aria-selected="{% if current_division == division_code %}true{% else %}false{% endif %}">
+                <span class="pay-division-icon">
+                    {% if division_code == 'all' %}<i class="fas fa-th-large"></i>
+                    {% elif division_code == 'Nursery' %}<i class="fas fa-baby"></i>
+                    {% elif division_code == 'Primary' %}<i class="fas fa-book-open"></i>
+                    {% else %}<i class="fas fa-graduation-cap"></i>{% endif %}
+                </span>
+                <span class="pay-division-text">
+                    {{ division_name }}
+                    <small>
+                        {% if division_code == 'all' %}{% trans 'All school levels' %}
+                        {% elif division_code == 'Nursery' %}{% trans 'Nursery and KG' %}
+                        {% elif division_code == 'Primary' %}{% trans 'Primary 1 - 6' %}
+                        {% else %}{% trans 'JHS 1 - 3' %}{% endif %}
+                    </small>
+                </span>
+                <i class="fas fa-chevron-right pay-division-arrow"></i>
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+
+    <!-- Filter Toolbar -->
+    <form method="get" class="pay-filter-bar">
+        <input type="hidden" name="division" value="{{ current_division }}">
+        <div class="pay-filter-info">
+            <h5>{% trans 'Term Statistics' %}: <strong>{{ current_term|default:"Not Set" }}</strong></h5>
+            <p>{% trans 'Showing data for' %} <strong>{{ current_division_name }}</strong></p>
+        </div>
+        <div class="pay-filter-control">
+            <label for="pay-level-filter"><i class="fas fa-filter"></i> {% trans 'Level' %}</label>
+            <select name="level" id="pay-level-filter" class="form-select" onchange="this.form.submit()">
+                <option value="">{% trans 'All Levels' %}</option>
+                {% for code, name in division_levels %}
+                <option value="{{ code }}" {% if selected_level == code %}selected{% endif %}>
+                    {{ name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
     </form>
-</div>
 
 <div class="row users-count px-3">
     <!-- Core Stats -->
@@ -324,5 +520,6 @@
     </div>
     {% endif %}
 </div>
+</div><!-- /.pay-dashboard -->
 
 {% endblock %}

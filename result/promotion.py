@@ -23,6 +23,7 @@ from accounts.models import (
     STUDENT_STATUS_ACTIVE,
     STUDENT_STATUS_GRADUATED,
     Student,
+    SubClass,
     User,
 )
 from core.models import Term
@@ -338,9 +339,22 @@ def _move_student(student, target_level, school):
         or student.program
     )
 
+    # Carry the learner's arm (for example Primary 1A -> Primary 2A) when the
+    # target class runs a sub-class with the same name.  Otherwise detach the
+    # old arm so it cannot point at a class the learner has left.
+    target_sub_class = None
+    if student.sub_class_id and student.sub_class:
+        target_sub_class = SubClass.objects.filter(
+            school=school,
+            level=target_level,
+            name__iexact=student.sub_class.name,
+            is_active=True,
+        ).first()
+
     Student.objects.filter(pk=student.pk).update(
         level=target_level,
         program=program,
+        sub_class=target_sub_class,
     )
     if target_division and student.student.division != target_division:
         User.objects.filter(pk=student.student_id).update(
@@ -349,6 +363,7 @@ def _move_student(student, target_level, school):
 
     student.level = target_level
     student.program = program
+    student.sub_class = target_sub_class
 
 
 def apply_promotion(candidates, decided_by=None):

@@ -345,6 +345,7 @@ if "test" in sys.argv:
 STUDENT_ID_PREFIX = config("STUDENT_ID_PREFIX", "STU")
 TEACHER_ID_PREFIX = config("TEACHER_ID_PREFIX", "TCH")
 LECTURER_ID_PREFIX = config("LECTURER_ID_PREFIX", "TEA")
+ADMIN_ID_PREFIX = config("ADMIN_ID_PREFIX", "ADM")
 
 
 # Constants for Ghana Education System

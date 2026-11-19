@@ -6,7 +6,6 @@
 
 {% block content %}
 
-{% include 'snippets/messages.html' %}
 <form method="POST" class="card border-0 shadow-sm"><div class="card-body">{% csrf_token %}
     <div class="row">
         <div class="col-md-6">{{ form.first_name|as_crispy_field }}</div>

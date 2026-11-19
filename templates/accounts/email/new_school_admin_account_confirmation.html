@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+{% load i18n %}
+<html>
+  <head>
+    <title>{% trans 'School Administrator Account' %}</title>
+  </head>
+  <body style="margin: 0; padding: 24px; background-color: #ebf0fb; font-family: 'Helvetica Neue', Arial, sans-serif; color: #46528f; line-height: 1.5;">
+    <div style="max-width: 600px; margin: 0 auto; background: #fff; border: 1px solid #cfcfcf; border-radius: 5px; overflow: hidden;">
+      <div style="background: #ebf0fb; border-bottom: 1px solid #cfcfcf; padding: 12px 24px;">
+        <h2 style="margin: 0; color: #012481;">{{ school.name|default:"Scolaa" }}</h2>
+        <p style="margin: 2px 0 0; font-size: 13px;">{% trans 'Your educational management portal' %}</p>
+      </div>
+      <div style="padding: 24px;">
+        <h1 style="margin: 0 0 16px; font-size: 24px; color: #012481;">{% trans 'Confirm your school administrator account' %}</h1>
+        <p>Dear <b>{{ user.get_full_name }}</b>,</p>
+        <p>
+          {% trans 'A school administrator account has been created for you at' %} <b>{{ school.name|default:"Scolaa" }}</b>.
+          {% trans 'Use the temporary credentials below to sign in and change your password immediately.' %}
+        </p>
+        <ul style="padding-left: 20px;">
+          <li>{% trans 'Username' %}: <b>{{ user.username }}</b></li>
+          <li>{% trans 'Temporary password' %}: <b>{{ password }}</b></li>
+        </ul>
+        <p>
+          <a href="{{ login_url }}" style="display: inline-block; padding: 10px 20px; background: #0c2340; color: #fff !important; border-radius: 3px; text-decoration: none;">{% trans 'Login to your account' %}</a>
+        </p>
+        <p style="font-size: 13px; color: #888888;">
+          {% trans 'If you were not expecting this email, you can safely ignore it.' %}
+        </p>
+      </div>
+      <div style="padding: 20px 24px; background: #333333; color: #fff; text-align: center; font-size: 13px;">
+        <p style="margin: 0 0 4px;">{% trans 'Sincerely' %}, {{ school.name|default:"Scolaa" }} {% trans 'team!' %}</p>
+        {% if school.support_email or school.email %}
+        <p style="margin: 4px 0;">{% trans 'Email' %}: {{ school.support_email|default:school.email }}</p>
+        {% endif %}
+        <p style="margin: 4px 0;">&copy; {% now "Y" %} {{ school.name|default:"Scolaa" }} | {% trans 'All rights reserved.' %}</p>
+      </div>
+    </div>
+  </body>
+</html>

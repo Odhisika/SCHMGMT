@@ -15,7 +15,6 @@
     </ol>
 </nav>
 
-{% include 'snippets/messages.html' %}
 
 <div class="container-fluid p-0">
     <!-- Hero Section -->
@@ -106,8 +105,8 @@
                     <div class="row g-4">
                         <div class="col-sm-6">
                             <div class="p-3 bg-light rounded-3">
-                                <p class="text-muted small mb-1">{% trans 'Current Level' %}</p>
-                                <h6 class="fw-bold mb-0">{{ student.level }}</h6>
+                                <p class="text-muted small mb-1">{% trans 'Current Class' %}</p>
+                                <h6 class="fw-bold mb-0">{{ student.class_label|default:"—" }}</h6>
                             </div>
                         </div>
                         <div class="col-sm-6">

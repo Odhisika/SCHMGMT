@@ -1,7 +1,12 @@
 {% extends 'base.html' %}
 {% load i18n %}
+{% load static %}
 {% load custom_filters %}
 {% block title %} {% trans 'Manage Classes' %} | {{ block.super }}{% endblock title %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/plain-ui.css' %}">
+{% endblock %}
 
 {% block content %}
 <nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
@@ -11,39 +16,79 @@
     </ol>
 </nav>
 
-<div class="card-clean mb-4">
-    <div class="card-header-clean">
-        <h3>{% trans 'All Classes' %}</h3>
+<p class="title-1"><i class="fas fa-chalkboard"></i>{% trans 'Classes' %}</p>
+
+<!-- Pick a division first, then use the class cards below. -->
+<ul class="nav plain-division-tabs" id="classDivisionTabs" aria-label="{% trans 'Select division' %}">
+    {% for tab in division_tabs %}
+    <li class="nav-item">
+        <a class="nav-link {% if active_division == tab.key %}active{% endif %}"
+           href="{{ tab.url }}"
+           {% if active_division == tab.key %}aria-current="page"{% endif %}>
+            <i class="{{ tab.icon }} me-2"></i>{% if tab.is_all %}{% trans 'All divisions' %}{% else %}{{ tab.label }}{% endif %}
+        </a>
+    </li>
+    {% endfor %}
+</ul>
+
+<div class="plain-card mt-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 px-3 py-3 border-bottom">
+        <h2 class="plain-section-title mb-0">
+            {% if active_division %}{{ active_division_label }} {% trans 'classes' %}{% else %}{% trans 'All classes' %}{% endif %}
+        </h2>
+        <span class="plain-count">{{ active_levels|length }} {% trans 'classes' %}</span>
     </div>
-    <div class="card-body-clean">
+    <div class="p-3">
         {% if is_teacher %}
-        <div class="alert-info-clean mb-4" style="font-size: 14px;">
-            <i class="fas fa-info-circle"></i> {% trans 'You are viewing only the classes where you have assigned subjects.' %}
+        <div class="alert alert-light border small mb-3">
+            <i class="fas fa-info-circle me-1"></i> {% trans 'You are viewing only the classes where you have assigned subjects.' %}
         </div>
         {% endif %}
 
-        {% if levels %}
-        <div class="row">
-            {% for level_code, level_name in levels %}
-            <div class="col-6 col-md-3 mb-3">
-                <a href="{% url 'class_detail' level_code %}" style="text-decoration: none;">
-                    <div class="card-clean p-3 text-center h-100 d-flex align-items-center justify-content-center shadow-sm" style="margin-bottom: 0; min-height: 80px; transition: transform 0.2s; border: 1px solid #f1f3f4;">
-                        <h5 class="m-0" style="color: #202124; font-weight: 600;">{{ level_name }}</h5>
-                    </div>
+        {% if active_levels %}
+        <div class="plain-level-grid">
+            {% for level_code, level_name in active_levels %}
+            <div class="plain-level-card">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                    <a href="{% url 'class_detail' level_code %}" class="plain-level-title">{{ level_name }}</a>
+                    <span class="plain-count" title="{% trans 'Active students' %}">
+                        <i class="fas fa-users me-1"></i>{{ students_counts|get_item:level_code }}
+                    </span>
+                </div>
+
+                {% with subs=sub_classes_by_level|get_item:level_code %}
+                {% if subs %}
+                <div class="d-flex flex-wrap gap-1">
+                    {% for sub in subs %}
+                    <a href="{% url 'class_detail' level_code %}?sub_class={{ sub.pk }}"
+                       class="plain-chip"
+                       title="{% blocktrans with name=sub.name count=sub.roster_count %}{{ name }} — {{ count }} student(s){% endblocktrans %}">
+                        {{ sub.name }} <span class="text-muted">({{ sub.roster_count }})</span>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted small mb-0">{% trans 'No sub-classes yet.' %}</p>
+                {% endif %}
+                {% endwith %}
+
+                {% if not is_teacher %}
+                <a href="{% url 'class_detail' level_code %}?tab=subclasses"
+                   class="btn btn-sm btn-outline-secondary w-100 mt-auto">
+                    <i class="fas fa-plus me-1"></i>{% trans 'Add sub-class' %}
                 </a>
+                {% endif %}
             </div>
             {% endfor %}
         </div>
         {% else %}
-        <div class="empty-state">
-            <div class="empty-state-icon"><i class="fas fa-layer-group"></i></div>
-            <p class="empty-state-text">
-                {% if is_teacher %}
-                {% trans 'You currently have no course allocations.' %}
-                {% else %}
-                {% trans 'No classes are currently set up.' %}
-                {% endif %}
-            </p>
+        <div class="plain-empty">
+            <i class="fas fa-layer-group"></i>
+            {% if is_teacher %}
+            {% trans 'You currently have no course allocations.' %}
+            {% else %}
+            {% trans 'No classes are currently set up.' %}
+            {% endif %}
         </div>
         {% endif %}
     </div>

@@ -9,6 +9,7 @@ from django.core.management import call_command
 from django.urls import reverse
 
 from core.testing import DemoDataTestCase
+from accounts.models import SubClass
 from result.models import (
     BECEMockExam,
     BECEMockResult,
@@ -853,6 +854,44 @@ class FinalClassPromotionTests(DemoDataTestCase):
         self.assertEqual(summary["promoted"], 0)
         self.assertEqual(student.level, level)
         self.assertEqual(student.status, "ACTIVE")
+
+    def test_promotion_carries_the_same_sub_class_to_the_next_level(self):
+        level = self.demo_levels[0]
+        target_level = next_level(level)
+        candidates = build_candidates(level, self.current_term.year, self.school)
+        candidate = next(c for c in candidates if c.promoted)
+        student = candidate.student
+        source_arm = SubClass.objects.create(
+            school=self.school, level=level, name="A"
+        )
+        target_arm = SubClass.objects.create(
+            school=self.school, level=target_level, name="A"
+        )
+        student.sub_class = source_arm
+        student.save(update_fields=["sub_class"])
+
+        apply_promotion([candidate])
+        student.refresh_from_db()
+
+        self.assertEqual(student.level, target_level)
+        self.assertEqual(student.sub_class, target_arm)
+
+    def test_promotion_clears_a_sub_class_when_the_next_level_has_no_match(self):
+        level = self.demo_levels[0]
+        target_level = next_level(level)
+        candidates = build_candidates(level, self.current_term.year, self.school)
+        candidate = next(c for c in candidates if c.promoted)
+        student = candidate.student
+        student.sub_class = SubClass.objects.create(
+            school=self.school, level=level, name="A"
+        )
+        student.save(update_fields=["sub_class"])
+
+        apply_promotion([candidate])
+        student.refresh_from_db()
+
+        self.assertEqual(student.level, target_level)
+        self.assertIsNone(student.sub_class)
 
     def test_promote_students_final_only_runs_in_second_term(self):
         # Make the second term current so only final-class completion is due.
