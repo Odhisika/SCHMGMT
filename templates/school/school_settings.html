@@ -267,6 +267,9 @@
           <a class="nav-link {% if active_tab == 'identity' %}active{% endif %}" href="{% url 'school_settings_identity' %}">
             <i class="fas fa-fingerprint"></i> {% trans 'General Identity' %}
           </a>
+          <a class="nav-link {% if active_tab == 'divisions' %}active{% endif %}" href="{% url 'school_settings_divisions' %}">
+            <i class="fas fa-layer-group"></i> {% trans 'Divisions & Classes' %}
+          </a>
           <a class="nav-link {% if active_tab == 'grading' %}active{% endif %}" href="{% url 'school_settings_grading' %}">
             <i class="fas fa-chart-pie"></i> {% trans 'Grade Weights' %}
           </a>
@@ -395,6 +398,98 @@
           </div>
         </form>
 
+        {% elif active_tab == 'divisions' %}
+        {# ────────────────── DIVISIONS SECTION ────────────────── #}
+        <div class="d-flex align-items-center justify-content-between mb-4">
+          <div>
+            <h3 class="fw-bold m-0 text-dark">{% trans 'Divisions & Classes' %}</h3>
+            <p class="text-muted mb-0">{% trans 'Add divisions your school uses, such as Creche, and the classes under them.' %}</p>
+          </div>
+        </div>
+
+        <div class="alert alert-light border small mb-4">
+          <strong>{% trans 'Current division order:' %}</strong>
+          {% for key, label in division_choices %}{{ label }}{% if not forloop.last %} &rarr; {% endif %}{% endfor %}.
+          {% trans 'Nursery, Primary and JHS are built in; extras can be added and reordered below.' %}
+        </div>
+
+        <form method="post" action="{% url 'school_settings_divisions' %}" class="border rounded p-3 mb-4">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="save_order">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <h5 class="fw-bold mb-0"><i class="fas fa-sort me-2"></i>{% trans 'Arrange divisions' %}</h5>
+            <span class="small text-muted">{% trans 'Lower numbers appear first.' %}</span>
+          </div>
+          {% if division_order_form.non_field_errors %}
+          <div class="alert alert-danger py-2">{{ division_order_form.non_field_errors }}</div>
+          {% endif %}
+          <div class="row g-3">
+            {% for name, field in division_order_form.division_order_fields %}
+            <div class="col-md-3 col-6">
+              <label class="form-label small fw-bold mb-1" for="{{ field.id_for_label }}">{{ name }}</label>
+              {{ field }}
+            </div>
+            {% endfor %}
+          </div>
+          <button class="btn btn-outline-primary mt-3" type="submit"><i class="fas fa-save me-1"></i>{% trans 'Save order' %}</button>
+        </form>
+
+        <form method="post" action="{% url 'school_settings_divisions' %}" class="border rounded p-4 mb-4">
+          {% csrf_token %}
+          <h5 class="fw-bold mb-3"><i class="fas fa-plus-circle me-2"></i>{% trans 'Add a division' %}</h5>
+          <div class="row g-3">
+            <div class="col-md-6">{{ division_form.name|as_crispy_field }}</div>
+            <div class="col-md-3">{{ division_form.id_prefix|as_crispy_field }}</div>
+            <div class="col-md-3">{{ division_form.id_pattern|as_crispy_field }}</div>
+            <div class="col-12">{{ division_form.levels|as_crispy_field }}</div>
+          </div>
+          <button class="btn btn-primary mt-3" type="submit"><i class="fas fa-save me-1"></i>{% trans 'Add division' %}</button>
+        </form>
+
+        <h5 class="fw-bold mb-3">{% trans 'Custom divisions' %}</h5>
+        {% for division, form in division_forms %}
+        <div class="border rounded p-3 mb-3">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <h6 class="fw-bold mb-1">{{ division.name }}</h6>
+              <div class="small text-muted">
+                {% trans 'Classes:' %}
+                {% for level in division.levels.all %}{{ level.name }}{% if not forloop.last %}, {% endif %}{% empty %}{% trans 'None' %}{% endfor %}
+              </div>
+              <div class="small text-muted">{% trans 'ID prefix:' %} {{ division.id_prefix }}</div>
+            </div>
+            <div class="d-flex gap-2">
+              <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#edit-division-{{ division.pk }}">
+                <i class="fas fa-edit me-1"></i>{% trans 'Edit' %}
+              </button>
+              <form method="post" action="{% url 'school_settings_divisions' %}">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="delete">
+                <input type="hidden" name="division_id" value="{{ division.pk }}">
+                <button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('{% trans 'Delete this division? Existing student records keep their current values.' %}');">
+                  <i class="fas fa-trash me-1"></i>{% trans 'Delete' %}
+                </button>
+              </form>
+            </div>
+          </div>
+          <div class="collapse mt-3" id="edit-division-{{ division.pk }}">
+            <form method="post" action="{% url 'school_settings_divisions' %}" class="border-top pt-3">
+              {% csrf_token %}
+              {{ form.division_id }}
+              <div class="row g-3">
+                <div class="col-md-6">{{ form.name|as_crispy_field }}</div>
+                <div class="col-md-3">{{ form.id_prefix|as_crispy_field }}</div>
+                <div class="col-md-3">{{ form.id_pattern|as_crispy_field }}</div>
+                <div class="col-12">{{ form.levels|as_crispy_field }}</div>
+              </div>
+              <button class="btn btn-sm btn-primary mt-3" type="submit"><i class="fas fa-save me-1"></i>{% trans 'Save changes' %}</button>
+            </form>
+          </div>
+        </div>
+        {% empty %}
+        <p class="text-muted">{% trans 'No custom divisions yet.' %}</p>
+        {% endfor %}
+
         {% elif active_tab == 'grading' %}
         {# ────────────────── GRADING SECTION ────────────────── #}
         <div class="d-flex align-items-center justify-content-between mb-4">
@@ -491,27 +586,26 @@
         </div>
         <form method="post" action="{% url 'school_settings_student_ids' %}">
           {% csrf_token %}
+          {% for card in division_cards %}
           <div class="border rounded p-3 mb-3">
-            <h5 class="h6">{% trans 'Nursery / Pre-School' %} <span class="badge text-bg-light">{% trans 'Next:' %} {{ student_id_next.Nursery }}</span></h5>
+            <h5 class="h6">
+              {{ card.label }}
+              <span class="badge text-bg-light">{% trans 'Next:' %} {{ card.next_number }}</span>
+              {% if not card.built_in %}<span class="badge text-bg-secondary">{% trans 'Custom' %}</span>{% endif %}
+            </h5>
+            {% if card.built_in %}
             <div class="row g-2">
-              <div class="col-md-4">{{ student_id_format_form.student_id_nursery_prefix|as_crispy_field }}</div>
-              <div class="col-md-8">{{ student_id_format_form.student_id_nursery_pattern|as_crispy_field }}</div>
+              <div class="col-md-4">{{ card.prefix_field|as_crispy_field }}</div>
+              <div class="col-md-8">{{ card.pattern_field|as_crispy_field }}</div>
             </div>
-          </div>
-          <div class="border rounded p-3 mb-3">
-            <h5 class="h6">{% trans 'Primary' %} <span class="badge text-bg-light">{% trans 'Next:' %} {{ student_id_next.Primary }}</span></h5>
-            <div class="row g-2">
-              <div class="col-md-4">{{ student_id_format_form.student_id_primary_prefix|as_crispy_field }}</div>
-              <div class="col-md-8">{{ student_id_format_form.student_id_primary_pattern|as_crispy_field }}</div>
+            {% else %}
+            <div class="small text-muted">
+              {% trans 'Prefix:' %} {{ card.division.id_prefix }} &bull; {% trans 'Format:' %} {{ card.division.get_id_pattern_display }}
             </div>
+            <div class="small text-muted">{% trans 'Edit this in the Divisions & Classes tab.' %}</div>
+            {% endif %}
           </div>
-          <div class="border rounded p-3 mb-3">
-            <h5 class="h6">{% trans 'JHS' %} <span class="badge text-bg-light">{% trans 'Next:' %} {{ student_id_next.JHS }}</span></h5>
-            <div class="row g-2">
-              <div class="col-md-4">{{ student_id_format_form.student_id_jhs_prefix|as_crispy_field }}</div>
-              <div class="col-md-8">{{ student_id_format_form.student_id_jhs_pattern|as_crispy_field }}</div>
-            </div>
-          </div>
+          {% endfor %}
           <p class="small text-muted">{% blocktrans with school_code=school_code %}School code for formats that include it: {{ school_code }}. Each division has its own counter, shown above. Changing a format does not reset the counter, and existing student IDs stay the same.{% endblocktrans %}</p>
           <button class="btn btn-primary" type="submit"><i class="fas fa-save me-1"></i>{% trans 'Save ID formats' %}</button>
         </form>

@@ -1,7 +1,11 @@
 from django import forms
-from django.conf import settings
 from django.db.models import Q
 import django_filters
+
+from school.division_utils import (
+    get_division_choices,
+    get_levels_for_division,
+)
 
 from .models import (
     STUDENT_STATUS_ACTIVE,
@@ -48,7 +52,7 @@ class StudentFilter(django_filters.FilterSet):
     # as a hidden value while the remaining filters stay visible.
     division = django_filters.ChoiceFilter(
         field_name="student__division",
-        choices=settings.DIVISION_CHOICES,
+        choices=get_division_choices(),  # replaced with school-specific choices in __init__
         label="",
         empty_label="All divisions",
         widget=forms.HiddenInput,
@@ -93,6 +97,10 @@ class StudentFilter(django_filters.FilterSet):
     def __init__(self, *args, school=None, **kwargs):
         super().__init__(*args, **kwargs)
 
+        division_choices = get_division_choices(school)
+        self.filters["division"].field.choices = division_choices
+        valid_divisions = {value for value, _ in division_choices}
+
         if school is not None:
             sub_classes = SubClass.objects.filter(school=school, is_active=True)
             # Sub-classes only belong to one division's class levels. Narrow the
@@ -103,9 +111,9 @@ class StudentFilter(django_filters.FilterSet):
                 division = self.data.get("division")
             else:
                 division = self.form.initial.get("division")
-            if division in dict(settings.DIVISION_CHOICES):
+            if division in valid_divisions:
                 sub_classes = sub_classes.filter(
-                    level__in=settings.DIVISION_LEVEL_MAPPING.get(division, [])
+                    level__in=get_levels_for_division(division, school=school)
                 )
             self.filters["sub_class"].queryset = sub_classes
 

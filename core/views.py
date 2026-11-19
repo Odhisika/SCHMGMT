@@ -8,6 +8,11 @@ from datetime import timedelta
 import json
 
 from accounts.decorators import admin_required, lecturer_required
+from school.division_utils import (
+    get_division_choices,
+    get_level_choices,
+    get_levels_for_division,
+)
 from accounts.models import STUDENT_STATUS_ACTIVE, Student, User
 from course.models import Program, Course
 from .forms import SemesterForm, NewsAndEventsForm, TermWeekForm
@@ -109,7 +114,11 @@ def post_detail(request, pk):
 def dashboard_view(request):
     division = request.GET.get('division', 'ALL')
     dashboard_school = request.school
-    
+    division_choices = get_division_choices(dashboard_school)
+    valid_divisions = {key for key, _ in division_choices}
+    if division != 'ALL' and division not in valid_divisions:
+        division = 'ALL'
+
     # 1. Base QuerySets
     student_qs = Student.objects.filter(
         student__school=dashboard_school,
@@ -121,8 +130,8 @@ def dashboard_view(request):
     )
     
     # 2. Apply Division Filters
-    if division in [settings.DIVISION_NURSERY, settings.DIVISION_PRIMARY, settings.DIVISION_JHS]:
-        levels = settings.DIVISION_LEVEL_MAPPING.get(division, [])
+    if division in valid_divisions:
+        levels = get_levels_for_division(division, school=dashboard_school)
         student_qs = student_qs.filter(level__in=levels)
         teacher_qs = teacher_qs.filter(division=division)
         
@@ -165,10 +174,11 @@ def dashboard_view(request):
     # Use the levels from settings to ensure order
     target_levels = []
     if division != 'ALL':
-        target_levels = settings.DIVISION_LEVEL_MAPPING.get(division, [])
+        target_levels = get_levels_for_division(division, school=dashboard_school)
     else:
-        for d in [settings.DIVISION_NURSERY, settings.DIVISION_PRIMARY, settings.DIVISION_JHS]:
-             target_levels.extend(settings.DIVISION_LEVEL_MAPPING.get(d, []))
+        target_levels = [
+            code for code, _ in get_level_choices(dashboard_school)
+        ]
              
     # Default 0
     for l in target_levels:
@@ -223,6 +233,7 @@ def dashboard_view(request):
         "females_count": females_count,
         "logs": logs,
         "selected_division": division,
+        "divisions": division_choices,
         "current_term": current_term,
         "term_weeks": term_weeks,
         "current_week": current_week,

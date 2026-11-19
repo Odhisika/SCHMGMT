@@ -22,7 +22,7 @@ def generate_password():
 def generate_student_id(school=None, division=None):
     """Allocate the next ID for a school's division, starting at 1."""
     UserModel = get_user_model()
-    if school and division in ("Nursery", "Primary", "JHS"):
+    if school and division:
         from school.models import StudentIDSequence
 
         division_fields = {
@@ -30,32 +30,42 @@ def generate_student_id(school=None, division=None):
             "Primary": ("student_id_primary_prefix", "student_id_primary_pattern"),
             "JHS": ("student_id_jhs_prefix", "student_id_jhs_pattern"),
         }
-        prefix_field, pattern_field = division_fields[division]
-        prefix = getattr(school, prefix_field).strip().upper()
-        pattern = getattr(school, pattern_field)
-        patterns = {
-            "DIVISION_SEQUENCE": "{division}-{seq:04d}",
-            "DIVISION_YEAR_SEQUENCE": "{division}-{year}-{seq:04d}",
-            "SCHOOL_DIVISION_SEQUENCE": "{school}-{division}-{seq:04d}",
-            "SCHOOL_DIVISION_YEAR_SEQUENCE": "{school}-{division}-{year}-{seq:04d}",
-        }
-        template = patterns[pattern]
-        sequence, _ = StudentIDSequence.objects.get_or_create(
-            school=school,
-            division=division,
-        )
-        sequence = StudentIDSequence.objects.select_for_update().get(pk=sequence.pk)
-        number = sequence.last_number
-        year = timezone.localdate().year
-        while True:
-            number += 1
-            username = template.format(
-                school=f"S{school.pk}", division=prefix, year=year, seq=number
+        if division in division_fields:
+            prefix_field, pattern_field = division_fields[division]
+            prefix = getattr(school, prefix_field).strip().upper()
+            pattern = getattr(school, pattern_field)
+        else:
+            custom_division = school.custom_divisions.filter(
+                name=division, is_active=True
+            ).first()
+            # Unknown division: fall back to the legacy ID format below.
+            prefix = custom_division.id_prefix.strip().upper() if custom_division else None
+            pattern = custom_division.id_pattern if custom_division else None
+
+        if prefix and pattern:
+            patterns = {
+                "DIVISION_SEQUENCE": "{division}-{seq:04d}",
+                "DIVISION_YEAR_SEQUENCE": "{division}-{year}-{seq:04d}",
+                "SCHOOL_DIVISION_SEQUENCE": "{school}-{division}-{seq:04d}",
+                "SCHOOL_DIVISION_YEAR_SEQUENCE": "{school}-{division}-{year}-{seq:04d}",
+            }
+            template = patterns[pattern]
+            sequence, _ = StudentIDSequence.objects.get_or_create(
+                school=school,
+                division=division,
             )
-            if not UserModel.objects.filter(username=username).exists():
-                sequence.last_number = number
-                sequence.save(update_fields=["last_number"])
-                return username
+            sequence = StudentIDSequence.objects.select_for_update().get(pk=sequence.pk)
+            number = sequence.last_number
+            year = timezone.localdate().year
+            while True:
+                number += 1
+                username = template.format(
+                    school=f"S{school.pk}", division=prefix, year=year, seq=number
+                )
+                if not UserModel.objects.filter(username=username).exists():
+                    sequence.last_number = number
+                    sequence.save(update_fields=["last_number"])
+                    return username
 
     # Legacy fallback for callers that do not have a school/division context.
     registered_year = timezone.localdate().year
@@ -173,33 +183,23 @@ def send_new_account_email(user, password):
 # Division-based Access Control Utilities
 # ########################################################
 
-def get_division_for_level(level_code):
+def get_division_for_level(level_code, school=None):
     """
-    Returns the division that a given level belongs to
-    
-    Args:
-        level_code: The level code (e.g., 'Primary 1', 'JHS 1')
-    
-    Returns:
-        Division constant (DIVISION_NURSERY, DIVISION_PRIMARY, or DIVISION_JHS) or None
+    Returns the division that a given level belongs to.
+
+    ``school`` is optional so older callers keep working, but passing it lets
+    school-specific divisions (e.g. Creche) resolve correctly.
     """
-    for division, levels in settings.DIVISION_LEVEL_MAPPING.items():
-        if level_code in levels:
-            return division
-    return None
+    from school.division_utils import get_division_for_level as _get_division
+
+    return _get_division(level_code, school=school)
 
 
-def get_levels_for_division(division):
-    """
-    Returns all levels in a given division
-    
-    Args:
-        division: Division constant (DIVISION_NURSERY, DIVISION_PRIMARY, or DIVISION_JHS)
-    
-    Returns:
-        List of level codes in that division
-    """
-    return settings.DIVISION_LEVEL_MAPPING.get(division, [])
+def get_levels_for_division(division, school=None):
+    """Return all level codes in a division, including custom school levels."""
+    from school.division_utils import get_levels_for_division as _get_levels
+
+    return _get_levels(division, school=school)
 
 
 def check_teacher_division_access(teacher, level_code):
@@ -219,23 +219,26 @@ def check_teacher_division_access(teacher, level_code):
 
 def filter_levels_by_division(user):
     """
-    Filter LEVEL_CHOICES based on user's division
-    
-    Args:
-        user: User object
-    
-    Returns:
-        Filtered list of (code, name) tuples for levels the user can access
+    Filter LEVEL_CHOICES based on user's division.
+
+    Returns a list of ``(code, name)`` tuples for levels the user can access.
     """
+    from school.division_utils import get_level_choices
+
+    school = getattr(user, "school", None)
+    all_levels = get_level_choices(school)
+
     # Admins see all levels
     if user.is_superuser or user.is_school_admin:
-        return settings.LEVEL_CHOICES
-    
+        return all_levels
+
     # Teachers see only levels in their division
     if (user.is_teacher or user.is_lecturer) and user.division:
         accessible_levels = user.get_division_levels()
-        return [(code, name) for code, name in settings.LEVEL_CHOICES if code in accessible_levels]
-    
+        return [
+            (code, name) for code, name in all_levels if code in accessible_levels
+        ]
+
     # Default: return all levels
-    return settings.LEVEL_CHOICES
+    return all_levels
 

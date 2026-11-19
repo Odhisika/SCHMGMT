@@ -26,33 +26,21 @@
 {% include 'snippets/filter_form.html' %}
 
 <ul class="nav nav-tabs mt-4" id="teacherTab" role="tablist">
+    {% for division in teacher_divisions %}
     <li class="nav-item" role="presentation">
-      <button class="nav-link active" id="nursery-tab" data-bs-toggle="tab" data-bs-target="#nursery" type="button" role="tab" aria-controls="nursery" aria-selected="true">
-        <i class="fas fa-baby me-2"></i>{% trans 'Nursery/Pre-School' %}
+      <button class="nav-link {% if forloop.first %}active{% endif %}" id="teacher-tab-{{ forloop.counter }}" data-bs-toggle="tab" data-bs-target="#teacher-pane-{{ forloop.counter }}" type="button" role="tab" aria-controls="teacher-pane-{{ forloop.counter }}" aria-selected="{% if forloop.first %}true{% else %}false{% endif %}">
+        <i class="{{ division.icon }} me-2"></i>{{ division.label }}
       </button>
     </li>
-    <li class="nav-item" role="presentation">
-      <button class="nav-link" id="primary-tab" data-bs-toggle="tab" data-bs-target="#primary" type="button" role="tab" aria-controls="primary" aria-selected="false">
-        <i class="fas fa-child me-2"></i>{% trans 'Primary School' %}
-      </button>
-    </li>
-    <li class="nav-item" role="presentation">
-      <button class="nav-link" id="jhs-tab" data-bs-toggle="tab" data-bs-target="#jhs" type="button" role="tab" aria-controls="jhs" aria-selected="false">
-        <i class="fas fa-user-graduate me-2"></i>{% trans 'JHS' %}
-      </button>
-    </li>
+    {% endfor %}
 </ul>
 
 <div class="tab-content" id="teacherTabContent">
-    <div class="tab-pane fade show active" id="nursery" role="tabpanel" aria-labelledby="nursery-tab">
-        {% include 'accounts/snippets/teacher_table.html' with lecturers=nursery_teachers %}
+    {% for division in teacher_divisions %}
+    <div class="tab-pane fade {% if forloop.first %}show active{% endif %}" id="teacher-pane-{{ forloop.counter }}" role="tabpanel" aria-labelledby="teacher-tab-{{ forloop.counter }}">
+        {% include 'accounts/snippets/teacher_table.html' with lecturers=division.teachers %}
     </div>
-    <div class="tab-pane fade" id="primary" role="tabpanel" aria-labelledby="primary-tab">
-        {% include 'accounts/snippets/teacher_table.html' with lecturers=primary_teachers %}
-    </div>
-    <div class="tab-pane fade" id="jhs" role="tabpanel" aria-labelledby="jhs-tab">
-        {% include 'accounts/snippets/teacher_table.html' with lecturers=jhs_teachers %}
-    </div>
+    {% endfor %}
 </div>
 {% endblock content %}
 

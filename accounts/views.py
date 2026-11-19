@@ -50,6 +50,11 @@ from accounts.models import (
     User,
 )
 from accounts.utils import generate_student_credentials, get_division_for_level
+from school.division_utils import (
+    get_division_choices,
+    get_level_choices,
+    get_levels_for_division,
+)
 from core.models import Semester
 from course.models import Course, CourseAllocation, Program
 from result.models import TakenCourse, Result
@@ -695,11 +700,26 @@ class LecturerFilterView(FilterView):
         # Apply the filter from the filterset
         filtered_qs = self.filterset_class(self.request.GET, queryset=qs).qs
         
+        icons = {
+            settings.DIVISION_NURSERY: "fas fa-baby",
+            settings.DIVISION_PRIMARY: "fas fa-child",
+            settings.DIVISION_JHS: "fas fa-user-graduate",
+        }
+        teacher_divisions = []
+        for key, label in get_division_choices(self.request.school):
+            teacher_divisions.append({
+                "key": key,
+                "label": label,
+                "icon": icons.get(key, "fas fa-layer-group"),
+                "teachers": filtered_qs.filter(division=key),
+            })
+        context["teacher_divisions"] = teacher_divisions
+        # Preserve the legacy context keys used by existing tests/integrations.
         context["nursery_teachers"] = filtered_qs.filter(division=settings.DIVISION_NURSERY)
         context["primary_teachers"] = filtered_qs.filter(division=settings.DIVISION_PRIMARY)
         context["jhs_teachers"] = filtered_qs.filter(division=settings.DIVISION_JHS)
         context["other_teachers"] = filtered_qs.filter(division__isnull=True)
-        
+
         return context
 
 
@@ -1416,7 +1436,7 @@ def import_students(request):
                 if not errors:
                     with transaction.atomic():
                         for values in data:
-                            division = get_division_for_level(values["level"])
+                            division = get_division_for_level(values["level"], school=request.school)
                             username = values["username"] or generate_student_credentials(
                                 school=request.school, division=division
                             )[0]
@@ -1618,7 +1638,9 @@ def _division_links(request, url_name, drop_params=()):
         settings.DIVISION_PRIMARY: "fas fa-child",
         settings.DIVISION_JHS: "fas fa-user-graduate",
     }
-    options = (("", "All divisions"),) + tuple(settings.DIVISION_CHOICES)
+    options = (("", "All divisions"),) + tuple(
+        get_division_choices(getattr(request, "school", None))
+    )
     links = []
     for key, label in options:
         link_params = params.copy()
@@ -1633,7 +1655,7 @@ def _division_links(request, url_name, drop_params=()):
         links.append({
             "key": key,
             "label": label,
-            "icon": icons[key],
+            "icon": icons.get(key, "fas fa-layer-group"),
             "url": url,
             "is_all": not key,
         })
@@ -1674,21 +1696,23 @@ class StudentListView(FilterView):
             self.request.GET, queryset=qs, school=self.request.school
         ).qs
 
-        context["nursery_students"] = filtered_qs.filter(
-            student__division=settings.DIVISION_NURSERY
-        )
-        context["primary_students"] = filtered_qs.filter(
-            student__division=settings.DIVISION_PRIMARY
-        )
-        context["jhs_students"] = filtered_qs.filter(
-            student__division=settings.DIVISION_JHS
-        )
+        division_choices = get_division_choices(self.request.school)
+        valid_divisions = dict(division_choices)
+        division_students = {
+            key: filtered_qs.filter(student__division=key)
+            for key in valid_divisions
+        }
+        context["division_students"] = division_students
+        # Keep the original names for existing templates/tests.
+        context["nursery_students"] = division_students.get(settings.DIVISION_NURSERY, [])
+        context["primary_students"] = division_students.get(settings.DIVISION_PRIMARY, [])
+        context["jhs_students"] = division_students.get(settings.DIVISION_JHS, [])
         context["other_students"] = filtered_qs.filter(
             student__division__isnull=True
         )
 
         active_division = self.request.GET.get("division", "")
-        if active_division not in dict(settings.DIVISION_CHOICES):
+        if active_division not in valid_divisions:
             active_division = ""
         context["active_division"] = active_division
         context["division_tabs"] = _division_links(
@@ -1706,13 +1730,8 @@ class StudentListView(FilterView):
         if active_division:
             context["clear_filters_url"] += f"?division={active_division}"
 
-        division_context_keys = {
-            settings.DIVISION_NURSERY: "nursery_students",
-            settings.DIVISION_PRIMARY: "primary_students",
-            settings.DIVISION_JHS: "jhs_students",
-        }
         context["active_students"] = (
-            context[division_context_keys[active_division]]
+            division_students[active_division]
             if active_division
             else filtered_qs
         )
@@ -1868,12 +1887,12 @@ def class_list_view(request):
 
     if is_admin:
         # Admins see all classes
-        levels = settings.LEVEL_CHOICES
+        levels = get_level_choices(request.school)
     elif request.user.division:
         # Teachers see only classes in their assigned division
         accessible_levels = request.user.get_division_levels()
         levels = [
-            (code, name) for code, name in settings.LEVEL_CHOICES
+            (code, name) for code, name in get_level_choices(request.school)
             if code in accessible_levels
         ]
     else:
@@ -1909,7 +1928,7 @@ def class_list_view(request):
         if sub_class.level in sub_classes_by_level:
             sub_classes_by_level[sub_class.level].append(sub_class)
 
-    valid_divisions = dict(settings.DIVISION_CHOICES)
+    valid_divisions = dict(get_division_choices(request.school))
     active_division = request.GET.get("division", "")
     if active_division not in valid_divisions:
         active_division = ""
@@ -1923,7 +1942,7 @@ def class_list_view(request):
             if tab["is_all"] or tab["key"] == request.user.division
         ]
 
-    division_levels = settings.DIVISION_LEVEL_MAPPING.get(active_division, [])
+    division_levels = get_levels_for_division(active_division, school=request.school)
     active_levels = [
         (code, name) for code, name in levels
         if not active_division or code in division_levels
@@ -1961,7 +1980,7 @@ def class_detail_view(request, level_code):
 
     # Access Control: Verify teacher can access this level based on division
     if not request.user.can_access_level(level_code):
-        level_division = get_division_for_level(level_code)
+        level_division = get_division_for_level(level_code, school=request.school)
         
         if not request.user.division:
             messages.error(
@@ -2017,7 +2036,7 @@ def class_detail_view(request, level_code):
     current_term = Semester.objects.filter(is_current_term=True, school=request.school).first()
     is_third_term = current_term and current_term.term == settings.THIRD_TERM
 
-    level_division = get_division_for_level(level_code)
+    level_division = get_division_for_level(level_code, school=request.school)
     level_teachers = User.objects.filter(
         school=request.school,
         is_teacher=True,

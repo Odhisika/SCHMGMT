@@ -9,6 +9,12 @@ from django.contrib.auth.forms import (
 from django.contrib.auth.forms import PasswordResetForm
 from django.conf import settings
 from course.models import Program
+from school.division_utils import (
+    get_division_choices,
+    get_division_level_mapping,
+    get_level_choices,
+    get_levels_for_division,
+)
 from .models import (
     User, Student, SubClass, Parent, RELATION_SHIP, LEVEL, GENDERS,
     NON_TEACHING_POSITIONS,
@@ -181,13 +187,17 @@ def _make_picture_optional(form):
 class DivisionLevelSelect(forms.Select):
     """Select widget that tags each class level with its school division."""
 
+    def __init__(self, school=None, attrs=None):
+        self.school = school
+        super().__init__(attrs)
+
     def create_option(
         self, name, value, label, selected, index, subindex=None, attrs=None
     ):
         option = super().create_option(
             name, value, label, selected, index, subindex=subindex, attrs=attrs
         )
-        division = get_division_for_level(value) if value else None
+        division = get_division_for_level(value, school=self.school) if value else None
         if division:
             option["attrs"]["data-division"] = division
         return option
@@ -213,6 +223,9 @@ class StaffAddForm(UserCreationForm):
     def __init__(self, *args, **kwargs):
         self.school = kwargs.pop("school", None)
         super(StaffAddForm, self).__init__(*args, **kwargs)
+        self.fields["division"].choices = [("", "Select Division")] + list(
+            get_division_choices(self.school)
+        )
         _disable_password_inputs(self)
         _apply_bootstrap_widgets(self)
         _make_picture_optional(self)
@@ -265,7 +278,7 @@ class StaffAddForm(UserCreationForm):
         widget=forms.Select(
             attrs={"class": "browser-default custom-select form-control"}
         ),
-        label="Division (Nursery, Primary, or JHS)",
+        label="Division",
         required=True,
         help_text="Teachers can only access classes in their assigned division"
     )
@@ -344,7 +357,7 @@ class StaffAddForm(UserCreationForm):
         # The division selection is also the teacher's academic department.
         # Keeping one source of truth avoids asking administrators to enter it twice.
         department_division = self.cleaned_data.get("division")
-        department_name = dict(settings.DIVISION_CHOICES).get(department_division)
+        department_name = dict(get_division_choices(self.school)).get(department_division)
         if department_name and self.school:
             user.department, _ = Program.objects.get_or_create(
                 school=self.school,
@@ -595,12 +608,18 @@ class StudentAddForm(UserCreationForm):
         else:
             division_value = self.initial.get("division")
             if not division_value and self.initial.get("level"):
-                division_value = get_division_for_level(self.initial["level"])
+                division_value = get_division_for_level(
+                    self.initial["level"], school=self.school
+                )
                 if division_value:
                     self.initial["division"] = division_value
-        allowed_levels = settings.DIVISION_LEVEL_MAPPING.get(division_value, [])
+        self.fields["division"].choices = [("", _("Select division"))] + list(
+            get_division_choices(self.school)
+        )
+        self.fields["level"].widget.school = self.school
+        allowed_levels = get_levels_for_division(division_value, school=self.school)
         if allowed_levels:
-            level_labels = dict(LEVEL)
+            level_labels = dict(get_level_choices(self.school))
             self.fields["level"].choices = [("", _("Select level"))] + [
                 (level, level_labels.get(level, level)) for level in allowed_levels
             ]
@@ -771,7 +790,7 @@ class StudentAddForm(UserCreationForm):
         division = cleaned.get("division")
         level = cleaned.get("level")
         sub_class = cleaned.get("sub_class")
-        level_division = get_division_for_level(level) if level else None
+        level_division = get_division_for_level(level, school=self.school) if level else None
 
         if division and level_division and level_division != division:
             self.add_error(
@@ -816,7 +835,7 @@ class StudentAddForm(UserCreationForm):
         user.address = self.cleaned_data.get("address")
         user.email = self.cleaned_data.get("email")
         user.division = self.cleaned_data.get("division") or get_division_for_level(
-            self.cleaned_data.get("level")
+            self.cleaned_data.get("level"), school=school
         )
         
         # Generate a username when one was not supplied, but always make sure
@@ -825,7 +844,9 @@ class StudentAddForm(UserCreationForm):
         password = self.cleaned_data.get("password1")
         generated_password = None
         if not user.username:
-            division = get_division_for_level(self.cleaned_data.get("level"))
+            division = get_division_for_level(
+                self.cleaned_data.get("level"), school=school
+            )
             user.username, generated_password = generate_student_credentials(
                 school=school, division=division
             )
@@ -865,6 +886,15 @@ class ProfileUpdateForm(UserChangeForm):
         self.is_admin = kwargs.pop("is_admin", False)
         self.is_staff_admin = kwargs.pop("is_staff_admin", False)
         super(ProfileUpdateForm, self).__init__(*args, **kwargs)
+
+        if "division" in self.fields:
+            self.fields["division"].choices = [("", _("Select Division"))] + list(
+                get_division_choices(self.school)
+            )
+        if "assigned_level" in self.fields:
+            self.fields["assigned_level"].choices = [
+                ("", _("No class assigned"))
+            ] + list(get_level_choices(self.school))
 
         instance = self.instance
         is_student = getattr(instance, "is_student", False)
@@ -938,7 +968,7 @@ class ProfileUpdateForm(UserChangeForm):
         # an administrator from the same form.
         if is_student and self.is_admin:
             self.fields["level"] = forms.ChoiceField(
-                choices=[("", _("Select level"))] + list(LEVEL),
+                choices=[("", _("Select level"))] + list(get_level_choices(self.school)),
                 required=False,
                 label=_("Class / Level"),
                 widget=forms.Select(attrs={"class": "form-select"}),
@@ -1109,7 +1139,7 @@ class ProfileUpdateForm(UserChangeForm):
             if assigned_level and not division:
                 self.add_error("division", _("Choose a division for the assigned class."))
             if assigned_level and division:
-                valid_levels = settings.DIVISION_LEVEL_MAPPING.get(division, [])
+                valid_levels = get_levels_for_division(division, school=self.school)
                 if assigned_level not in valid_levels:
                     self.add_error("assigned_level", _("Choose a class within the selected division."))
 
@@ -1146,7 +1176,7 @@ class ProfileUpdateForm(UserChangeForm):
         if commit and (getattr(user, "is_teacher", False) or getattr(user, "is_lecturer", False)) and self.is_admin and self.is_staff_admin:
             division = self.cleaned_data.get("division")
             if division:
-                title = dict(settings.DIVISION_CHOICES).get(division)
+                title = dict(get_division_choices(self.school)).get(division)
                 user.department, _ = Program.objects.get_or_create(
                     school=self.school or user.school,
                     division=division,
@@ -1230,7 +1260,7 @@ class SubClassForm(forms.ModelForm):
                 school=self.school, is_teacher=True, is_active=True
             )
             if self.level:
-                division = get_division_for_level(self.level)
+                division = get_division_for_level(self.level, school=self.school)
                 if division:
                     teachers = teachers.filter(division=division)
             self.fields["class_teacher"].queryset = teachers.order_by(
@@ -1324,6 +1354,9 @@ class StudentTransferForm(forms.Form):
         self.school = school
         self.student = student
         super().__init__(*args, **kwargs)
+        self.fields["to_level"].choices = [("", _("Select level"))] + list(
+            get_level_choices(school)
+        )
 
         queryset = SubClass.objects.none()
         if school is not None:
@@ -1387,12 +1420,18 @@ class StaffPromotionForm(forms.Form):
     def __init__(self, *args, **kwargs):
         self.school = kwargs.pop("school", None)
         super().__init__(*args, **kwargs)
+        self.fields["division"].choices = [("", _("Select division"))] + list(
+            get_division_choices(self.school)
+        )
+        self.fields["assigned_level"].choices = [
+            ("", _("No class assigned"))
+        ] + list(get_level_choices(self.school))
 
     def clean(self):
         cleaned = super().clean()
         division = cleaned.get("division")
         level = cleaned.get("assigned_level")
-        if level and level not in settings.DIVISION_LEVEL_MAPPING.get(division, []):
+        if level and level not in get_levels_for_division(division, school=self.school):
             self.add_error("assigned_level", _("Choose a class within the selected division."))
         if cleaned.get("is_class_teacher") and not level:
             self.add_error("assigned_level", _("Assign a class before marking this teacher as a class teacher."))

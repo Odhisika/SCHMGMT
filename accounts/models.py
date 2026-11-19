@@ -395,10 +395,12 @@ class User(AbstractUser):
         )
     
     def get_division_levels(self):
-        """Return all levels in this teacher's division"""
+        """Return all levels in this teacher's division, including custom ones."""
         if not self.division:
             return []
-        return settings.DIVISION_LEVEL_MAPPING.get(self.division, [])
+        from school.division_utils import get_levels_for_division
+
+        return get_levels_for_division(self.division, school=self.school)
     
     def can_access_level(self, level_code):
         """Check if this teacher can access the given level"""
@@ -596,13 +598,16 @@ class Student(models.Model):
         return self.level or ""
 
     def get_division(self):
-        """Derive the school division (Nursery/Primary/JHS) from the level."""
+        """Derive the school division from the level, including custom divisions."""
         if not self.level:
             return None
-        for division, levels in settings.DIVISION_LEVEL_MAPPING.items():
-            if self.level in levels:
-                return division
-        return None
+        from school.division_utils import get_division_for_level
+
+        try:
+            school = self.student.school
+        except Exception:
+            school = None
+        return get_division_for_level(self.level, school=school)
 
     @property
     def is_active_student(self):

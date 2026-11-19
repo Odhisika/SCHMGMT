@@ -120,6 +120,93 @@ class School(models.Model):
         return self.users.filter(is_school_admin=True, is_active=True).count()
 
 
+class SchoolDivision(models.Model):
+    """A school-specific academic division (for example Creche or Sixth Form)."""
+
+    school = models.ForeignKey(
+        School, on_delete=models.CASCADE, related_name="custom_divisions"
+    )
+    name = models.CharField(max_length=50, help_text=_("Division name, e.g. Creche"))
+    id_prefix = models.CharField(
+        max_length=12,
+        default="DIV",
+        validators=[STUDENT_ID_PREFIX_VALIDATOR],
+        help_text=_("Short code used in generated student IDs (e.g. CRE)."),
+    )
+    id_pattern = models.CharField(
+        max_length=40, choices=STUDENT_ID_PATTERNS, default="SCHOOL_DIVISION_YEAR_SEQUENCE"
+    )
+    order = models.PositiveSmallIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = _("School division")
+        verbose_name_plural = _("School divisions")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("school", "name"), name="unique_custom_division_per_school"
+            )
+        ]
+        ordering = ("order", "name")
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        self.name = (self.name or "").strip()
+        self.id_prefix = (self.id_prefix or "").strip().upper()
+        return super().save(*args, **kwargs)
+
+
+class SchoolDivisionLevel(models.Model):
+    """A class/level belonging to a school-specific division."""
+
+    division = models.ForeignKey(
+        SchoolDivision, on_delete=models.CASCADE, related_name="levels"
+    )
+    name = models.CharField(max_length=50, help_text=_("Class name, e.g. Creche 1"))
+    order = models.PositiveSmallIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = _("School division class")
+        verbose_name_plural = _("School division classes")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("division", "name"), name="unique_level_per_custom_division"
+            )
+        ]
+        ordering = ("order", "name")
+
+    def __str__(self):
+        return self.name
+
+
+class SchoolDivisionOrder(models.Model):
+    """Per-school display order for built-in and custom divisions."""
+
+    school = models.ForeignKey(
+        School, on_delete=models.CASCADE, related_name="division_order"
+    )
+    division = models.CharField(max_length=50)
+    order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        verbose_name = _("Division order")
+        verbose_name_plural = _("Division orders")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("school", "division"), name="unique_division_order_per_school"
+            )
+        ]
+        ordering = ("order", "division")
+
+    def __str__(self):
+        return f"{self.division}: {self.order}"
+
+
 class StudentIDSequence(models.Model):
     """Persistent independent student ID counter for each school division."""
 

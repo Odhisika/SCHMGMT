@@ -9,11 +9,15 @@ from django.utils.translation import gettext_lazy as _
 from django.core.mail import send_mail
 from django.conf import settings
 
-from .models import School, GradeWeightConfig, PromotionPolicy
+from .models import (
+    School, SchoolDivision, SchoolDivisionOrder, GradeWeightConfig, PromotionPolicy,
+)
 from .forms import (
     SchoolForm, SchoolOnboardingForm, SchoolStatusForm,
-    SchoolIdentityForm, StudentIDFormatForm, GradeWeightForm, PromotionPolicyForm,
+    SchoolIdentityForm, SchoolDivisionForm, SchoolDivisionOrderForm,
+    StudentIDFormatForm, GradeWeightForm, PromotionPolicyForm,
 )
+from .division_utils import get_division_choices
 from accounts.models import User
 from core.models import Notification
 from core.notifications import notify, notify_admins
@@ -186,6 +190,115 @@ def school_settings_identity(request):
     })
 
 
+def _put_new_division_first(school, division_name):
+    """Keep the current order but place a newly added division before it."""
+    ordered_names = [name for name, _ in get_division_choices(school)]
+    for index, name in enumerate(ordered_names):
+        SchoolDivisionOrder.objects.update_or_create(
+            school=school, division=name, defaults={"order": index + 1}
+        )
+    SchoolDivisionOrder.objects.update_or_create(
+        school=school, division=division_name, defaults={"order": 0}
+    )
+
+
+@_school_admin_required
+def school_settings_divisions(request):
+    """Let a school admin add, arrange and edit divisions and their classes."""
+    school = request.school
+    divisions = school.custom_divisions.prefetch_related("levels").order_by("order", "name")
+    form = SchoolDivisionForm(school=school)
+    order_form = SchoolDivisionOrderForm(school=school)
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+
+        if action == "delete":
+            division = get_object_or_404(
+                SchoolDivision, pk=request.POST.get("division_id"), school=school
+            )
+            SchoolDivisionOrder.objects.filter(school=school, division=division.name).delete()
+            division.delete()
+            messages.success(request, _("Division removed."))
+            return redirect("school_settings_divisions")
+
+        if action == "save_order":
+            order_form = SchoolDivisionOrderForm(request.POST, school=school)
+            if order_form.is_valid():
+                for index, name in enumerate(order_form.ordered_divisions()):
+                    SchoolDivisionOrder.objects.update_or_create(
+                        school=school, division=name, defaults={"order": index}
+                    )
+                messages.success(request, _("Division order saved."))
+                return redirect("school_settings_divisions")
+            messages.error(request, _("Please correct the division order."))
+        else:
+            division_id = request.POST.get("division_id") or None
+            division = (
+                get_object_or_404(SchoolDivision, pk=division_id, school=school)
+                if division_id else None
+            )
+            is_new = division is None
+            old_name = division.name if division else None
+            form = SchoolDivisionForm(request.POST, school=school, division=division)
+            if form.is_valid():
+                if is_new:
+                    division = SchoolDivision(school=school, order=divisions.count())
+                division.name = form.cleaned_data["name"]
+                division.id_prefix = form.cleaned_data["id_prefix"]
+                division.id_pattern = form.cleaned_data["id_pattern"]
+                division.save()
+
+                if is_new:
+                    _put_new_division_first(school, division.name)
+                elif old_name != division.name:
+                    SchoolDivisionOrder.objects.filter(
+                        school=school, division=old_name
+                    ).update(division=division.name)
+
+                # The form is the source of truth for this division's classes.
+                division.levels.all().delete()
+                for index, level_name in enumerate(form.cleaned_data["levels"]):
+                    division.levels.create(name=level_name, order=index)
+
+                messages.success(request, _("Division saved."))
+                return redirect("school_settings_divisions")
+            messages.error(request, _("Please correct the errors below."))
+
+    division_forms = [
+        (
+            division,
+            SchoolDivisionForm(
+                initial={
+                    "division_id": division.pk,
+                    "name": division.name,
+                    "levels": "\n".join(level.name for level in division.levels.all()),
+                    "id_prefix": division.id_prefix,
+                    "id_pattern": division.id_pattern,
+                },
+                school=school,
+                division=division,
+            ),
+        )
+        for division in divisions
+    ]
+
+    from result.models import PromotionRequest
+    pending_count = PromotionRequest.objects.filter(school=school, status='PENDING').count()
+
+    return render(request, 'school/school_settings.html', {
+        'active_tab': 'divisions',
+        'division_form': form,
+        'division_order_form': order_form,
+        'division_forms': division_forms,
+        'custom_divisions': divisions,
+        'division_choices': get_division_choices(school),
+        'school': school,
+        'pending_count': pending_count,
+        'title': _('School Settings — Divisions'),
+    })
+
+
 @_school_admin_required
 def school_settings_student_ids(request):
     """Configure school-wide student ID generation patterns."""
@@ -200,9 +313,44 @@ def school_settings_student_ids(request):
     else:
         student_id_format_form = StudentIDFormatForm(instance=school)
 
-    student_id_next = {"Nursery": 1, "Primary": 1, "JHS": 1}
+    division_choices = get_division_choices(school)
+    student_id_next = {name: 1 for name, _ in division_choices}
     for sequence in school.student_id_sequences.all():
         student_id_next[sequence.division] = sequence.last_number + 1
+
+    custom_by_name = {
+        division.name: division
+        for division in school.custom_divisions.filter(is_active=True)
+    }
+    built_in_specs = {
+        "Nursery": (
+            _("Nursery / Pre-School"),
+            student_id_format_form.student_id_nursery_prefix,
+            student_id_format_form.student_id_nursery_pattern,
+        ),
+        "Primary": (
+            _("Primary"),
+            student_id_format_form.student_id_primary_prefix,
+            student_id_format_form.student_id_primary_pattern,
+        ),
+        "JHS": (
+            "JHS",
+            student_id_format_form.student_id_jhs_prefix,
+            student_id_format_form.student_id_jhs_pattern,
+        ),
+    }
+    division_cards = []
+    for name, label in division_choices:
+        card = {"name": name, "label": label, "next_number": student_id_next[name]}
+        if name in built_in_specs:
+            card.update({
+                "built_in": True,
+                "prefix_field": built_in_specs[name][1],
+                "pattern_field": built_in_specs[name][2],
+            })
+        elif name in custom_by_name:
+            card.update({"built_in": False, "division": custom_by_name[name]})
+        division_cards.append(card)
 
     from result.models import PromotionRequest
     pending_count = PromotionRequest.objects.filter(school=school, status='PENDING').count()
@@ -210,6 +358,7 @@ def school_settings_student_ids(request):
         'active_tab': 'student_ids',
         'student_id_format_form': student_id_format_form,
         'student_id_next': student_id_next,
+        'division_cards': division_cards,
         'school_code': f"S{school.pk}",
         'school': school,
         'pending_count': pending_count,

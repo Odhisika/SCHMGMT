@@ -22,9 +22,9 @@
     <!-- Division Filter Pills -->
     	<div class="btn-group" role="group" aria-label="Division Filter">
         <a href="?division=ALL" class="btn btn-outline-primary {% if selected_division == 'ALL' %}active{% endif %}">{% trans 'All' %}</a>
-        <a href="?division=Nursery" class="btn btn-outline-primary {% if selected_division == 'Nursery' %}active{% endif %}">{% trans 'Nursery' %}</a>
-        <a href="?division=Primary" class="btn btn-outline-primary {% if selected_division == 'Primary' %}active{% endif %}">{% trans 'Primary' %}</a>
-        <a href="?division=JHS" class="btn btn-outline-primary {% if selected_division == 'JHS' %}active{% endif %}">{% trans 'JHS' %}</a>
+        {% for key, label in divisions %}
+        <a href="?division={{ key|urlencode }}" class="btn btn-outline-primary {% if selected_division == key %}active{% endif %}">{{ label }}</a>
+        {% endfor %}
     </div>
 </div>
 

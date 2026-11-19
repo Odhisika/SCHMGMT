@@ -1,7 +1,12 @@
 from django import forms
+from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ValidationError
-from .models import School, GradeWeightConfig, PromotionPolicy
+from .division_utils import get_division_choices
+from .models import (
+    School, SchoolDivision, SchoolDivisionLevel, GradeWeightConfig,
+    PromotionPolicy, STUDENT_ID_PATTERNS, STUDENT_ID_PREFIX_VALIDATOR,
+)
 
 
 class SchoolIdentityForm(forms.ModelForm):
@@ -30,6 +35,159 @@ class SchoolIdentityForm(forms.ModelForm):
             'secondary_color': forms.TextInput(attrs={'class': 'form-control', 'type': 'color'}),
             'accent_color': forms.TextInput(attrs={'class': 'form-control', 'type': 'color'}),
         }
+
+
+class SchoolDivisionForm(forms.Form):
+    """Add or edit a school-specific division and the classes under it."""
+
+    division_id = forms.IntegerField(required=False, widget=forms.HiddenInput())
+    name = forms.CharField(
+        max_length=50,
+        label=_("Division name"),
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": _("e.g. Creche")}),
+    )
+    levels = forms.CharField(
+        label=_("Classes / levels"),
+        widget=forms.Textarea(attrs={"class": "form-control", "rows": 5}),
+        help_text=_("Enter one class per line, for example Creche 1, Creche 2."),
+    )
+    id_prefix = forms.CharField(
+        max_length=12,
+        label=_("Student ID prefix"),
+        validators=[STUDENT_ID_PREFIX_VALIDATOR],
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": _("e.g. CRE")}),
+    )
+    id_pattern = forms.ChoiceField(
+        choices=STUDENT_ID_PATTERNS,
+        label=_("Student ID format"),
+        initial="SCHOOL_DIVISION_YEAR_SEQUENCE",
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+
+    def __init__(self, *args, school=None, division=None, **kwargs):
+        self.school = school
+        self.division = division
+        super().__init__(*args, **kwargs)
+
+    def clean_name(self):
+        name = (self.cleaned_data.get("name") or "").strip()
+        if name.lower() in {value.lower() for value, _ in settings.DIVISION_CHOICES}:
+            raise ValidationError(_("Nursery, Primary and JHS are already built in."))
+        return name
+
+    def clean_levels(self):
+        raw = self.cleaned_data.get("levels") or ""
+        levels = []
+        seen = set()
+        built_in = {code.lower() for code, _ in settings.LEVEL_CHOICES}
+        for line in raw.splitlines():
+            name = line.strip()
+            if not name:
+                continue
+            if len(name) > 50:
+                raise ValidationError(_("Class names must be 50 characters or fewer."))
+            if name.lower() in built_in:
+                raise ValidationError(
+                    _("Use a new class name; %(name)s is already a built-in class.")
+                    % {"name": name}
+                )
+            if name.lower() in seen:
+                continue
+            seen.add(name.lower())
+            levels.append(name)
+        if not levels:
+            raise ValidationError(_("Add at least one class for this division."))
+        return levels
+
+    def clean(self):
+        cleaned = super().clean()
+        name = cleaned.get("name")
+        prefix = (cleaned.get("id_prefix") or "").strip().upper()
+        cleaned["id_prefix"] = prefix
+
+        if self.school and name:
+            existing = SchoolDivision.objects.filter(school=self.school, name__iexact=name)
+            if self.division:
+                existing = existing.exclude(pk=self.division.pk)
+            if existing.exists():
+                self.add_error("name", _("This division already exists for this school."))
+
+        if prefix:
+            built_in_prefixes = {"NUR", "PRI", "JHS"}
+            taken = set(built_in_prefixes)
+            if self.school:
+                others = SchoolDivision.objects.filter(school=self.school)
+                if self.division:
+                    others = others.exclude(pk=self.division.pk)
+                taken.update(d.id_prefix.upper() for d in others)
+            if prefix in taken:
+                self.add_error("id_prefix", _("Use a different ID prefix."))
+
+        levels = cleaned.get("levels") or []
+        if self.school and levels:
+            conflicts = SchoolDivisionLevel.objects.filter(
+                division__school=self.school, name__in=levels
+            )
+            if self.division:
+                conflicts = conflicts.exclude(division=self.division)
+            if conflicts.exists():
+                self.add_error(
+                    "levels",
+                    _("A class with one of these names already exists in another division."),
+                )
+
+        return cleaned
+
+
+class SchoolDivisionOrderForm(forms.Form):
+    """Arrange built-in and custom divisions for a school."""
+
+    def __init__(self, *args, school=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.school = school
+        self.division_keys = [name for name, _ in get_division_choices(school)]
+
+        placements = {}
+        if school and getattr(school, "pk", None):
+            placements = {p.division: p.order for p in school.division_order.all()}
+
+        for index, name in enumerate(self.division_keys):
+            self.fields[f"order_{index}"] = forms.IntegerField(
+                label=name,
+                min_value=0,
+                initial=placements.get(name, index),
+                widget=forms.NumberInput(
+                    attrs={"class": "form-control", "min": "0", "style": "max-width: 100px;"}
+                ),
+            )
+
+    @property
+    def division_order_fields(self):
+        return [
+            (name, self[f"order_{index}"])
+            for index, name in enumerate(self.division_keys)
+        ]
+
+    def clean(self):
+        cleaned = super().clean()
+        orders = [
+            cleaned.get(f"order_{index}")
+            for index in range(len(self.division_keys))
+        ]
+        orders = [order for order in orders if order is not None]
+        if len(orders) != len(set(orders)):
+            raise ValidationError(_("Give every division a different order number."))
+        return cleaned
+
+    def ordered_divisions(self):
+        """Return division names sorted by the submitted order numbers."""
+        ordered = sorted(
+            (
+                (self.cleaned_data[f"order_{index}"], index, name)
+                for index, name in enumerate(self.division_keys)
+            )
+        )
+        return [name for _, _, name in ordered]
 
 
 class StudentIDFormatForm(forms.ModelForm):
