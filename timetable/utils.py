@@ -33,10 +33,10 @@ def auto_generate_timetable(school, term):
 
             days = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY']
             
-            # 3. Get all active classes (levels)
-            # We iterate through levels defined in settings
-            from django.conf import settings
-            levels = [code for code, name in settings.LEVEL_CHOICES]
+            # 3. Get all active classes (levels), including custom divisions
+            from school.division_utils import get_level_choices
+
+            levels = [code for code, name in get_level_choices(school)]
             
             for level in levels:
                 # Get subjects for this level and term

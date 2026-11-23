@@ -6,6 +6,7 @@ import uuid
 
 from accounts.models import Student
 from core.models import Term
+from school.fields import FlexibleChoiceCharField
 
 
 class FeeStructure(models.Model):
@@ -13,11 +14,20 @@ class FeeStructure(models.Model):
     school = models.ForeignKey('school.School', on_delete=models.CASCADE, related_name='fee_structures')
     name = models.CharField(max_length=100, help_text=_("e.g., Tuition Fee, Exam Fee"))
     amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, help_text=_("Total calculated amount"))
-    level = models.CharField(
-        max_length=25, 
-        choices=settings.LEVEL_CHOICES, 
+    division = FlexibleChoiceCharField(
+        max_length=25,
+        choices=settings.DIVISION_CHOICES,
         blank=True,
-        help_text=_("Leave blank for all levels")
+        help_text=_(
+            "Choose a division and leave Class blank to apply to every class "
+            "in that division. Leave both blank for all divisions."
+        ),
+    )
+    level = FlexibleChoiceCharField(
+        max_length=25,
+        choices=settings.LEVEL_CHOICES,
+        blank=True,
+        help_text=_("Leave blank for all classes in the selected division")
     )
     term = models.CharField(
         max_length=20,
@@ -28,7 +38,7 @@ class FeeStructure(models.Model):
     is_active = models.BooleanField(default=True)
     auto_assign = models.BooleanField(
         default=True,
-        help_text=_("Automatically assign this fee to all students in the specified level/term")
+        help_text=_("Automatically assign this fee to all matching students in the selected scope")
     )
     description = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -42,10 +52,20 @@ class FeeStructure(models.Model):
         return f"{self.name} - {self.school.name} - {settings.CURRENCY_SYMBOL}{self.amount}"
 
     def update_total_amount(self):
-        """Recalculate total amount from items"""
-        total = self.items.aggregate(models.Sum('amount'))['amount__sum'] or 0
+        """Recalculate total amount from items and keep generated assignments in sync."""
+        previous_amount = self.amount or Decimal('0.00')
+        total = self.items.aggregate(models.Sum('amount'))['amount__sum'] or Decimal('0.00')
         self.amount = total
-        self.save()
+        self.save(update_fields=['amount'])
+
+        # Fee items are saved after the fee structure, so auto-assignments are
+        # first created with the default zero amount. Refresh any assignment
+        # still holding the previous/default amount without clobbering manual
+        # per-student overrides.
+        StudentFeeAssignment.objects.filter(
+            fee_structure=self,
+            amount=previous_amount,
+        ).update(amount=total)
 
 
 class FeeItem(models.Model):

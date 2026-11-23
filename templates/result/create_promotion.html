@@ -45,9 +45,9 @@
         {% if selected_is_final %}
         <div class="alert alert-info">
             <i class="fas fa-graduation-cap"></i>
-            <strong>{% trans 'Final class completion (JHS 3)' %}</strong> &mdash;
-            {% trans 'There is no academic repeat in JHS 3. Learners with a valid record are completed/graduated; Term 3 is not required and BECE results are handled by WAEC.' %}
-            {% trans 'Use "Hold" only if a learner cannot complete/register for BECE due to illness, fees, or a school decision (they remain active in JHS 3, not repeating).' %}
+            <strong>{% trans 'Final class completion' %}: {{ selected_level }}</strong> &mdash;
+            {% trans 'There is no academic repeat in the final class. Learners with a valid record are completed/graduated, and the final-term requirement follows the school promotion policy.' %}
+            {% trans 'Use "Hold" only if a learner cannot complete the final class due to illness, fees, or a school decision (they remain active in the final class, not repeating).' %}
         </div>
         {% endif %}
 
@@ -125,7 +125,7 @@
                                     </button>
                                     <button type="submit" name="student_action" value="{{ item.student.pk }}:hold"
                                             class="btn btn-sm btn-outline-warning"
-                                            title="{% trans 'Keep in JHS 3 on hold (e.g. unable to register for BECE). Not a repeat.' %}">
+                                            title="{% trans 'Keep in the final class on hold. Not a repeat.' %}">
                                         <i class="fas fa-pause-circle"></i> {% trans 'Hold' %}
                                     </button>
                                     {% else %}
@@ -143,7 +143,7 @@
                                 </div>
                                 {% if item.promoted %}
                                 <small class="text-success d-block mt-1">
-                                    {% if item.is_graduating %}{% trans 'Will graduate/complete JHS 3' %}{% else %}{% trans 'Next:' %} {{ item.next_level }}{% endif %}
+                                    {% if item.is_graduating %}{% trans 'Will graduate/complete' %} {{ selected_level }}{% else %}{% trans 'Next:' %} {{ item.next_level }}{% endif %}
                                 </small>
                                 {% elif item.status == 'INCOMPLETE' %}
                                 <small class="text-warning d-block mt-1">

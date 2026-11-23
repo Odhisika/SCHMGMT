@@ -42,7 +42,7 @@ class SchoolDivisionForm(forms.Form):
 
     division_id = forms.IntegerField(required=False, widget=forms.HiddenInput())
     name = forms.CharField(
-        max_length=50,
+        max_length=25,
         label=_("Division name"),
         widget=forms.TextInput(attrs={"class": "form-control", "placeholder": _("e.g. Creche")}),
     )
@@ -84,8 +84,8 @@ class SchoolDivisionForm(forms.Form):
             name = line.strip()
             if not name:
                 continue
-            if len(name) > 50:
-                raise ValidationError(_("Class names must be 50 characters or fewer."))
+            if len(name) > 25:
+                raise ValidationError(_("Class names must be 25 characters or fewer."))
             if name.lower() in built_in:
                 raise ValidationError(
                     _("Use a new class name; %(name)s is already a built-in class.")

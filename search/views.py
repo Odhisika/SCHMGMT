@@ -135,12 +135,15 @@ class SearchView(LoginRequiredMixin, ListView):
         if not needle_tokens:
             return []
 
-        division_labels = dict(settings.DIVISION_CHOICES)
+        school = getattr(self.request, "school", None)
+        from school.division_utils import get_division_labels, get_level_choices
+
+        division_labels = get_division_labels(school)
         results = []
-        for level_code, level_label in settings.LEVEL_CHOICES:
+        for level_code, level_label in get_level_choices(school):
             if not user.can_access_level(level_code):
                 continue
-            division = get_division_for_level(level_code) or ""
+            division = get_division_for_level(level_code, school=school) or ""
             division_label = division_labels.get(division, "")
             haystack = " ".join(
                 [str(level_code), str(level_label), str(division), str(division_label)]

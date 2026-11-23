@@ -11,7 +11,6 @@ from django.conf import settings
 from course.models import Program
 from school.division_utils import (
     get_division_choices,
-    get_division_level_mapping,
     get_level_choices,
     get_levels_for_division,
 )
@@ -618,11 +617,14 @@ class StudentAddForm(UserCreationForm):
         )
         self.fields["level"].widget.school = self.school
         allowed_levels = get_levels_for_division(division_value, school=self.school)
-        if allowed_levels:
-            level_labels = dict(get_level_choices(self.school))
-            self.fields["level"].choices = [("", _("Select level"))] + [
-                (level, level_labels.get(level, level)) for level in allowed_levels
-            ]
+        if not allowed_levels:
+            # The form allows the division to be blank, so offer every class
+            # configured by the school instead of only the legacy built-ins.
+            allowed_levels = [code for code, _ in get_level_choices(self.school)]
+        level_labels = dict(get_level_choices(self.school))
+        self.fields["level"].choices = [("", _("Select level"))] + [
+            (level, level_labels.get(level, level)) for level in allowed_levels
+        ]
 
         _disable_password_inputs(self)
         _apply_bootstrap_widgets(self)

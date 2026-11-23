@@ -43,21 +43,17 @@ from .promotion import (
     term_rank,
 )
 from school.models import GradeWeightConfig
+from school.division_utils import (
+    get_default_division,
+    get_division_choices,
+    get_division_labels,
+    get_level_choices_for_codes,
+    get_levels_for_division,
+    is_known_division,
+)
 
 
 CM = 2.54
-
-
-def get_next_level(current_level):
-    """Helper to determine next class level"""
-    levels = [l[0] for l in settings.LEVEL_CHOICES]  # Extract keys
-    try:
-        index = levels.index(current_level)
-        if index + 1 < len(levels):
-            return levels[index + 1]
-    except ValueError:
-        pass
-    return None
 
 
 @login_required
@@ -91,16 +87,16 @@ def create_promotion(request):
     )
 
     # Division filtering logic
-    DEFAULT_DIV = settings.DIVISION_NURSERY
-    current_division = request.GET.get("division", DEFAULT_DIV)
-    division_levels_list = settings.DIVISION_LEVEL_MAPPING.get(
-        current_division, []
-    )
+    divisions = get_division_choices(request.school)
+    default_division = get_default_division(request.school)
+    current_division = request.GET.get("division", default_division)
+    if not is_known_division(current_division, request.school):
+        current_division = default_division
+    division_levels_list = get_levels_for_division(current_division, school=request.school)
 
-    division_level_choices = []
-    for code, name in settings.LEVEL_CHOICES:
-        if code in division_levels_list:
-            division_level_choices.append((code, name))
+    division_level_choices = get_level_choices_for_codes(
+        division_levels_list, school=request.school
+    )
 
     selected_level = request.GET.get("level") or request.POST.get("level")
 
@@ -108,7 +104,7 @@ def create_promotion(request):
         selected_level = None
 
     selected_is_final = (
-        is_final_class(selected_level) if selected_level else False
+        is_final_class(selected_level, school=request.school) if selected_level else False
     )
     can_process = bool(current_term) and (
         is_third_term
@@ -127,11 +123,7 @@ def create_promotion(request):
         "pass_mark": pass_mark,
         "failure_mark": failure_mark,
         "current_division": current_division,
-        "divisions": [
-            (settings.DIVISION_NURSERY, _("Nursery/Pre-School")),
-            (settings.DIVISION_PRIMARY, _("Primary School")),
-            (settings.DIVISION_JHS, _("Junior High School")),
-        ],
+        "divisions": divisions,
         "selected_level": selected_level,
     }
 
@@ -1178,18 +1170,18 @@ def report_cards(request):
     """
     List all students and their report card status for the school admin.
     """
-    from accounts.utils import get_division_for_level
-    
     # Get current division and level from request
-    DIVISION_NURSERY = settings.DIVISION_NURSERY
-    current_division = request.GET.get('division', DIVISION_NURSERY)
+    default_division = get_default_division(request.school)
+    current_division = request.GET.get('division', default_division)
+    if not is_known_division(current_division, request.school):
+        current_division = default_division
     selected_level = request.GET.get('level')
-    
+
     # Base queryset
     students = Student.objects.filter(student__school=request.school)
     
     # Division filtering
-    division_levels = settings.DIVISION_LEVEL_MAPPING.get(current_division, [])
+    division_levels = get_levels_for_division(current_division, school=request.school)
     if division_levels:
         students = students.filter(level__in=division_levels)
     
@@ -1202,18 +1194,12 @@ def report_cards(request):
     current_term = Semester.objects.filter(is_current_term=True, school=request.school).first()
     
     # Prepare context for tabs and filters
-    divisions = [
-        (settings.DIVISION_NURSERY, _("Nursery/Pre-School")),
-        (settings.DIVISION_PRIMARY, _("Primary School")),
-        (settings.DIVISION_JHS, _("Junior High School")),
-    ]
-    
-    # Filter valid levels for the dropdown based on current division
-    # settings.LEVEL_CHOICES contains all levels. We filter them.
-    division_level_choices = []
-    for code, name in settings.LEVEL_CHOICES:
-        if code in division_levels:
-            division_level_choices.append((code, name))
+    divisions = get_division_choices(request.school)
+
+    # Filter valid levels for the dropdown based on current division.
+    division_level_choices = get_level_choices_for_codes(
+        division_levels, school=request.school
+    )
 
     context = {
         "students": students,
@@ -1440,18 +1426,15 @@ def ca_scoresheet(request):
         is_current_term=True, school=request.school
     ).first()
     is_admin = request.user.is_superuser or request.user.is_school_admin
-    divisions = [
-        (settings.DIVISION_NURSERY, _("Nursery/Pre-School")),
-        (settings.DIVISION_PRIMARY, _("Primary School")),
-        (settings.DIVISION_JHS, _("JHS")),
-    ]
+    divisions = get_division_choices(request.school)
+    default_division = get_default_division(request.school)
 
     if is_admin:
-        current_division = request.GET.get("division", settings.DIVISION_NURSERY)
-        if current_division not in dict(divisions):
-            current_division = settings.DIVISION_NURSERY
+        current_division = request.GET.get("division", default_division)
+        if not is_known_division(current_division, request.school):
+            current_division = default_division
         subjects = Course.objects.filter(school=request.school).distinct()
-        division_levels = settings.DIVISION_LEVEL_MAPPING.get(current_division, [])
+        division_levels = get_levels_for_division(current_division, school=request.school)
         subjects = subjects.filter(level__in=division_levels)
     else:
         subjects = Course.objects.filter(
@@ -1464,7 +1447,7 @@ def ca_scoresheet(request):
         subjects = subjects.filter(term=current_term.term)
 
     allocated_levels = list(subjects.values_list("level", flat=True).distinct())
-    levels = [level for level in settings.LEVEL_CHOICES if level[0] in allocated_levels]
+    levels = get_level_choices_for_codes(allocated_levels, school=request.school)
 
     selected_level = request.GET.get("level", "")
     subject_id = request.GET.get("subject")
@@ -1490,7 +1473,7 @@ def ca_scoresheet(request):
             return redirect("ca_scoresheet")
 
         if is_admin:
-            division_levels = settings.DIVISION_LEVEL_MAPPING.get(current_division, [])
+            division_levels = get_levels_for_division(current_division, school=request.school)
             if course.level not in division_levels:
                 messages.error(
                     request, _("That subject is outside the selected division.")
@@ -1752,18 +1735,15 @@ def manage_scores_dashboard(request):
 
     # Get subjects taught by teacher (strictly allocated)
     is_admin = request.user.is_superuser or request.user.is_school_admin
-    divisions = [
-        (settings.DIVISION_NURSERY, _("Nursery/Pre-School")),
-        (settings.DIVISION_PRIMARY, _("Primary School")),
-        (settings.DIVISION_JHS, _("JHS")),
-    ]
+    divisions = get_division_choices(request.school)
+    default_division = get_default_division(request.school)
     if is_admin:
         # Admins can view courses across the school, narrowed by division.
-        current_division = request.GET.get("division", settings.DIVISION_NURSERY)
-        if current_division not in dict(divisions):
-            current_division = settings.DIVISION_NURSERY
+        current_division = request.GET.get("division", default_division)
+        if not is_known_division(current_division, request.school):
+            current_division = default_division
         subjects = Course.objects.filter(school=request.school).distinct()
-        division_levels = settings.DIVISION_LEVEL_MAPPING.get(current_division, [])
+        division_levels = get_levels_for_division(current_division, school=request.school)
         subjects = subjects.filter(level__in=division_levels)
     else:
         # Filter strictly by teacher allocation, within this school
@@ -1783,8 +1763,8 @@ def manage_scores_dashboard(request):
         subjects.values_list("level", flat=True).distinct()
     )
 
-    # Map levels to settings choices for labels
-    levels = [l for l in settings.LEVEL_CHOICES if l[0] in allocated_levels]
+    # Map levels to choices for labels (including custom school levels).
+    levels = get_level_choices_for_codes(allocated_levels, school=request.school)
 
     selected_level = ""
     score_configuration = None

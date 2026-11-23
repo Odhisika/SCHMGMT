@@ -13,7 +13,28 @@ from accounts.models import STUDENT_STATUS_ACTIVE, Student
 from core.models import Term
 from core.models import Notification
 from core.notifications import notify
+from school.division_utils import (
+    get_division_choices,
+    get_division_for_level,
+    get_level_choices,
+    get_level_choices_for_codes,
+    get_levels_for_division,
+    is_known_division,
+)
 from .models import FeeStructure, StudentFeeAssignment, Payment, SchoolBankAccount, StudentPaymentReference
+
+
+def division_level_map(school):
+    """JSON-friendly division -> class choices map for the fee form."""
+    return {
+        division: list(
+            get_level_choices_for_codes(
+                get_levels_for_division(division, school=school),
+                school=school,
+            )
+        )
+        for division, _label in get_division_choices(school)
+    }
 
 
 @login_required
@@ -37,16 +58,16 @@ def admin_payment_dashboard(request):
     selected_level = request.GET.get('level')
     
     # Division levels for filtering
+    if current_division != 'all' and not is_known_division(current_division, request.school):
+        current_division = 'all'
     if current_division == 'all':
         division_levels = [] # No specific division levels to restrict to
         current_division_display = _("All Divisions")
     else:
-        division_levels = settings.DIVISION_LEVEL_MAPPING.get(current_division, [])
-        current_division_display = dict([
-            (settings.DIVISION_NURSERY, _("Nursery/Pre-School")),
-            (settings.DIVISION_PRIMARY, _("Primary School")),
-            (settings.DIVISION_JHS, _("Junior High School")),
-        ]).get(current_division, current_division)
+        division_levels = get_levels_for_division(current_division, school=request.school)
+        current_division_display = dict(get_division_choices(request.school)).get(
+            current_division, current_division
+        )
 
     # Base querysets
     payments_qs = Payment.objects.filter(school=request.school)
@@ -99,10 +120,9 @@ def admin_payment_dashboard(request):
     ).order_by('-is_default')
     
     # Prepare division level choices
-    division_level_choices = []
-    for code, name in settings.LEVEL_CHOICES:
-        if code in division_levels:
-            division_level_choices.append((code, name))
+    division_level_choices = get_level_choices_for_codes(
+        division_levels, school=request.school
+    )
 
     context = {
         'title': _('Payment Management'),
@@ -118,12 +138,9 @@ def admin_payment_dashboard(request):
         'current_division_name': current_division_display,
         'selected_level': selected_level,
         'division_levels': division_level_choices,
-        'divisions': [
-            ('all', _("All Divisions")),
-            (settings.DIVISION_NURSERY, _("Nursery/Pre-School")),
-            (settings.DIVISION_PRIMARY, _("Primary School")),
-            (settings.DIVISION_JHS, _("Junior High School")),
-        ],
+        'divisions': [('all', _("All Divisions"))] + list(
+            get_division_choices(request.school)
+        ),
     }
     return render(request, 'fees/admin_dashboard.html', context)
 
@@ -193,7 +210,7 @@ def fee_structure_create(request):
     from .forms import FeeStructureForm, FeeItemFormSet
     
     if request.method == 'POST':
-        form = FeeStructureForm(request.POST)
+        form = FeeStructureForm(request.POST, school=request.school)
         formset = FeeItemFormSet(request.POST, prefix='items')
         
         if form.is_valid() and formset.is_valid():
@@ -212,13 +229,14 @@ def fee_structure_create(request):
             messages.success(request, _("Fee structure created successfully!"))
             return redirect('fees:fee_list')
     else:
-        form = FeeStructureForm()
+        form = FeeStructureForm(school=request.school)
         formset = FeeItemFormSet(prefix='items')
     
     context = {
         'title': _('Create Fee Structure'),
         'form': form,
         'formset': formset,
+        'division_level_map': division_level_map(request.school),
     }
     return render(request, 'fees/fee_form.html', context)
 
@@ -232,7 +250,7 @@ def fee_structure_edit(request, pk):
     fee = get_object_or_404(FeeStructure, pk=pk, school=request.school)
     
     if request.method == 'POST':
-        form = FeeStructureForm(request.POST, instance=fee)
+        form = FeeStructureForm(request.POST, instance=fee, school=request.school)
         formset = FeeItemFormSet(request.POST, instance=fee, prefix='items')
         
         if form.is_valid() and formset.is_valid():
@@ -245,7 +263,7 @@ def fee_structure_edit(request, pk):
             messages.success(request, _("Fee structure updated successfully!"))
             return redirect('fees:fee_list')
     else:
-        form = FeeStructureForm(instance=fee)
+        form = FeeStructureForm(instance=fee, school=request.school)
         formset = FeeItemFormSet(instance=fee, prefix='items')
     
     context = {
@@ -253,6 +271,7 @@ def fee_structure_edit(request, pk):
         'form': form,
         'fee': fee,
         'formset': formset,
+        'division_level_map': division_level_map(request.school),
     }
     return render(request, 'fees/fee_form.html', context)
 
@@ -284,7 +303,9 @@ def duplicate_fee_structure(request, pk):
     from .forms import FeeReplicationForm
     
     if request.method == 'POST':
-        form = FeeReplicationForm(request.POST, current_level=source_fee.level)
+        form = FeeReplicationForm(
+            request.POST, current_level=source_fee.level, school=request.school
+        )
         
         if form.is_valid():
             target_levels = form.cleaned_data['target_levels']
@@ -304,13 +325,20 @@ def duplicate_fee_structure(request, pk):
                             term=source_fee.term,
                             level=level
                         ).exists():
-                            # Clone parent
+                            # Clone parent.  Keep the division so a replicated
+                            # fee still targets the right school-defined group.
                             new_fee = FeeStructure.objects.create(
                                 school=request.school,
                                 name=source_fee.name,
                                 amount=source_fee.amount,
+                                division=(
+                                    source_fee.division
+                                    or get_division_for_level(level, school=request.school)
+                                    or ''
+                                ),
                                 level=level,
                                 term=source_fee.term,
+                                auto_assign=source_fee.auto_assign,
                                 is_active=source_fee.is_active,
                                 description=source_fee.description
                             )
@@ -322,6 +350,8 @@ def duplicate_fee_structure(request, pk):
                                     name=item.name,
                                     amount=item.amount
                                 )
+
+                            new_fee.update_total_amount()
                             
                             created_count += 1
                     
@@ -336,7 +366,7 @@ def duplicate_fee_structure(request, pk):
                 messages.error(request, _(f"An error occurred during replication: {str(e)}"))
                 
     else:
-        form = FeeReplicationForm(current_level=source_fee.level)
+        form = FeeReplicationForm(current_level=source_fee.level, school=request.school)
     
     context = {
         'title': _('Replicate Fee Structure'),
@@ -389,7 +419,7 @@ def record_manual_payment(request, student_id=None):
                     'title': _('Record Manual Payment'),
                     'form': form,
                     'student': student,
-                    'level_choices': settings.LEVEL_CHOICES,
+                    'level_choices': get_level_choices(request.school),
                  }
                  return render(request, 'fees/record_payment.html', context)
 
@@ -431,7 +461,7 @@ def record_manual_payment(request, student_id=None):
         'title': _('Record Manual Payment'),
         'form': form,
         'student': student,
-        'level_choices': settings.LEVEL_CHOICES,
+        'level_choices': get_level_choices(request.school),
     }
     return render(request, 'fees/record_payment.html', context)
 
@@ -731,10 +761,12 @@ def defaulters_list(request):
     selected_level = request.GET.get('level')
     status_filter = request.GET.get('status') # 'paid', 'owing', 'partial'
     
+    if current_division != 'all' and not is_known_division(current_division, request.school):
+        current_division = 'all'
     if current_division == 'all':
         division_levels = []
     else:
-        division_levels = settings.DIVISION_LEVEL_MAPPING.get(current_division, [])
+        division_levels = get_levels_for_division(current_division, school=request.school)
     
     # Base student queryset
     students_qs = Student.objects.filter(
@@ -782,11 +814,10 @@ def defaulters_list(request):
         })
 
     # Prepare context
-    division_level_choices = []
-    for code, name in settings.LEVEL_CHOICES:
-        if code in division_levels:
-            division_level_choices.append((code, name))
-            
+    division_level_choices = get_level_choices_for_codes(
+        division_levels, school=request.school
+    )
+
     context = {
         'title': _('Fee Defaulters & Payments'),
         'student_data': student_data,
@@ -795,12 +826,9 @@ def defaulters_list(request):
         'selected_level': selected_level,
         'status_filter': status_filter,
         'division_levels': division_level_choices,
-        'divisions': [
-            ('all', _("All Divisions")),
-            (settings.DIVISION_NURSERY, _("Nursery/Pre-School")),
-            (settings.DIVISION_PRIMARY, _("Primary School")),
-            (settings.DIVISION_JHS, _("Junior High School")),
-        ],
+        'divisions': [('all', _("All Divisions"))] + list(
+            get_division_choices(request.school)
+        ),
     }
     return render(request, 'fees/defaulters_list.html', context)
 

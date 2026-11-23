@@ -20,6 +20,11 @@ from result.promotion import (
     is_final_class,
     term_rank,
 )
+from school.division_utils import (
+    get_division_labels,
+    get_level_choices,
+    get_levels_for_division,
+)
 from school.models import School
 
 
@@ -37,12 +42,7 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--division",
-            choices=[
-                settings.DIVISION_NURSERY,
-                settings.DIVISION_PRIMARY,
-                settings.DIVISION_JHS,
-            ],
-            help="Limit promotion to one school division.",
+            help="Limit promotion to one school division (including custom divisions).",
         )
         parser.add_argument(
             "--level",
@@ -87,16 +87,19 @@ class Command(BaseCommand):
             "More than one school exists. Pass --school <slug> to choose one."
         )
 
-    def _levels(self, division, level):
+    def _levels(self, school, division, level):
+        level_codes = [code for code, _ in get_level_choices(school)]
         if level:
-            if level not in [choice[0] for choice in settings.LEVEL_CHOICES]:
+            if level not in level_codes:
                 raise CommandError(f"Unknown level {level!r}.")
             return [level]
 
         if division:
-            return settings.DIVISION_LEVEL_MAPPING[division]
+            if division not in get_division_labels(school):
+                raise CommandError(f"Unknown division {division!r} for {school.name}.")
+            return get_levels_for_division(division, school=school)
 
-        return [choice[0] for choice in settings.LEVEL_CHOICES]
+        return level_codes
 
     def handle(self, *args, **options):
         school = self._get_school(options["school"])
@@ -125,14 +128,14 @@ class Command(BaseCommand):
             current_term and current_term.term == settings.THIRD_TERM
         )
 
-        levels = self._levels(options["division"], options["level"])
+        levels = self._levels(school, options["division"], options["level"])
 
         if options["final_only"]:
-            levels = [level for level in levels if is_final_class(level)]
+            levels = [level for level in levels if is_final_class(level, school=school)]
             if not levels:
                 raise CommandError("No final class found in the selected scope.")
         elif options["exclude_final"]:
-            levels = [level for level in levels if not is_final_class(level)]
+            levels = [level for level in levels if not is_final_class(level, school=school)]
             if not levels:
                 raise CommandError("No non-final classes found in the selected scope.")
 
@@ -148,7 +151,7 @@ class Command(BaseCommand):
                 pass
             elif can_run_final:
                 # Before the Third Term only the final class can be closed.
-                levels = [level for level in levels if is_final_class(level)]
+                levels = [level for level in levels if is_final_class(level, school=school)]
             else:
                 raise CommandError(
                     f"Current term is {current_term.term}. Final-class completion "
@@ -158,7 +161,7 @@ class Command(BaseCommand):
 
         blocked = []
         for level in levels:
-            if is_final_class(level):
+            if is_final_class(level, school=school):
                 if not can_run_final and not options["force"]:
                     blocked.append(
                         f"{level} (final class can be completed from {completion_term} Term)"
@@ -217,7 +220,7 @@ class Command(BaseCommand):
             evaluated += len(candidates)
 
         for level, candidates in level_candidates:
-            final_class = is_final_class(level)
+            final_class = is_final_class(level, school=school)
             label = "final class" if final_class else "promotion"
             self.stdout.write(
                 self.style.HTTP_INFO(

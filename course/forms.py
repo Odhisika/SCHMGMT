@@ -10,9 +10,15 @@ class ProgramForm(forms.ModelForm):
         fields = "__all__"
 
     def __init__(self, *args, **kwargs):
+        self.school = kwargs.pop("school", None)
         super().__init__(*args, **kwargs)
         self.fields["title"].widget.attrs.update({"class": "form-control"})
         self.fields["summary"].widget.attrs.update({"class": "form-control"})
+
+        if self.school:
+            from school.division_utils import get_division_choices
+
+            self.fields["division"].choices = get_division_choices(self.school)
 
 
 class CourseAddForm(forms.ModelForm):
@@ -28,10 +34,14 @@ class CourseAddForm(forms.ModelForm):
         # Exclude program, school, term as they will be handled automatically
 
     def __init__(self, *args, **kwargs):
+        self.school = kwargs.pop("school", None)
         super().__init__(*args, **kwargs)
-        from django.conf import settings
-        self.fields['replicate_to'].choices = settings.LEVEL_CHOICES
-        
+        from school.division_utils import get_level_choices
+
+        levels = get_level_choices(self.school)
+        self.fields['replicate_to'].choices = levels
+        self.fields['level'].choices = [("", "---------")] + list(levels)
+
         self.fields["title"].widget.attrs.update({"class": "form-control"})
         self.fields["code"].widget.attrs.update({"class": "form-control"})
         self.fields["summary"].widget.attrs.update({"class": "form-control", "rows": 3})
@@ -81,7 +91,7 @@ class CourseAllocationForm(forms.ModelForm):
                 teachers = teachers.filter(division=division_filter)
                 
                 # Filter courses by levels in that division
-                division_levels = get_levels_for_division(division_filter)
+                division_levels = get_levels_for_division(division_filter, school=request.school)
                 courses = courses.filter(level__in=division_levels)
 
             self.fields["teacher"].queryset = teachers

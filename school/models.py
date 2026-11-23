@@ -6,6 +6,8 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.utils.text import slugify
 
+from .fields import FlexibleChoiceCharField
+
 
 STUDENT_ID_PATTERNS = (
     ("DIVISION_SEQUENCE", _("Division prefix + sequence (e.g. NUR-0001)")),
@@ -126,7 +128,7 @@ class SchoolDivision(models.Model):
     school = models.ForeignKey(
         School, on_delete=models.CASCADE, related_name="custom_divisions"
     )
-    name = models.CharField(max_length=50, help_text=_("Division name, e.g. Creche"))
+    name = models.CharField(max_length=25, help_text=_("Division name, e.g. Creche"))
     id_prefix = models.CharField(
         max_length=12,
         default="DIV",
@@ -166,7 +168,7 @@ class SchoolDivisionLevel(models.Model):
     division = models.ForeignKey(
         SchoolDivision, on_delete=models.CASCADE, related_name="levels"
     )
-    name = models.CharField(max_length=50, help_text=_("Class name, e.g. Creche 1"))
+    name = models.CharField(max_length=25, help_text=_("Class name, e.g. Creche 1"))
     order = models.PositiveSmallIntegerField(default=0)
     is_active = models.BooleanField(default=True)
 
@@ -190,7 +192,7 @@ class SchoolDivisionOrder(models.Model):
     school = models.ForeignKey(
         School, on_delete=models.CASCADE, related_name="division_order"
     )
-    division = models.CharField(max_length=50)
+    division = models.CharField(max_length=25)
     order = models.PositiveSmallIntegerField(default=0)
 
     class Meta:
@@ -219,7 +221,7 @@ class StudentIDSequence(models.Model):
     school = models.ForeignKey(
         School, on_delete=models.CASCADE, related_name="student_id_sequences"
     )
-    division = models.CharField(max_length=20, choices=DIVISION_CHOICES)
+    division = FlexibleChoiceCharField(max_length=25, choices=DIVISION_CHOICES)
     last_number = models.PositiveIntegerField(default=0)
 
     class Meta:

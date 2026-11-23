@@ -4,6 +4,8 @@ from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from django.conf import settings
 
+from school.fields import FlexibleChoiceCharField
+
 
 NEWS = _("News")
 EVENTS = _("Event")
@@ -65,7 +67,7 @@ class NewsAndEvents(models.Model):
     school = models.ForeignKey("school.School", on_delete=models.CASCADE, null=True, blank=True)
 
     # Targeted Messaging
-    target_division = models.CharField(
+    target_division = FlexibleChoiceCharField(
         max_length=25,
         choices=settings.DIVISION_CHOICES,
         blank=True,

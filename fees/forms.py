@@ -1,5 +1,6 @@
 from django import forms
 from django.forms import inlineformset_factory
+from django.utils.translation import gettext_lazy as _
 from .models import FeeStructure, StudentFeeAssignment, Payment, FeeItem, SchoolBankAccount
 from accounts.models import STUDENT_STATUS_ACTIVE, Student
 
@@ -57,16 +58,57 @@ class ManualPaymentForm(forms.ModelForm):
 
 class FeeStructureForm(forms.ModelForm):
     """Form for creating/editing fee structures"""
-    
+
     class Meta:
         model = FeeStructure
-        fields = ['name', 'level', 'term', 'auto_assign', 'description', 'is_active']
+        fields = ['name', 'division', 'level', 'term', 'auto_assign', 'description', 'is_active']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Fee Name (e.g. Term 1 Fees)'}),
-            'level': forms.Select(attrs={'class': 'form-select'}),
+            'division': forms.Select(attrs={'class': 'form-select', 'id': 'id_division'}),
+            'level': forms.Select(attrs={'class': 'form-select', 'id': 'id_level'}),
             'term': forms.Select(attrs={'class': 'form-select'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
         }
+        labels = {
+            'division': _('Division'),
+            'level': _('Class'),
+        }
+        help_texts = {
+            'division': _('Optional. Choose a division to target all of its classes.'),
+            'level': _(
+                'Leave blank to target every class in the selected division '
+                '(or every class in the school when no division is selected).'
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        school = kwargs.pop('school', None)
+        super().__init__(*args, **kwargs)
+        self.school = school
+        if school:
+            from school.division_utils import get_division_choices, get_level_choices
+
+            self.fields['division'].choices = [('', _('All divisions'))] + list(
+                get_division_choices(school)
+            )
+            self.fields['level'].choices = [
+                ('', _('All classes in the selected division'))
+            ] + list(get_level_choices(school))
+
+    def clean(self):
+        cleaned_data = super().clean()
+        division = cleaned_data.get('division')
+        level = cleaned_data.get('level')
+
+        if division and level and self.school:
+            from school.division_utils import get_division_for_level
+
+            if get_division_for_level(level, school=self.school) != division:
+                self.add_error(
+                    'level',
+                    _('Choose a class in the selected division, or leave it blank for all of them.'),
+                )
+        return cleaned_data
 
 
 FeeItemFormSet = inlineformset_factory(
@@ -90,19 +132,16 @@ class FeeReplicationForm(forms.Form):
         required=True
     )
 
-    def __init__(self, *args, current_level=None, **kwargs):
+    def __init__(self, *args, current_level=None, school=None, **kwargs):
         super().__init__(*args, **kwargs)
-        from django.conf import settings
-        
-        # Populate choices from settings.LEVEL_CHOICES
-        # Exclude the current level to avoid duplicating to self
-        choices = []
-        if hasattr(settings, 'LEVEL_CHOICES'):
-            for value, label in settings.LEVEL_CHOICES:
-                if value != current_level:
-                    choices.append((value, label))
-        
-        self.fields['target_levels'].choices = choices
+        from school.division_utils import get_level_choices
+
+        # Include school-defined classes and exclude the source level.
+        self.fields['target_levels'].choices = [
+            (value, label)
+            for value, label in get_level_choices(school)
+            if value != current_level
+        ]
 
 
 class SchoolBankAccountForm(forms.ModelForm):

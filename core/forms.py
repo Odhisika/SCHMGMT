@@ -28,7 +28,14 @@ class NewsAndEventsForm(forms.ModelForm):
         )
 
     def __init__(self, *args, **kwargs):
+        self.school = kwargs.pop("school", None)
         super().__init__(*args, **kwargs)
+        if self.school:
+            from school.division_utils import get_division_choices
+
+            self.fields["target_division"].choices = [("", _("All divisions"))] + list(
+                get_division_choices(self.school)
+            )
         self.fields["title"].widget.attrs.update({"class": "form-control"})
         self.fields["summary"].widget.attrs.update({"class": "form-control", "rows": 4})
         self.fields["posted_as"].widget.attrs.update({"class": "form-control"})

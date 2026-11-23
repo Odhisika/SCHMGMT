@@ -6,6 +6,7 @@ from django.utils.translation import gettext_lazy as _
 from accounts.models import Student
 from course.models import Course
 from core.models import Term
+from school.fields import FlexibleChoiceCharField
 
 
 PRESENT = "Present"
@@ -25,7 +26,7 @@ class AttendanceSession(models.Model):
     """Daily attendance session for a class/level - enables bulk marking"""
     school = models.ForeignKey("school.School", on_delete=models.CASCADE)
     term = models.ForeignKey(Term, on_delete=models.CASCADE)
-    level = models.CharField(max_length=25, choices=settings.LEVEL_CHOICES)
+    level = FlexibleChoiceCharField(max_length=25, choices=settings.LEVEL_CHOICES)
     date = models.DateField()
     marked_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,

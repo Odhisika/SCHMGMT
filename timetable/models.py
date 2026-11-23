@@ -3,6 +3,8 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from django.conf import settings
 
+from school.fields import FlexibleChoiceCharField
+
 
 class Period(models.Model):
     """Defines time slots in the school day (e.g., Period 1, Break, Assembly)"""
@@ -17,7 +19,7 @@ class Period(models.Model):
     school = models.ForeignKey('school.School', on_delete=models.CASCADE)
     name = models.CharField(max_length=50, help_text=_("e.g., Period 1, Break, Assembly"))
     period_type = models.CharField(max_length=20, choices=PERIOD_TYPES, default='LESSON')
-    division = models.CharField(
+    division = FlexibleChoiceCharField(
         max_length=25,
         choices=settings.DIVISION_CHOICES,
         blank=True,
@@ -58,7 +60,7 @@ class TimetableEntry(models.Model):
     term = models.ForeignKey('core.Term', on_delete=models.CASCADE, help_text=_("Timetable for specific term"))
     
     # Class/Grade
-    level = models.CharField(max_length=25, choices=settings.LEVEL_CHOICES, help_text=_("Class level"))
+    level = FlexibleChoiceCharField(max_length=25, choices=settings.LEVEL_CHOICES, help_text=_("Class level"))
     
     # Timing
     day_of_week = models.CharField(max_length=10, choices=DAYS_OF_WEEK)

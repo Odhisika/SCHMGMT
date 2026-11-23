@@ -23,46 +23,27 @@
 
 {% include 'snippets/filter_form.html' %}
 
-<!-- Division Tabs -->
+<!-- Division Tabs (built-in and school-defined) -->
 <ul class="nav nav-tabs mt-4" id="divisionTab" role="tablist">
-    {% if nursery_levels %}
+    {% for tab in division_tabs %}
     <li class="nav-item" role="presentation">
-      <button class="nav-link {% if active_tab == 'nursery' %}active{% endif %}" id="nursery-tab" data-bs-toggle="tab" data-bs-target="#nursery" type="button" role="tab" aria-controls="nursery" aria-selected="{% if active_tab == 'nursery' %}true{% else %}false{% endif %}">
-        <i class="fas fa-baby me-2"></i>{% trans 'Nursery/Pre-School' %}
+      <button class="nav-link {% if active_tab == tab.key %}active{% endif %}" id="{{ tab.key }}-tab" data-bs-toggle="tab" data-bs-target="#{{ tab.key }}" type="button" role="tab" aria-controls="{{ tab.key }}" aria-selected="{% if active_tab == tab.key %}true{% else %}false{% endif %}">
+        <i class="fas {{ tab.icon }} me-2"></i>{{ tab.label }}
       </button>
     </li>
-    {% endif %}
-    
-    {% if primary_levels %}
-    <li class="nav-item" role="presentation">
-      <button class="nav-link {% if active_tab == 'primary' %}active{% endif %}" id="primary-tab" data-bs-toggle="tab" data-bs-target="#primary" type="button" role="tab" aria-controls="primary" aria-selected="{% if active_tab == 'primary' %}true{% else %}false{% endif %}">
-        <i class="fas fa-child me-2"></i>{% trans 'Primary School' %}
-      </button>
-    </li>
-    {% endif %}
-    
-    {% if jhs_levels %}
-    <li class="nav-item" role="presentation">
-      <button class="nav-link {% if active_tab == 'jhs' %}active{% endif %}" id="jhs-tab" data-bs-toggle="tab" data-bs-target="#jhs" type="button" role="tab" aria-controls="jhs" aria-selected="{% if active_tab == 'jhs' %}true{% else %}false{% endif %}">
-        <i class="fas fa-user-graduate me-2"></i>{% trans 'JHS' %}
-      </button>
-    </li>
-    {% endif %}
-    
-
+    {% endfor %}
 </ul>
 
 <div class="tab-content" id="divisionTabContent">
-    <!-- Nursery Tab -->
-    <!-- Nursery Tab -->
-    <div class="tab-pane fade {% if active_tab == 'nursery' %}show active{% endif %}" id="nursery" role="tabpanel" aria-labelledby="nursery-tab">
+    {% for tab in division_tabs %}
+    <div class="tab-pane fade {% if active_tab == tab.key %}show active{% endif %}" id="{{ tab.key }}" role="tabpanel" aria-labelledby="{{ tab.key }}-tab">
         <div class="row mt-4">
-            {% for level_code, level_name in nursery_levels %}
+            {% for level_code, level_name in tab.levels %}
             <div class="col-md-3 col-sm-6 mb-3">
                 <a href="{% url 'class_level_detail' level_code=level_code %}" style="text-decoration: none;">
                     <div class="card text-center h-100 shadow-sm" style="border: 1px solid #e0e0e0; transition: all 0.2s;">
                         <div class="card-body d-flex flex-column align-items-center justify-content-center py-4">
-                            <i class="fas fa-baby fa-2x mb-3 text-primary"></i>
+                            <i class="fas {{ tab.icon }} fa-2x mb-3 text-primary"></i>
                             <h5 class="card-title mb-2">{{ level_name }}</h5>
                             <p class="text-muted small mb-0">
                                 {{ level_subject_counts|get_item:level_code|default:0 }} {% trans 'Subjects' %}
@@ -71,54 +52,15 @@
                     </div>
                 </a>
             </div>
-            {% endfor %}
-        </div>
-    </div>
-
-    <!-- Primary Tab -->
-    <!-- Primary Tab -->
-    <div class="tab-pane fade {% if active_tab == 'primary' %}show active{% endif %}" id="primary" role="tabpanel" aria-labelledby="primary-tab">
-        <div class="row mt-4">
-            {% for level_code, level_name in primary_levels %}
-            <div class="col-md-3 col-sm-6 mb-3">
-                <a href="{% url 'class_level_detail' level_code=level_code %}" style="text-decoration: none;">
-                    <div class="card text-center h-100 shadow-sm" style="border: 1px solid #e0e0e0; transition: all 0.2s;">
-                        <div class="card-body d-flex flex-column align-items-center justify-content-center py-4">
-                            <i class="fas fa-book fa-2x mb-3 text-success"></i>
-                            <h5 class="card-title mb-2">{{ level_name }}</h5>
-                            <p class="text-muted small mb-0">
-                                {{ level_subject_counts|get_item:level_code|default:0 }} {% trans 'Subjects' %}
-                            </p>
-                        </div>
-                    </div>
-                </a>
+            {% empty %}
+            <div class="col-12">
+                <div class="alert alert-info">{% trans 'No classes have been configured for this division yet.' %}</div>
             </div>
             {% endfor %}
         </div>
     </div>
-
-    <!-- JHS Tab -->
-    <!-- JHS Tab -->
-    <div class="tab-pane fade {% if active_tab == 'jhs' %}show active{% endif %}" id="jhs" role="tabpanel" aria-labelledby="jhs-tab">
-        <div class="row mt-4">
-            {% for level_code, level_name in jhs_levels %}
-            <div class="col-md-3 col-sm-6 mb-3">
-                <a href="{% url 'class_level_detail' level_code=level_code %}" style="text-decoration: none;">
-                    <div class="card text-center h-100 shadow-sm" style="border: 1px solid #e0e0e0; transition: all 0.2s;">
-                        <div class="card-body d-flex flex-column align-items-center justify-content-center py-4">
-                            <i class="fas fa-graduation-cap fa-2x mb-3 text-info"></i>
-                            <h5 class="card-title mb-2">{{ level_name }}</h5>
-                            <p class="text-muted small mb-0">
-                                {{ level_subject_counts|get_item:level_code|default:0 }} {% trans 'Subjects' %}
-                            </p>
-                        </div>
-                    </div>
-                </a>
-            </div>
-            {% endfor %}
-        </div>
-    </div>
-
-
+    {% empty %}
+    <div class="alert alert-info mt-4">{% trans 'No divisions are available for your account.' %}</div>
+    {% endfor %}
 </div>
 {% endblock content %}

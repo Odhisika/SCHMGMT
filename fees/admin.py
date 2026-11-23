@@ -6,8 +6,8 @@ from .models import FeeStructure, FeeItem, StudentFeeAssignment, Payment, School
 
 @admin.register(FeeStructure)
 class FeeStructureAdmin(admin.ModelAdmin):
-    list_display = ['name', 'school', 'level', 'term', 'amount', 'auto_assign', 'is_active', 'created_at']
-    list_filter = ['school', 'level', 'term', 'is_active', 'auto_assign']
+    list_display = ['name', 'school', 'division', 'level', 'term', 'amount', 'auto_assign', 'is_active', 'created_at']
+    list_filter = ['school', 'division', 'level', 'term', 'is_active', 'auto_assign']
     search_fields = ['name', 'description']
     readonly_fields = ['created_at']
 

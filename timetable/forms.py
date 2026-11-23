@@ -21,6 +21,12 @@ class PeriodForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         self.school = kwargs.pop('school', None)
         super().__init__(*args, **kwargs)
+        if self.school:
+            from school.division_utils import get_division_choices
+
+            self.fields['division'].choices = [('', _('Global (all divisions)'))] + list(
+                get_division_choices(self.school)
+            )
 
     def clean(self):
         cleaned_data = super().clean()
@@ -67,8 +73,16 @@ class TimetableEntryForm(forms.ModelForm):
         school = kwargs.pop('school', None)
         level_code = kwargs.pop('level_code', None)
         super().__init__(*args, **kwargs)
-        
+        self.school = school
+
         if school:
+            from school.division_utils import get_division_for_level, get_level_choices
+
+            # Include custom school classes in the level dropdown.
+            self.fields['level'].choices = [('', _('---------'))] + list(
+                get_level_choices(school)
+            )
+
             # Filter periods and subjects by school
             periods_qs = Period.objects.filter(school=school)
             
@@ -77,8 +91,7 @@ class TimetableEntryForm(forms.ModelForm):
             target_level = level_code or self.initial.get('level') or (self.instance.level if self.instance.pk else None)
             
             if target_level:
-                from accounts.utils import get_division_for_level
-                division = get_division_for_level(target_level)
+                division = get_division_for_level(target_level, school=school)
                 if division:
                     # Filter periods for this division OR global periods (if any)
                     periods_qs = periods_qs.filter(division=division)

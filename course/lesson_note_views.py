@@ -169,27 +169,30 @@ def lesson_note_delete(request, pk):
 @admin_required
 def lesson_note_admin_list(request):
     """Admin view of all lesson notes with filtering"""
-    from django.conf import settings
-    
     lesson_notes = LessonNote.objects.select_related(
         'course', 'term', 'teacher', 'reviewed_by'
-    ).order_by('-created_at')
+    ).filter(course__school=request.school).order_by('-created_at')
     
-    # Division Filtering (Tabs)
-    current_division = request.GET.get('division', settings.DIVISION_NURSERY) # Default to Nursery
-    
-    # Map levels to divisions for safer filtering
-    division_levels_map = {
-        settings.DIVISION_NURSERY: [settings.NURSERY_1, settings.NURSERY_2, settings.KG_1, settings.KG_2],
-        settings.DIVISION_PRIMARY: [settings.PRIMARY_1, settings.PRIMARY_2, settings.PRIMARY_3, 
-                                     settings.PRIMARY_4, settings.PRIMARY_5, settings.PRIMARY_6],
-        settings.DIVISION_JHS: [settings.JHS_1, settings.JHS_2, settings.JHS_3],
-    }
-    
-    # Filter by division using levels
-    if current_division in division_levels_map:
-        target_levels = division_levels_map[current_division]
-        lesson_notes = lesson_notes.filter(course__level__in=target_levels)
+    # Division Filtering (Tabs) — includes custom school divisions.
+    from school.division_utils import (
+        get_default_division,
+        get_division_choices,
+        get_level_choices_for_codes,
+        get_levels_for_division,
+        is_known_division,
+    )
+
+    default_division = get_default_division(request.school)
+    current_division = request.GET.get('division', default_division)
+    if not is_known_division(current_division, request.school):
+        current_division = default_division
+
+    current_division_levels = get_levels_for_division(
+        current_division, school=request.school
+    )
+
+    # Filter by division using levels (an empty list correctly matches nothing)
+    lesson_notes = lesson_notes.filter(course__level__in=current_division_levels)
 
     # Filter by specific level (Sub-filter)
     level_filter = request.GET.get('level')
@@ -222,20 +225,13 @@ def lesson_note_admin_list(request):
     ).distinct().order_by('first_name', 'last_name')
     
     # Context data for tabs and filters
-    divisions = [
-        (settings.DIVISION_NURSERY, "Nursery/Pre-School"),
-        (settings.DIVISION_PRIMARY, "Primary School"),
-        (settings.DIVISION_JHS, "Junior High School"),
-    ]
-    
+    divisions = get_division_choices(request.school)
+
     # Get levels for the current division for the sub-filter dropdown
-    current_division_levels = []
-    if current_division in division_levels_map:
-        # Get tuples of (code, name) for levels in this division
-        all_levels = dict(settings.LEVEL_CHOICES)
-        for lvl in division_levels_map[current_division]:
-            current_division_levels.append((lvl, all_levels.get(lvl, lvl)))
-            
+    current_division_level_choices = get_level_choices_for_codes(
+        current_division_levels, school=request.school
+    )
+
     context = {
         'lesson_notes': lesson_notes,
         'teachers': teachers,
@@ -246,7 +242,7 @@ def lesson_note_admin_list(request):
         'selected_term': term_filter,
         'divisions': divisions,
         'current_division': current_division,
-        'current_division_levels': current_division_levels,
+        'current_division_levels': current_division_level_choices,
         'selected_level': level_filter,
     }
     return render(request, 'course/lesson_note_admin_list.html', context)

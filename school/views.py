@@ -325,18 +325,18 @@ def school_settings_student_ids(request):
     built_in_specs = {
         "Nursery": (
             _("Nursery / Pre-School"),
-            student_id_format_form.student_id_nursery_prefix,
-            student_id_format_form.student_id_nursery_pattern,
+            student_id_format_form['student_id_nursery_prefix'],
+            student_id_format_form['student_id_nursery_pattern'],
         ),
         "Primary": (
             _("Primary"),
-            student_id_format_form.student_id_primary_prefix,
-            student_id_format_form.student_id_primary_pattern,
+            student_id_format_form['student_id_primary_prefix'],
+            student_id_format_form['student_id_primary_pattern'],
         ),
         "JHS": (
             "JHS",
-            student_id_format_form.student_id_jhs_prefix,
-            student_id_format_form.student_id_jhs_pattern,
+            student_id_format_form['student_id_jhs_prefix'],
+            student_id_format_form['student_id_jhs_pattern'],
         ),
     }
     division_cards = []

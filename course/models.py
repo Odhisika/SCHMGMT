@@ -9,6 +9,7 @@ from django.utils.translation import gettext_lazy as _
 
 from core.models import ActivityLog, Term
 from core.utils import unique_slug_generator
+from school.fields import FlexibleChoiceCharField
 
 # Keep Semester import for backward compatibility
 Semester = Term
@@ -29,7 +30,7 @@ class Program(models.Model):
     school = models.ForeignKey("school.School", on_delete=models.CASCADE, null=True, blank=True)
     
     # Link program to a division (Nursery, Primary, JHS)
-    division = models.CharField(
+    division = FlexibleChoiceCharField(
         max_length=25,
         choices=settings.DIVISION_CHOICES,
         blank=True,
@@ -86,7 +87,7 @@ class Course(models.Model):
     code = models.CharField(max_length=200)
     summary = models.TextField(max_length=200, blank=True)
     program = models.ForeignKey(Program, on_delete=models.CASCADE)
-    level = models.CharField(max_length=25, choices=settings.LEVEL_CHOICES)
+    level = FlexibleChoiceCharField(max_length=25, choices=settings.LEVEL_CHOICES)
     term = models.CharField(choices=settings.TERM_CHOICES, max_length=200)
     is_core_subject = models.BooleanField(default=True, help_text=_("Core subjects are mandatory"))
     is_elective = models.BooleanField(default=False)
@@ -167,8 +168,8 @@ class SubjectTemplate(models.Model):
     """Pre-defined subject templates for each level to standardize curriculum"""
     title = models.CharField(max_length=200, help_text=_("Subject name, e.g., English Language, Mathematics"))
     code_prefix = models.CharField(max_length=50, help_text=_("Subject code prefix, e.g., ENG, MATH, SCI"))
-    level = models.CharField(max_length=25, choices=settings.LEVEL_CHOICES, help_text=_("Grade level for this subject"))
-    division = models.CharField(max_length=25, choices=settings.DIVISION_CHOICES, help_text=_("Academic division"))
+    level = FlexibleChoiceCharField(max_length=25, choices=settings.LEVEL_CHOICES, help_text=_("Grade level for this subject"))
+    division = FlexibleChoiceCharField(max_length=25, choices=settings.DIVISION_CHOICES, help_text=_("Academic division"))
     is_core_subject = models.BooleanField(
         default=True, 
         help_text=_("Core subjects are mandatory for all students")

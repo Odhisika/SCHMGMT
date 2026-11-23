@@ -185,9 +185,6 @@
 	</div>
 </div>
 
-<script src="{% url 'javascript-catalog' %}"></script>
-<script src="{% static 'js/dashboard.js' %}"></script>
-
 <!-- Safer Data Passing -->
 <script id="dashboard-data-payload" type="application/json">
     {
@@ -198,9 +195,16 @@
     }
 </script>
 
+{% endblock content %}
+
+{% block js %}
 <script>
+(function () {
+    'use strict';
+
     // Handle chart cleanup for HTMX/SPA navigation
     function safelyDestroyChart(canvasId) {
+        if (typeof Chart === 'undefined') return;
         try {
             const chart = Chart.getChart(canvasId);
             if (chart) {
@@ -211,17 +215,25 @@
         }
     }
 
-	$('.fa-expand-alt').click(function () {
-		if ($(this).parent('.chart-wrap').parent('.col-md-6').hasClass('expand')) {
-			$('.col-md-6.expand').removeClass('expand');
-		}
-		else {
-			$('.col-md-6.expand')?.removeClass('expand');
-			$(this).parent('.chart-wrap').parent('.col-md-6').addClass('expand');
-		}
-	})
+    function bindExpandControls() {
+        if (typeof jQuery === 'undefined') return;
+        jQuery(document)
+            .off('click.dashboardExpand', '.fa-expand-alt')
+            .on('click.dashboardExpand', '.fa-expand-alt', function () {
+                const $icon = jQuery(this);
+                const $column = $icon.closest('.col-md-6');
+                if ($column.hasClass('expand')) {
+                    jQuery('.col-md-6.expand').removeClass('expand');
+                } else {
+                    jQuery('.col-md-6.expand').removeClass('expand');
+                    $column.addClass('expand');
+                }
+            });
+    }
 
     function initDashboardCharts() {
+        // This block runs after base.html loads Chart.js, but keep the guard
+        // for CDN failures so the rest of the page is never broken.
         if (typeof Chart === 'undefined') {
             console.warn("Chart.js not loaded yet.");
             return;
@@ -229,7 +241,7 @@
 
         const payloadEl = document.getElementById('dashboard-data-payload');
         if (!payloadEl) return;
-        
+
         let payload;
         try {
             payload = JSON.parse(payloadEl.textContent);
@@ -253,16 +265,16 @@
                     labels: trafficData.labels,
                     datasets: [{
                         label: gettext('Students'),
-                        backgroundColor: 'rgba(26, 115, 232, 0.1)', 
-                        borderColor: '#1a73e8', 
+                        backgroundColor: 'rgba(26, 115, 232, 0.1)',
+                        borderColor: '#1a73e8',
                         borderWidth: 2,
                         pointBackgroundColor: '#1a73e8',
                         tension: 0.4,
                         data: trafficData.students
                     }, {
                         label: gettext('Teachers'),
-                        backgroundColor: 'rgba(95, 99, 104, 0.1)', 
-                        borderColor: '#5f6368', 
+                        backgroundColor: 'rgba(95, 99, 104, 0.1)',
+                        borderColor: '#5f6368',
                         borderWidth: 2,
                         pointBackgroundColor: '#5f6368',
                         tension: 0.4,
@@ -294,7 +306,7 @@
                     labels: enrollmentData.labels,
                     datasets: [{
                         label: gettext('Students'),
-                        backgroundColor: '#1a73e8', 
+                        backgroundColor: '#1a73e8',
                         borderRadius: 4,
                         data: enrollmentData.data
                     }]
@@ -324,7 +336,7 @@
                     labels: staffingData.labels,
                     datasets: [{
                         label: gettext("Teachers"),
-                        backgroundColor: '#da932c', 
+                        backgroundColor: '#da932c',
                         borderRadius: 4,
                         data: staffingData.data
                     }]
@@ -372,18 +384,22 @@
         }
     }
 
-    // Initialize logic
-    if (typeof htmx !== 'undefined') {
-        htmx.onLoad(function(content) {
-            initDashboardCharts();
-        });
-    } else {
-        document.addEventListener('DOMContentLoaded', initDashboardCharts);
+    function boot() {
+        bindExpandControls();
+        initDashboardCharts();
     }
-    
-    // Fallback: also try running immediately in case this script runs after DOMContentLoaded
-    initDashboardCharts();
 
+    // htmx is loaded in the document head; onLoad also covers swapped content.
+    if (typeof htmx !== 'undefined') {
+        htmx.onLoad(boot);
+    } else {
+        document.addEventListener('DOMContentLoaded', boot);
+    }
+
+    // This script is at the end of the body, so it is normally safe to run now.
+    if (document.readyState !== 'loading') {
+        boot();
+    }
+})();
 </script>
-
-{% endblock content %}
+{% endblock js %}

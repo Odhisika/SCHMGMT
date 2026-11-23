@@ -65,6 +65,22 @@ def get_division_choices(school=None):
     )
 
 
+def get_division_labels(school=None):
+    """Return a ``{division: label}`` lookup including custom divisions."""
+    return dict(get_division_choices(school))
+
+
+def get_default_division(school=None):
+    """Return the school's first division, or the legacy Nursery default."""
+    choices = get_division_choices(school)
+    return choices[0][0] if choices else settings.DIVISION_NURSERY
+
+
+def is_known_division(division, school=None):
+    """True when ``division`` exists for this school (including custom ones)."""
+    return bool(division) and division in get_division_labels(school)
+
+
 def get_division_level_mapping(school=None):
     """Return the division -> levels mapping in display order."""
     built_in_mapping = {
@@ -106,6 +122,24 @@ def get_level_choices(school=None):
                 choices.append((code, labels.get(code, code)))
                 known.add(code)
     return tuple(choices)
+
+
+def get_level_choices_for_codes(codes, school=None):
+    """Return labelled level choices for ``codes`` in the school's order.
+
+    Unknown codes (for example a class whose level was deleted from division
+    settings) are kept with their raw value as the label so nothing silently
+    disappears from a dropdown.
+    """
+    available = dict(get_level_choices(school))
+    ordered = []
+    seen = set()
+    for code in _level_codes(codes):
+        if code in seen:
+            continue
+        seen.add(code)
+        ordered.append((code, available.get(code, code)))
+    return ordered
 
 
 def get_division_for_level(level_code, school=None):

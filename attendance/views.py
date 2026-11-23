@@ -15,16 +15,17 @@ from accounts.decorators import lecturer_required, student_required, admin_requi
 from accounts.models import STUDENT_STATUS_ACTIVE, Student, Parent
 from core.models import Term
 from course.models import CourseAllocation
+from school.division_utils import get_level_choices
 from .models import Attendance, AttendanceSession, AttendanceSummary, PRESENT, ABSENT
 
 
-def _attendance_levels_for_user(user):
+def _attendance_levels_for_user(user, school=None):
     """Return attendance levels this user can view.
 
     This controls read access only. Marking is restricted separately to
     teachers with an allocated course in the class.
     """
-    all_levels = settings.LEVEL_CHOICES
+    all_levels = get_level_choices(school or getattr(user, "school", None))
     valid_level_codes = {code for code, _ in all_levels}
 
     if user.is_superuser or user.is_school_admin:
@@ -71,7 +72,7 @@ def _attendance_marking_levels_for_user(user, school):
     markable_levels = _teacher_markable_level_codes(user, school)
     return [
         (code, name)
-        for code, name in settings.LEVEL_CHOICES
+        for code, name in get_level_choices(school)
         if code in markable_levels
     ]
 
@@ -151,7 +152,7 @@ def attendance_dashboard(request):
     target_level = request.GET.get('level')
     target_date_str = request.GET.get('date')
     if target_level and target_date_str:
-        allowed_levels = {code for code, _ in _attendance_levels_for_user(request.user)}
+        allowed_levels = {code for code, _ in _attendance_levels_for_user(request.user, request.school)}
         target_date = parse_date(target_date_str)
         if target_level in allowed_levels and target_date:
             url = reverse('attendance:mark_attendance', args=[target_level])
@@ -162,7 +163,7 @@ def attendance_dashboard(request):
     current_term = Term.objects.filter(is_current_term=True, school=request.school).first()
     today = timezone.localdate()
     
-    view_levels = _attendance_levels_for_user(request.user)
+    view_levels = _attendance_levels_for_user(request.user, request.school)
     view_level_codes = [code for code, name in view_levels]
     marking_levels = _attendance_marking_levels_for_user(request.user, request.school)
     
@@ -295,7 +296,7 @@ def save_attendance_ajax(request):
 @lecturer_required  
 def mark_attendance(request, level=None):
     """View a class register and let allocated teachers mark it."""
-    view_levels = {code for code, _ in _attendance_levels_for_user(request.user)}
+    view_levels = {code for code, _ in _attendance_levels_for_user(request.user, request.school)}
     if level not in view_levels:
         return HttpResponseForbidden(_("You can only access attendance for your assigned class or division."))
 
@@ -416,7 +417,7 @@ def mark_attendance(request, level=None):
     context = {
         'title': _('Mark Attendance'),
         'level': level,
-        'level_name': dict(settings.LEVEL_CHOICES).get(level, level),
+        'level_name': dict(get_level_choices(request.school)).get(level, level),
         'students': students,
         'marked_count': len(marked_student_ids),
         'total_count': students_qs.count(),
@@ -437,7 +438,7 @@ def mark_attendance(request, level=None):
 @login_required
 def attendance_reports(request):
     """View attendance reports with filters"""
-    accessible_levels = _attendance_levels_for_user(request.user)
+    accessible_levels = _attendance_levels_for_user(request.user, request.school)
     accessible_level_codes = [code for code, _ in accessible_levels]
     # Default: last 30 days
     end_date = date.today()

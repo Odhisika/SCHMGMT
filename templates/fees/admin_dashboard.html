@@ -313,15 +313,14 @@
                     {% if division_code == 'all' %}<i class="fas fa-th-large"></i>
                     {% elif division_code == 'Nursery' %}<i class="fas fa-baby"></i>
                     {% elif division_code == 'Primary' %}<i class="fas fa-book-open"></i>
-                    {% else %}<i class="fas fa-graduation-cap"></i>{% endif %}
+                    {% elif division_code == 'JHS' %}<i class="fas fa-graduation-cap"></i>
+                    {% else %}<i class="fas fa-layer-group"></i>{% endif %}
                 </span>
                 <span class="pay-division-text">
                     {{ division_name }}
                     <small>
                         {% if division_code == 'all' %}{% trans 'All school levels' %}
-                        {% elif division_code == 'Nursery' %}{% trans 'Nursery and KG' %}
-                        {% elif division_code == 'Primary' %}{% trans 'Primary 1 - 6' %}
-                        {% else %}{% trans 'JHS 1 - 3' %}{% endif %}
+                        {% else %}{% trans 'Classes in this division' %}{% endif %}
                     </small>
                 </span>
                 <i class="fas fa-chevron-right pay-division-arrow"></i>

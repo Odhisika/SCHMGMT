@@ -3,13 +3,14 @@ from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from accounts.models import Student
 from core.models import Term
+from school.fields import FlexibleChoiceCharField
 
 
 class AttendanceSession(models.Model):
     """Daily attendance session for a class/level"""
     school = models.ForeignKey('school.School', on_delete=models.CASCADE, related_name='student_attendance_sessions')
     term = models.ForeignKey(Term, on_delete=models.CASCADE, related_name='student_attendance_sessions')
-    level = models.CharField(max_length=25, choices=settings.LEVEL_CHOICES)
+    level = FlexibleChoiceCharField(max_length=25, choices=settings.LEVEL_CHOICES)
     date = models.DateField()
     marked_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,

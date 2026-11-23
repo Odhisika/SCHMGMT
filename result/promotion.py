@@ -115,9 +115,19 @@ class PromotionCandidate:
         return ", ".join(self.terms_present)
 
 
-def next_level(current_level):
-    """Return the next class level, or ``None`` for the final class."""
-    levels = [level for level, _ in settings.LEVEL_CHOICES]
+def next_level(current_level, school=None):
+    """Return the next class level, or ``None`` for the final class.
+
+    ``school`` must be supplied for schools with custom divisions: their level
+    order lives in the database rather than in ``settings.LEVEL_CHOICES``.
+    Callers without a school keep the legacy behaviour.
+    """
+    if school is None:
+        levels = [level for level, _ in settings.LEVEL_CHOICES]
+    else:
+        from school.division_utils import get_level_choices
+
+        levels = [level for level, _ in get_level_choices(school)]
     try:
         index = levels.index(current_level)
     except ValueError:
@@ -127,12 +137,19 @@ def next_level(current_level):
     return None
 
 
-def is_final_class(level):
+def is_final_class(level, school=None):
     """Return True when ``level`` has no next class in this school."""
-    return next_level(level) is None
+    return next_level(level, school=school) is None
 
 
-def division_for_level(level):
+def division_for_level(level, school=None):
+    """Return the division owning ``level``, including custom divisions."""
+    from school.division_utils import get_division_for_level
+
+    division = get_division_for_level(level, school=school)
+    if division:
+        return division
+    # Legacy fallback for callers that have no school context.
     for division, levels in settings.DIVISION_LEVEL_MAPPING.items():
         if level in levels:
             return division
@@ -225,7 +242,7 @@ def build_candidates(level, session, school, policy=None):
         .order_by("student__last_name", "student__first_name", "student__username")
     )
 
-    final_class = is_final_class(level)
+    final_class = is_final_class(level, school=school)
     candidates = []
     for student in students:
         per_term = _term_results(student, session, level, school)
@@ -298,7 +315,7 @@ def build_candidates(level, session, school, policy=None):
         else:
             decision = "REPEAT"
 
-        upcoming = next_level(level)
+        upcoming = next_level(level, school=school)
         latest = t3 or t2 or t1
 
         candidates.append(
@@ -329,7 +346,7 @@ def build_candidates(level, session, school, policy=None):
 
 def _move_student(student, target_level, school):
     """Move a learner to the next class without re-running enrolment signals."""
-    target_division = division_for_level(target_level)
+    target_division = division_for_level(target_level, school=school)
     program = (
         Program.objects.filter(
             school=school,

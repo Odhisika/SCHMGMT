@@ -8,6 +8,7 @@ from django.db.models import Q
 from PIL import Image
 
 from course.models import Program
+from school.fields import FlexibleChoiceCharField
 from .validators import ASCIIUsernameValidator
 
 
@@ -322,15 +323,15 @@ class User(AbstractUser):
         "course.Program", on_delete=models.SET_NULL, null=True, blank=True, related_name="staff"
     )
 
-    assigned_level = models.CharField(
-        max_length=25, 
+    assigned_level = FlexibleChoiceCharField(
+        max_length=25,
         choices=LEVEL, 
         blank=True, 
         null=True,
         help_text=_("The class/level this teacher is responsible for (if class teacher)")
     )
 
-    division = models.CharField(
+    division = FlexibleChoiceCharField(
         max_length=25,
         choices=settings.DIVISION_CHOICES,
         blank=True,
@@ -463,7 +464,7 @@ class SubClass(models.Model):
         related_name="sub_classes",
         verbose_name=_("School"),
     )
-    level = models.CharField(
+    level = FlexibleChoiceCharField(
         max_length=25,
         choices=LEVEL,
         verbose_name=_("Class / Level"),
@@ -545,7 +546,7 @@ class StudentManager(models.Manager):
 class Student(models.Model):
     student = models.OneToOneField(User, on_delete=models.CASCADE)
     # id_number = models.CharField(max_length=20, unique=True, blank=True)
-    level = models.CharField(max_length=25, choices=LEVEL, null=True)
+    level = FlexibleChoiceCharField(max_length=25, choices=LEVEL, null=True)
     sub_class = models.ForeignKey(
         SubClass,
         on_delete=models.SET_NULL,
@@ -690,9 +691,9 @@ class ClassTransfer(models.Model):
         related_name="class_transfers",
         verbose_name=_("Student"),
     )
-    from_level = models.CharField(max_length=25, choices=LEVEL, blank=True)
+    from_level = FlexibleChoiceCharField(max_length=25, choices=LEVEL, blank=True)
     from_sub_class_name = models.CharField(max_length=20, blank=True)
-    to_level = models.CharField(max_length=25, choices=LEVEL)
+    to_level = FlexibleChoiceCharField(max_length=25, choices=LEVEL)
     to_sub_class_name = models.CharField(max_length=20, blank=True)
     from_sub_class = models.ForeignKey(
         SubClass,

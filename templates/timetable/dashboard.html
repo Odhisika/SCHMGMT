@@ -68,7 +68,7 @@
                     <div class="row">
                         {% for code, name in active_levels %}
                         <div class="col-md-4 mb-2">
-                            <a href="{% url 'timetable:timetable_by_class' level=code %}" class="btn {% if current_division == 'Primary' %}btn-outline-primary{% elif current_division == 'JHS' %}btn-outline-success{% else %}btn-outline-info{% endif %} w-100">
+                            <a href="{% url 'timetable:timetable_by_class' level=code %}" class="btn btn-outline-info w-100">
                                 {{ name }}
                             </a>
                         </div>

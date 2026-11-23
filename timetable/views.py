@@ -8,6 +8,13 @@ from .forms import PeriodForm, TimetableEntryForm
 from core.models import Term
 from accounts.models import Student
 from django.conf import settings
+from school.division_utils import (
+    get_default_division,
+    get_division_choices,
+    get_division_for_level,
+    get_level_choices,
+    is_known_division,
+)
 
 
 # ========== Period Management Views ==========
@@ -94,17 +101,18 @@ def period_delete(request, pk):
 @login_required
 def timetable_dashboard(request):
     """Main timetable dashboard - with division-based tabs"""
-    current_division = request.GET.get('division', settings.DIVISION_NURSERY)
+    default_division = get_default_division(request.school)
+    current_division = request.GET.get('division', default_division)
     current_term = Term.objects.filter(is_current_term=True, school=request.school).first()
-    
+
     # Determine accessible levels
     if request.user.is_superuser or request.user.is_school_admin:
-        levels = settings.LEVEL_CHOICES
+        levels = get_level_choices(request.school)
     elif request.user.is_student:
         # Students see only their own level
         try:
             student = Student.objects.get(student=request.user)
-            level_name = dict(settings.LEVEL_CHOICES).get(student.level, student.level)
+            level_name = dict(get_level_choices(request.school)).get(student.level, student.level)
             levels = [(student.level, level_name)]
         except Student.DoesNotExist:
             levels = []
@@ -119,32 +127,27 @@ def timetable_dashboard(request):
     else:
         levels = []
 
-    # Organize levels by division/section for display
-    from accounts.utils import get_division_for_level
-    
+    if not is_known_division(current_division, request.school):
+        current_division = default_division
+
+    # Organize levels by division/section for display.
     # Filter the list of levels for the current tab
     active_levels = []
     available_divisions = set()
-    
+
     for code, name in levels:
-        div = get_division_for_level(code)
+        div = get_division_for_level(code, school=request.school)
         if div:
             available_divisions.add(div)
             if div == current_division:
                 active_levels.append((code, name))
 
-    # Prep division tabs
-    division_choices = [
-        (settings.DIVISION_NURSERY, _("Nursery/Pre-School")),
-        (settings.DIVISION_PRIMARY, _("Primary School")),
-        (settings.DIVISION_JHS, _("Junior High School")),
+    # Prep division tabs (built-in and custom) that have levels for this user.
+    valid_divisions = [
+        (code, label)
+        for code, label in get_division_choices(request.school)
+        if code in available_divisions
     ]
-    
-    # Filter valid divisions (those that have levels for this user)
-    valid_divisions = []
-    for code, label in division_choices:
-        if code in available_divisions:
-            valid_divisions.append((code, label))
 
     context = {
         'title': _('Timetable Dashboard'),
@@ -187,9 +190,8 @@ def timetable_by_class(request, level):
         messages.error(request, _("You do not have permission to view this timetable."))
         return redirect('timetable:timetable_dashboard')
     
-    # Get the division for this level to filter periods
-    from accounts.utils import get_division_for_level
-    level_division = get_division_for_level(level)
+    # Get the division for this level to filter periods (school-aware).
+    level_division = get_division_for_level(level, school=request.school)
     
     # Get all periods for this school and division (lesson periods only for the grid)
     lesson_periods = Period.objects.filter(
@@ -224,7 +226,7 @@ def timetable_by_class(request, level):
     context = {
         'title': f'{dict(TimetableEntry.DAYS_OF_WEEK).get(level, level)} Timetable',
         'level': level,
-        'level_display': dict(settings.LEVEL_CHOICES).get(level, level),
+        'level_display': dict(get_level_choices(request.school)).get(level, level),
         'current_term': current_term,
         'lesson_periods': lesson_periods,
         'all_periods': all_periods,

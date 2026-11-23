@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.test import RequestFactory, TestCase, override_settings
+from django.urls import reverse
 
 from school.middleware import SchoolMiddleware
 from school.models import School
@@ -79,3 +80,33 @@ class DomainRoutingMiddlewareTests(TestCase):
         self.middleware.process_request(request)
 
         self.assertEqual(request.urlconf, "config.urls_public")
+
+
+@override_settings(ENFORCE_SCHOOL_SUBDOMAIN_REDIRECTS=False)
+class StudentIDSettingsViewTests(TestCase):
+    def setUp(self):
+        self.school = School.objects.create(
+            name="ID Academy", slug="id-academy", subdomain="id-academy"
+        )
+        self.admin = User.objects.create_user(
+            username="id_admin",
+            password="password",
+            school=self.school,
+            is_school_admin=True,
+        )
+
+    def test_student_ids_settings_page_renders_for_school_admin(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse("school_settings_student_ids"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "student_id_nursery_prefix")
+        nursery_card = next(
+            card for card in response.context["division_cards"]
+            if card["name"] == "Nursery"
+        )
+        self.assertTrue(nursery_card["built_in"])
+        self.assertEqual(
+            nursery_card["prefix_field"].name, "student_id_nursery_prefix"
+        )

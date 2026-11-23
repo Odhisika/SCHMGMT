@@ -9,6 +9,7 @@ from accounts.models import Student
 from core.models import Term
 from course.models import Course
 from school.models import GradeWeightConfig
+from school.fields import FlexibleChoiceCharField
 
 # Ghana Education Service Grading Scale (1-9)
 GRADE_1 = "1"
@@ -366,7 +367,7 @@ class Result(models.Model):
     )
     term = models.CharField(max_length=100, choices=settings.TERM_CHOICES)
     session = models.CharField(max_length=100, blank=True, null=True)
-    level = models.CharField(max_length=25, choices=settings.LEVEL_CHOICES, null=True)
+    level = FlexibleChoiceCharField(max_length=25, choices=settings.LEVEL_CHOICES, null=True)
 
     # Teacher comments
     class_teacher_comment = models.TextField(blank=True)
@@ -489,10 +490,10 @@ class PromotionDecision(models.Model):
         blank=True,
     )
     session = models.CharField(max_length=100)
-    level = models.CharField(
+    level = FlexibleChoiceCharField(
         max_length=25, choices=settings.LEVEL_CHOICES, null=True
     )
-    next_level = models.CharField(
+    next_level = FlexibleChoiceCharField(
         max_length=25, choices=settings.LEVEL_CHOICES, null=True, blank=True
     )
 

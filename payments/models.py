@@ -5,6 +5,7 @@ from decimal import Decimal
 
 from accounts.models import Student
 from core.models import Term
+from school.fields import FlexibleChoiceCharField
 
 
 class Invoice(models.Model):
@@ -18,7 +19,7 @@ class Invoice(models.Model):
 
 class FeeStructure(models.Model):
     """Fee structure by grade level and term"""
-    grade_level = models.CharField(max_length=20, choices=settings.LEVEL_CHOICES)
+    grade_level = FlexibleChoiceCharField(max_length=20, choices=settings.LEVEL_CHOICES)
     term = models.CharField(max_length=20, choices=settings.TERM_CHOICES)
     year = models.CharField(max_length=4, help_text="Academic year (e.g., 2024)", default="2024")
     

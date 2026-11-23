@@ -31,12 +31,21 @@
             <div class="row">
                 <div class="col-md-6">
                     <h5 class="section-title">{% trans 'Basic Information' %}</h5>
+
+                    <div class="alert alert-info small">
+                        <i class="fas fa-lightbulb me-1"></i>
+                        {% trans 'Tip: choose a Division and leave Class blank to create one fee for every class in that division. Every student in those classes will be assigned the fee.' %}
+                    </div>
+
                     {% for field in form %}
                     <div class="form-group mb-3">
                         <label for="{{ field.id_for_label }}" class="form-label">
                             {{ field.label }}{% if field.field.required %} <span style="color: #d93025;">*</span>{% endif %}
                         </label>
                         {{ field }}
+                        {% if field.help_text %}
+                        <div class="form-text">{{ field.help_text }}</div>
+                        {% endif %}
                         {% if field.errors %}
                         <div class="text-danger small">{{ field.errors }}</div>
                         {% endif %}
@@ -119,8 +128,54 @@
     </div>
 </div>
 
+{{ division_level_map|json_script:"division-level-map" }}
+
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        const divisionSelect = document.getElementById('id_division');
+        const levelSelect = document.getElementById('id_level');
+        const levelMapNode = document.getElementById('division-level-map');
+
+        if (divisionSelect && levelSelect && levelMapNode) {
+            const levelMap = JSON.parse(levelMapNode.textContent);
+            const allClassesLabel = levelSelect.options.length
+                ? levelSelect.options[0].text
+                : 'All classes in the selected division';
+            const allLevelOptions = Array.from(levelSelect.options).slice(1).map(function(option) {
+                return { value: option.value, text: option.text };
+            });
+
+            function syncLevelOptions() {
+                const previous = levelSelect.value;
+                const division = divisionSelect.value;
+                const choices = division
+                    ? (levelMap[division] || []).map(function(pair) {
+                        return { value: pair[0], text: pair[1] };
+                    })
+                    : allLevelOptions;
+
+                levelSelect.innerHTML = '';
+                const blank = document.createElement('option');
+                blank.value = '';
+                blank.textContent = allClassesLabel;
+                levelSelect.appendChild(blank);
+
+                choices.forEach(function(choice) {
+                    const option = document.createElement('option');
+                    option.value = choice.value;
+                    option.textContent = choice.text;
+                    levelSelect.appendChild(option);
+                });
+
+                levelSelect.value = choices.some(function(choice) {
+                    return choice.value === previous;
+                }) ? previous : '';
+            }
+
+            divisionSelect.addEventListener('change', syncLevelOptions);
+            syncLevelOptions();
+        }
+
         const container = document.getElementById('fee-items-container');
         const addButton = document.getElementById('add-item');
         const totalDisplay = document.getElementById('total-display');

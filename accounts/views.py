@@ -52,8 +52,10 @@ from accounts.models import (
 from accounts.utils import generate_student_credentials, get_division_for_level
 from school.division_utils import (
     get_division_choices,
+    get_division_labels,
     get_level_choices,
     get_levels_for_division,
+    is_known_division,
 )
 from core.models import Semester
 from course.models import Course, CourseAllocation, Program
@@ -642,7 +644,7 @@ def edit_staff(request, pk):
                 school=request.school,
                 division=division,
                 is_academic_block=True,
-                defaults={"title": dict(settings.DIVISION_CHOICES).get(division)},
+                defaults={"title": get_division_labels(request.school).get(division)},
             )
             lecturer.division = division
             lecturer.department = department
@@ -830,7 +832,7 @@ def promote_non_teaching_staff(request, pk):
     form = StaffPromotionForm(request.POST or None, school=request.school)
     if request.method == "POST" and form.is_valid():
         division = form.cleaned_data["division"]
-        department_title = dict(settings.DIVISION_CHOICES).get(division)
+        department_title = get_division_labels(request.school).get(division)
         department, _ = Program.objects.get_or_create(
             school=request.school, division=division, is_academic_block=True,
             defaults={"title": department_title},
@@ -1072,9 +1074,11 @@ def import_staff(request):
                                 errors.append(f"Row {row_number}: {field_name}: {exc}")
                         division = cleaned_values.get("division")
                         level = cleaned_values.get("assigned_level")
-                        if division and division not in dict(settings.DIVISION_CHOICES):
+                        if division and not is_known_division(division, request.school):
                             errors.append(f"Row {row_number}: choose a valid division.")
-                        elif level and level not in settings.DIVISION_LEVEL_MAPPING.get(division, []):
+                        elif level and division and level not in get_levels_for_division(
+                            division, school=request.school
+                        ):
                             errors.append(f"Row {row_number}: assigned_level does not belong to division.")
                         elif cleaned_values["staff_type"] == "non-teaching" and not cleaned_values.get("non_teaching_position"):
                             errors.append(f"Row {row_number}: choose a non-teaching position.")
@@ -1106,7 +1110,7 @@ def import_staff(request):
                             else:
                                 user.is_class_teacher = False
                             if is_teacher:
-                                title = dict(settings.DIVISION_CHOICES)[values["division"]]
+                                title = get_division_labels(request.school)[values["division"]]
                                 user.department, _ = Program.objects.get_or_create(
                                     school=request.school, division=values["division"], is_academic_block=True,
                                     defaults={"title": title},
@@ -1976,7 +1980,7 @@ def class_detail_view(request, level_code):
     """Workspace for a specific class level - with division-based access control"""
     
     # Find level name from choices
-    level_name = dict(settings.LEVEL_CHOICES).get(level_code, level_code)
+    level_name = dict(get_level_choices(request.school)).get(level_code, level_code)
 
     # Access Control: Verify teacher can access this level based on division
     if not request.user.can_access_level(level_code):
@@ -2148,8 +2152,10 @@ def _next_sub_class_names(existing_names, count, scheme):
     return names
 
 
-def _validated_level_code(level_code):
-    return level_code if level_code in dict(settings.LEVEL_CHOICES) else None
+def _validated_level_code(level_code, school=None):
+    """Validate a level against this school's configured classes."""
+    codes = {code for code, _ in get_level_choices(school)}
+    return level_code if level_code in codes else None
 
 
 def _sub_class_manager_redirect(level_code):
@@ -2164,7 +2170,7 @@ def _sub_class_manager_redirect(level_code):
 @require_POST
 def sub_class_create(request, level_code):
     """Create one sub-class (arm) for a class level."""
-    level_code = _validated_level_code(level_code)
+    level_code = _validated_level_code(level_code, school=request.school)
     if not level_code:
         messages.error(request, "Invalid class level.")
         return redirect("class_list")
@@ -2193,7 +2199,7 @@ def sub_class_create(request, level_code):
 @require_POST
 def sub_class_bulk_create(request, level_code):
     """Create several sub-classes for a class level in one request."""
-    level_code = _validated_level_code(level_code)
+    level_code = _validated_level_code(level_code, school=request.school)
     if not level_code:
         messages.error(request, "Invalid class level.")
         return redirect("class_list")

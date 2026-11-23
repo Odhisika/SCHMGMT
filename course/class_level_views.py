@@ -2,6 +2,11 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from accounts.decorators import lecturer_required
+from school.division_utils import (
+    get_division_for_level,
+    get_division_labels,
+    get_level_choices,
+)
 
 
 @login_required
@@ -16,29 +21,12 @@ def class_level_detail(request, level_code):
     from accounts.models import User
     from core.models import Term
     
-    # Get the display name for this level
-    level_name = None
-    division = None
-    for code, name in settings.LEVEL_CHOICES:
-        if code == level_code:
-            level_name = name
-            break
-    
-    # Determine division from level code
-    if level_code in [settings.NURSERY_1, settings.NURSERY_2, settings.KG_1, settings.KG_2]:
-        division = settings.DIVISION_NURSERY
-        division_name = "Nursery/Pre-School"
-    elif level_code in [settings.PRIMARY_1, settings.PRIMARY_2, settings.PRIMARY_3, 
-                         settings.PRIMARY_4, settings.PRIMARY_5, settings.PRIMARY_6]:
-        division = settings.DIVISION_PRIMARY
-        division_name = "Primary School"
-    elif level_code in [settings.JHS_1, settings.JHS_2, settings.JHS_3]:
-        division = settings.DIVISION_JHS
-        division_name = "Junior High School"
-    else:
-        division = None
-        division_name = "Other"
-    
+    # Resolve the level and its division from this school's configuration.
+    level_labels = dict(get_level_choices(request.school))
+    level_name = level_labels.get(level_code)
+    division = get_division_for_level(level_code, school=request.school)
+    division_name = get_division_labels(request.school).get(division, "General")
+
     if not level_name:
         messages.error(request, "Invalid class level.")
         return redirect("programs")
@@ -104,31 +92,21 @@ def add_subject_to_level(request, level_code):
     from django.conf import settings
     from course.forms import CourseAddForm
     
-    # Get level name
-    level_name = None
-    for code, name in settings.LEVEL_CHOICES:
-        if code == level_code:
-            level_name = name
-            break
-    
+    # Get level name from this school's configured classes.
+    level_name = dict(get_level_choices(request.school)).get(level_code)
+
     if not level_name:
         messages.error(request, "Invalid class level.")
         return redirect("programs")
     
     if request.method == "POST":
-        form = CourseAddForm(request.POST)
+        form = CourseAddForm(request.POST, school=request.school)
         if form.is_valid():
-            # Get or create the appropriate Program for this level's division
-            # We assume there is a Program for each division (Nursery, Primary, JHS)
-            program_division = None
-            if level_code in [settings.NURSERY_1, settings.NURSERY_2, settings.KG_1, settings.KG_2]:
-                program_division = settings.DIVISION_NURSERY
-            elif level_code in [settings.PRIMARY_1, settings.PRIMARY_2, settings.PRIMARY_3, 
-                                 settings.PRIMARY_4, settings.PRIMARY_5, settings.PRIMARY_6]:
-                program_division = settings.DIVISION_PRIMARY
-            elif level_code in [settings.JHS_1, settings.JHS_2, settings.JHS_3]:
-                program_division = settings.DIVISION_JHS
-            
+            # Get or create the academic block for this level's division.
+            program_division = get_division_for_level(
+                level_code, school=request.school
+            )
+
             from course.models import Program, Course
             from core.models import Term
             
@@ -143,7 +121,7 @@ def add_subject_to_level(request, level_code):
             if not program:
                 # Fallback: Create a program for this division if it doesn't exist
                 # This ensures the system is robust
-                division_title = dict(settings.DIVISION_CHOICES).get(program_division, "General") 
+                division_title = get_division_labels(request.school).get(program_division, "General")
                 program, created = Program.objects.get_or_create(
                     school=request.school,
                     division=program_division,
@@ -157,11 +135,19 @@ def add_subject_to_level(request, level_code):
             
             # Helper to get short level code
             def get_level_suffix(level):
+                import re
+
                 if "Nursery" in level: return level.replace("Nursery ", "N")
                 if "KG" in level: return level.replace(" ", "")
                 if "Primary" in level: return level.replace("Primary ", "P")
                 if "JHS" in level: return level.replace("JHS ", "J")
-                return level[:3]
+                # Custom divisions (for example "Creche 1") use their final
+                # token as a short, unique suffix.
+                tokens = re.findall(r"[A-Za-z0-9]+", level)
+                if tokens:
+                    last = tokens[-1]
+                    return (last if last.isdigit() else "".join(tokens)[:6]).upper()
+                return "GEN"
 
             # Get user provided code and strip any existing suffix if they added one by mistake
             base_code = form.cleaned_data.get('code').upper().strip()
@@ -194,16 +180,11 @@ def add_subject_to_level(request, level_code):
                     if target_level == level_code:
                         continue # Skip self if selected
                         
-                    # Determine program for target level
-                    target_division = None
-                    if target_level in [settings.NURSERY_1, settings.NURSERY_2, settings.KG_1, settings.KG_2]:
-                        target_division = settings.DIVISION_NURSERY
-                    elif target_level in [settings.PRIMARY_1, settings.PRIMARY_2, settings.PRIMARY_3, 
-                                           settings.PRIMARY_4, settings.PRIMARY_5, settings.PRIMARY_6]:
-                        target_division = settings.DIVISION_PRIMARY
-                    elif target_level in [settings.JHS_1, settings.JHS_2, settings.JHS_3]:
-                        target_division = settings.DIVISION_JHS
-                    
+                    # Determine program for target level (school-aware).
+                    target_division = get_division_for_level(
+                        target_level, school=request.school
+                    )
+
                     # Find separate program for target level
                     target_program = Program.objects.filter(
                         school=request.school,
@@ -213,7 +194,7 @@ def add_subject_to_level(request, level_code):
                     
                     if not target_program:
                          # Fallback for target program
-                        div_title = dict(settings.DIVISION_CHOICES).get(target_division, "General") 
+                        div_title = get_division_labels(request.school).get(target_division, "General")
                         target_program, _ = Program.objects.get_or_create(
                             school=request.school,
                             division=target_division,
@@ -258,7 +239,7 @@ def add_subject_to_level(request, level_code):
         messages.error(request, "Correct the error(s) below.")
     else:
         # Pre-fill form with level
-        form = CourseAddForm(initial={"level": level_code})
+        form = CourseAddForm(initial={"level": level_code}, school=request.school)
     
     return render(
         request,

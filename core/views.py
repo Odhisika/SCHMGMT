@@ -264,7 +264,7 @@ def dashboard_view(request):
 @login_required
 def post_add(request):
     if request.method == "POST":
-        form = NewsAndEventsForm(request.POST)
+        form = NewsAndEventsForm(request.POST, school=request.school)
         title = form.cleaned_data.get("title", "Post") if form.is_valid() else None
         if form.is_valid():
             instance = form.save(commit=False)
@@ -302,7 +302,7 @@ def post_add(request):
             return redirect("home")
         messages.error(request, "Please correct the error(s) below.")
     else:
-        form = NewsAndEventsForm()
+        form = NewsAndEventsForm(school=request.school)
     return render(request, "core/post_add.html", {"title": "Add Post", "form": form})
 
 
@@ -311,7 +311,7 @@ def post_add(request):
 def edit_post(request, pk):
     instance = get_object_or_404(NewsAndEvents, pk=pk)
     if request.method == "POST":
-        form = NewsAndEventsForm(request.POST, instance=instance)
+        form = NewsAndEventsForm(request.POST, instance=instance, school=request.school)
         title = form.cleaned_data.get("title", "Post") if form.is_valid() else None
         if form.is_valid():
             form.save()
@@ -319,7 +319,7 @@ def edit_post(request, pk):
             return redirect("home")
         messages.error(request, "Please correct the error(s) below.")
     else:
-        form = NewsAndEventsForm(instance=instance)
+        form = NewsAndEventsForm(instance=instance, school=request.school)
     return render(request, "core/post_add.html", {"title": "Edit Post", "form": form})
 
 
@@ -558,8 +558,10 @@ def get_users_for_targeting(request):
     
     # 1. Division Logic
     if division and division != 'ALL':
-        # Get levels for this division
-        levels = settings.DIVISION_LEVEL_MAPPING.get(division, [])
+        from school.division_utils import get_levels_for_division
+
+        # Get levels for this division (including school-defined divisions).
+        levels = get_levels_for_division(division, school=request.school)
         
         # Teachers in this division
         teacher_q = Q(division=division) & (Q(is_teacher=True) | Q(is_lecturer=True))

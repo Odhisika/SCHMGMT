@@ -30,6 +30,20 @@ from course.models import (
     UploadVideo,
 )
 from result.models import TakenCourse
+from school.division_utils import (
+    get_default_division,
+    get_division_choices,
+    get_level_choices,
+    get_levels_for_division,
+    is_known_division,
+)
+
+
+_DIVISION_ICONS = {
+    settings.DIVISION_NURSERY: "fa-baby",
+    settings.DIVISION_PRIMARY: "fa-book",
+    settings.DIVISION_JHS: "fa-graduation-cap",
+}
 
 
 # ########################################################
@@ -56,72 +70,43 @@ class ProgramFilterView(FilterView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["title"] = "Academic Structure"
-        
-        # Import settings for level constants
-        from django.conf import settings
-        
-        # Determine visible divisions based on user role
+
+        school = self.request.school
         user = self.request.user
         is_admin = user.is_superuser or user.is_school_admin
-        user_division = user.division if hasattr(user, 'division') else None
+        user_division = getattr(user, "division", None)
 
-        # Helper to check visibility
         def is_visible(division_name):
             return is_admin or (user_division == division_name)
 
-        # Get class levels grouped by division
-        # Only populate if visible to the user
-        
-        context['nursery_levels'] = []
-        if is_visible(settings.DIVISION_NURSERY):
-            context['nursery_levels'] = [
-                (settings.NURSERY_1, "Nursery 1"),
-                (settings.NURSERY_2, "Nursery 2"),
-                (settings.KG_1, "KG 1"),
-                (settings.KG_2, "KG 2"),
-            ]
-        
-        context['primary_levels'] = []
-        if is_visible(settings.DIVISION_PRIMARY):
-            context['primary_levels'] = [
-                (settings.PRIMARY_1, "Primary 1"),
-                (settings.PRIMARY_2, "Primary 2"),
-                (settings.PRIMARY_3, "Primary 3"),
-                (settings.PRIMARY_4, "Primary 4"),
-                (settings.PRIMARY_5, "Primary 5"),
-                (settings.PRIMARY_6, "Primary 6"),
-            ]
-        
-        context['jhs_levels'] = []
-        if is_visible(settings.DIVISION_JHS):
-            context['jhs_levels'] = [
-                (settings.JHS_1, "JHS 1"),
-                (settings.JHS_2, "JHS 2"),
-                (settings.JHS_3, "JHS 3"),
-            ]
-            
-        # Determine active tab
-        active_tab = '' 
-        if context['nursery_levels']:
-            active_tab = 'nursery'
-        elif context['primary_levels']:
-            active_tab = 'primary'
-        elif context['jhs_levels']:
-            active_tab = 'jhs'
-            
-        context['active_tab'] = active_tab
-        
-        # Count subjects for each level
-        from course.models import Course
+        level_labels = dict(get_level_choices(school))
         level_subject_counts = {}
-        all_visible_levels = context['nursery_levels'] + context['primary_levels'] + context['jhs_levels']
-        
-        for level_code, level_name in all_visible_levels:
-            count = Course.objects.filter(level=level_code, school=self.request.school).count()
-            level_subject_counts[level_code] = count
-        
-        context['level_subject_counts'] = level_subject_counts
-        
+
+        # Build one tab per division (built-in or custom) in display order.
+        division_tabs = []
+        for index, (name, label) in enumerate(get_division_choices(school)):
+            if not is_visible(name):
+                continue
+            levels = [
+                (code, level_labels.get(code, code))
+                for code in get_levels_for_division(name, school=school)
+            ]
+            for code, _ in levels:
+                level_subject_counts[code] = Course.objects.filter(
+                    level=code, school=school
+                ).count()
+            division_tabs.append({
+                "key": f"division-{index}",
+                "name": name,
+                "label": label,
+                "levels": levels,
+                "icon": _DIVISION_ICONS.get(name, "fa-layer-group"),
+            })
+
+        context["division_tabs"] = division_tabs
+        context["active_tab"] = division_tabs[0]["key"] if division_tabs else ""
+        context["level_subject_counts"] = level_subject_counts
+
         return context
 
 
@@ -129,7 +114,7 @@ class ProgramFilterView(FilterView):
 @lecturer_required
 def program_add(request):
     if request.method == "POST":
-        form = ProgramForm(request.POST)
+        form = ProgramForm(request.POST, school=request.school)
         if form.is_valid():
             program = form.save(commit=False)
             program.school = request.school
@@ -138,7 +123,7 @@ def program_add(request):
             return redirect("programs")
         messages.error(request, "Correct the error(s) below.")
     else:
-        form = ProgramForm()
+        form = ProgramForm(school=request.school)
     return render(
         request, "course/program_add.html", {"title": "Add Program", "form": form}
     )
@@ -167,14 +152,14 @@ def program_detail(request, pk):
 def program_edit(request, pk):
     program = get_object_or_404(Program, pk=pk, school=request.school)
     if request.method == "POST":
-        form = ProgramForm(request.POST, instance=program)
+        form = ProgramForm(request.POST, instance=program, school=request.school)
         if form.is_valid():
             program = form.save()
             messages.success(request, f"{program.title} program has been updated.")
             return redirect("programs")
         messages.error(request, "Correct the error(s) below.")
     else:
-        form = ProgramForm(instance=program)
+        form = ProgramForm(instance=program, school=request.school)
     return render(
         request, "course/program_add.html", {"title": "Edit Program", "form": form}
     )
@@ -220,7 +205,7 @@ def course_single(request, slug):
 def course_add(request, pk):
     program = get_object_or_404(Program, pk=pk, school=request.school)
     if request.method == "POST":
-        form = CourseAddForm(request.POST)
+        form = CourseAddForm(request.POST, school=request.school)
         if form.is_valid():
             course = form.save(commit=False)
             course.school = request.school
@@ -231,7 +216,7 @@ def course_add(request, pk):
             return redirect("program_detail", pk=program.pk)
         messages.error(request, "Correct the error(s) below.")
     else:
-        form = CourseAddForm(initial={"program": program})
+        form = CourseAddForm(initial={"program": program}, school=request.school)
     return render(
         request,
         "course/course_add.html",
@@ -244,7 +229,7 @@ def course_add(request, pk):
 def course_edit(request, slug):
     course = get_object_or_404(Course, slug=slug, school=request.school)
     if request.method == "POST":
-        form = CourseAddForm(request.POST, instance=course)
+        form = CourseAddForm(request.POST, instance=course, school=request.school)
         if form.is_valid():
             course = form.save()
             messages.success(
@@ -253,7 +238,7 @@ def course_edit(request, slug):
             return redirect("program_detail", pk=course.program.pk)
         messages.error(request, "Correct the error(s) below.")
     else:
-        form = CourseAddForm(instance=course)
+        form = CourseAddForm(instance=course, school=request.school)
     return render(
         request, "course/course_add.html", {"title": "Edit Course", "form": form}
     )
@@ -311,7 +296,7 @@ class CourseAllocationFormView(CreateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["title"] = "Assign Course"
-        context["division_choices"] = settings.DIVISION_CHOICES
+        context["division_choices"] = get_division_choices(self.request.school)
         context["current_division"] = self.request.GET.get('division', '')
         return context
 
@@ -321,44 +306,44 @@ class CourseAllocationFilterView(FilterView):
     filterset_class = CourseAllocationFilter
     template_name = "course/course_allocation_view.html"
 
+    def _current_division(self):
+        default_division = get_default_division(self.request.school)
+        division = self.request.GET.get('division', default_division)
+        if not is_known_division(division, self.request.school):
+            division = default_division
+        return division
+
     def get_queryset(self):
         qs = CourseAllocation.objects.filter(teacher__school=self.request.school)
-        
-        # Division filtering
-        current_division = self.request.GET.get('division', settings.DIVISION_NURSERY)
-        division_levels = settings.DIVISION_LEVEL_MAPPING.get(current_division, [])
-        
-        # Filter by teacher division (primary)
-        qs = qs.filter(teacher__division=current_division)
-        
+
+        # Filter by teacher division (includes custom school divisions).
+        qs = qs.filter(teacher__division=self._current_division())
+
         # Further filter by level if selected
         selected_level = self.request.GET.get('level')
         if selected_level:
             qs = qs.filter(courses__level=selected_level).distinct()
-            
+
         return qs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        current_division = self.request.GET.get('division', settings.DIVISION_NURSERY)
+        school = self.request.school
+        current_division = self._current_division()
         selected_level = self.request.GET.get('level')
-        
-        division_levels = settings.DIVISION_LEVEL_MAPPING.get(current_division, [])
-        division_level_choices = []
-        for code, name in settings.LEVEL_CHOICES:
-            if code in division_levels:
-                division_level_choices.append((code, name))
-                
+
+        division_levels = get_levels_for_division(current_division, school=school)
+        level_labels = dict(get_level_choices(school))
+        division_level_choices = [
+            (code, level_labels.get(code, code)) for code in division_levels
+        ]
+
         context.update({
             "title": _("Course Allocations"),
             "current_division": current_division,
             "selected_level": selected_level,
             "division_levels": division_level_choices,
-            "divisions": [
-                (settings.DIVISION_NURSERY, _("Nursery/Pre-School")),
-                (settings.DIVISION_PRIMARY, _("Primary School")),
-                (settings.DIVISION_JHS, _("Junior High School")),
-            ]
+            "divisions": get_division_choices(school),
         })
         return context
 
