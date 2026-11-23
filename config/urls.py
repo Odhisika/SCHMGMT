@@ -6,6 +6,8 @@ from django.views import defaults as default_views
 from django.conf.urls.i18n import i18n_patterns
 from django.views.i18n import JavaScriptCatalog
 
+from config.asset_urls import media_urlpatterns
+
 admin.site.site_header = "SkyLearn Admin"
 
 urlpatterns = [
@@ -39,7 +41,9 @@ urlpatterns += i18n_patterns(
 
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+# Uploaded files must keep working when DEBUG is False.
+urlpatterns += media_urlpatterns()
 
 if settings.DEBUG:
     # This allows the error pages to be debugged during development, just visit

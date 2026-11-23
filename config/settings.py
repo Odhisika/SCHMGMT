@@ -334,11 +334,22 @@ LOGGING = {
     "root": {"level": "INFO", "handlers": ["console"]},
 }
 
-# WhiteNoise configuration
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+# WhiteNoise configuration.
+# Use the compressed (but NOT manifest/hashed) storage so `{% static %}` always
+# produces the same plain URLs. ManifestStaticFilesStorage makes URL generation
+# depend on `collectstatic` having produced an up-to-date staticfiles.json;
+# if it is missing or stale, pages fail when DEBUG is False. With DEBUG=True
+# Django silently bypassed the manifest, which hid the problem.
+STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage"
 
-# The manifest storage needs ``collectstatic`` to have run. Use the plain
-# storage for the automated test-suite so views can be rendered without it.
+# Let WhiteNoise find static files in the source directories as well. This way
+# CSS/JS/images keep working with DEBUG=False even on deployments where
+# `collectstatic` was never run (or where the web server aliases /static/ to
+# the source `static/` directory). Collected files in STATIC_ROOT are still
+# served first when available.
+WHITENOISE_USE_FINDERS = True
+
+# Plain storage for the test-suite is kept for parity with the storage above.
 if "test" in sys.argv:
     STATICFILES_STORAGE = "django.contrib.staticfiles.storage.StaticFilesStorage"
 

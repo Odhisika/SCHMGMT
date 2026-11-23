@@ -6,6 +6,8 @@ from django.conf.urls.i18n import i18n_patterns
 
 from django.views.i18n import JavaScriptCatalog
 
+from config.asset_urls import media_urlpatterns
+
 # Super Admin / Master Console URLs
 # This file is ONLY loaded when accessing via the Admin Domain (e.g. admin.localhost)
 
@@ -35,4 +37,6 @@ urlpatterns = [
 
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+# Uploaded files must keep working when DEBUG is False.
+urlpatterns += media_urlpatterns()
